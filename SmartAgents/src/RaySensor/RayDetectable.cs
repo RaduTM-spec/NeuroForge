@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using UnityEditor;
 using UnityEngine;
 
-namespace DRLAgents
+namespace SmartAgents
 {
     [AddComponentMenu("Smart Agents/Ray Detectable")]
     public class RayDetectable : MonoBehaviour

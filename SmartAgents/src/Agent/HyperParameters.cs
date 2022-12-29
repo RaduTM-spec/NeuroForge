@@ -6,10 +6,11 @@ using UnityEngine;
 
 public class HyperParameters : MonoBehaviour
 {
+    public HiddenLayers networkHiddenLayers = HiddenLayers.OneLarge;
+    [Space]
     [Range(0f, 1f)] public float learnRate = 0.1f;
     [Range(0f, 1f)] public float momentum = 0.9f;
     [Range(0f, 1f)] public float regularization = 0.01f;
-
     public ActivationType activationType = ActivationType.Tanh;//output activation is SoftMax for discrete actions and Tanh for continuous actions
     public LossType lossType = LossType.MeanSquare;//Cross Entropy for discrete actions
 

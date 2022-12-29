@@ -16,15 +16,21 @@ namespace SmartAgents {
         [SerializeField] public WeightLayer[] weightLayers;
         [SerializeField] public BiasLayer[] biasLayers;
 
+        [SerializeField] public ActivationType activationType = ActivationType.Tanh;
+        [SerializeField] public ActivationType outputActivationType = ActivationType.Tanh;
+        [SerializeField] public LossType lossType = LossType.MeanSquare;
+
         private WeightLayer[] weightGradients = null;
-        private BiasLayer[] biasGradients = null;
-        private WeightLayer[] weightsMomentum = null;
-        private BiasLayer[] biasesMomentum = null;
+        private WeightLayer[] weightMomentum = null;
+        private BiasLayer[] biasGradients = null;    
+        private BiasLayer[] biasMomentum = null;
 
-        LossType lossType;
+        
+        
 
+        List<Sample> samples = new List<Sample>();
 
-        public ArtificialNeuralNetwork(int inputs, int outputs, HiddenLayers size)
+        public ArtificialNeuralNetwork(int inputs, int outputs, HiddenLayers size, ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction)
         {
             //set format
             switch(size)
@@ -50,14 +56,14 @@ namespace SmartAgents {
                     format = new int[4];
                     format[0] = inputs;
                     format[1] = (inputs + outputs)/2;
-                    format[2] = (outputs + outputs)/2;
+                    format[2] = (inputs + outputs)/2;
                     format[3] = outputs;
                     break;
                 case HiddenLayers.TwoLarge:
                     format = new int[4];
                     format[0] = inputs;
                     format[1] = inputs + outputs;
-                    format[2] = outputs + outputs;
+                    format[2] = inputs + outputs;
                     format[3] = outputs;
                     break;
                 
@@ -90,14 +96,14 @@ namespace SmartAgents {
         {
             string name = "Network#" + UnityEngine.Random.Range(1, 1000);
             Debug.Log(name + " was created!");
-            AssetDatabase.CreateAsset(this, "Assets/Neural_Networks/" + name + ".asset");
-            EditorGUIUtility.SetIconForObject(this, AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SmartAgents/Icons/network_icon.png"));
+            AssetDatabase.CreateAsset(this, "Assets/" + name + ".asset");
+            EditorGUIUtility.SetIconForObject(this, AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SmartAgents/doc/network_icon.png"));
         }
 
         //-------------------------------------------------------------------------------------------------------//
         public double[] ForwardPropagation(double[] inputs)
         {
-            neuronLayers[0].SetValues(inputs);//biases are ignored
+            neuronLayers[0].SetOutValues(inputs);
             for (int l = 1; l < neuronLayers.Length; l++)
             {
                 for (int n = 0; n < neuronLayers[l].neurons.Length; n++)
@@ -105,49 +111,123 @@ namespace SmartAgents {
                     double sumValue = biasLayers[l].biases[n];
                     for (int prevn = 0; prevn < neuronLayers[l-1].neurons.Length; prevn++)
                     {
-                        sumValue += neuronLayers[l - 1].neurons[prevn].value * weightLayers[l - 1].weights[prevn][n];
+                        sumValue += neuronLayers[l - 1].neurons[prevn].OutValue * weightLayers[l - 1].weights[prevn][n];
                     }
-                    sumValue = Functions.Activation.Tanh(sumValue);
-                    neuronLayers[l].neurons[n].value = sumValue;
+                    neuronLayers[l].neurons[n].InValue = sumValue;
+                }
+
+                //Activate neuron layer
+                if(l < neuronLayers.Length - 1)
+                {
+                    Functions.Activation.ActivateLayer(neuronLayers[l], activationType);
+                }
+                //Activate output neuron layer
+                else
+                {
+                    Functions.Activation.ActivateLayer(neuronLayers[l], outputActivationType);
                 }
             }
-            return neuronLayers[neuronLayers.Length - 1].GetValues();
+
+
+            return neuronLayers[neuronLayers.Length - 1].GetOutValues();
         }
         public void BackPropagation(double[] inputs, double[] labels, bool applyGradients, float learningRate = 0.1f , float momentum = 0.9f, float regularization = 0.01f)
         {
-            if (weightGradients== null)
+            if (weightGradients == null)
                 InitGradients();
 
-            //Update Gradients
+            double[] predictions = ForwardPropagation(inputs);
+            double error = Functions.Cost.CalculateOutputLayerCost(neuronLayers[neuronLayers.Length-1], labels, outputActivationType, lossType);
 
-            if(applyGradients)
+            for (int i = neuronLayers.Length - 2; i > 0; i--)
             {
-                //Apply Gradients
+                Functions.Cost.CalculateLayerCost(neuronLayers[i], weightLayers[i - 1], neuronLayers[i + 1], activationType);
+                UpdateGradientsOf(weightLayers[i - 1], biasLayers[i], neuronLayers[i-1], neuronLayers[i]);
             }
-            void InitGradients()
+            if (applyGradients) {; }
+                //
+            //implemented collected modified learnRate in order to apply the gradients
+            
+        }
+
+        //--------------------------------------------------------------------------------------------------------//
+        private void UpdateGradientsOf(WeightLayer weightGradient, BiasLayer biasGradient, NeuronLayer previousNeuronLayer, NeuronLayer nextNeuronLayer)
+        {
+            lock(weightGradient)
             {
-                biasGradients = new BiasLayer[format.Length];
-                biasesMomentum = new BiasLayer[format.Length];
-                weightGradients = new WeightLayer[format.Length - 1];
-                weightsMomentum = new WeightLayer[format.Length - 1];
-
-                for (int i = 0; i < neuronLayers.Length; i++)
+                for (int i = 0; i < previousNeuronLayer.neurons.Length; i++)
                 {
-                    biasGradients[i] = new BiasLayer(format[i]);
-                    biasesMomentum[i] = new BiasLayer(format[i]);
-
+                    for (int j = 0; j < nextNeuronLayer.neurons.Length ; j++)
+                    {
+                        weightGradient.weights[i][j] += previousNeuronLayer.neurons[i].OutValue * nextNeuronLayer.neurons[i].CostValue;
+                    }
                 }
-                for (int i = 0; i < neuronLayers.Length - 1; i++)
+            }
+            lock(biasGradient)
+            {
+                for (int i = 0; i < previousNeuronLayer.neurons.Length; i++)
                 {
-                    weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1]);
-                    weightsMomentum[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1]);
+                    biasGradient.biases[i] += 1 * nextNeuronLayer.neurons[i].CostValue;
                 }
+            }
+        }
+       
+        private void ApplyGradients(float modifiedLearnRate, float momentum, float regularization)
+        {
+            double weightDecay = 1 - regularization * modifiedLearnRate;
+            for (int i = 0; i < weightLayers.Length; i++)
+            {
+                for (int j = 0; j < weightLayers[i].weights.Length; j++)
+                {
+                    for (int k = 0; k < weightLayers[i].weights[j].Length; k++)
+                    {
+                        weightMomentum[i].weights[j][k] = weightMomentum[i].weights[j][k] * momentum - weightGradients[i].weights[j][k];
+                        weightLayers[i].weights[j][k] = weightLayers[i].weights[j][k] * weightDecay + weightMomentum[i].weights[j][k];
+                        weightGradients[i].weights[j][k] = 0;
+                    }
+                }
+            }
+            for (int i = 0; i < biasLayers.Length; i++)
+            {
+                for (int j = 0; j < biasLayers[i].biases.Length; j++)
+                {
+                    biasMomentum[i].biases[j] = biasMomentum[i].biases[j] * momentum - biasGradients[i].biases[j];
+                    biasLayers[i].biases[j] += biasMomentum[i].biases[j];
+                    biasGradients[i].biases[j] = 0;
+                }
+            }
+        }
+        void InitGradients()
+        {
+            biasGradients = new BiasLayer[format.Length];
+            biasMomentum = new BiasLayer[format.Length];
+            weightGradients = new WeightLayer[format.Length - 1];
+            weightMomentum = new WeightLayer[format.Length - 1];
+
+            for (int i = 0; i < neuronLayers.Length; i++)
+            {
+                biasGradients[i] = new BiasLayer(format[i],true);
+                biasMomentum[i] = new BiasLayer(format[i],true);
 
             }
+            for (int i = 0; i < neuronLayers.Length - 1; i++)
+            {
+                weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], true);
+                weightMomentum[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], true);
+            }
+
         }
 
         //--------------------------------------------------------------------------------------------------------//
 
+        public int GetInputsNumber()
+        {
+            return format[0];
+        }
+        public int GetOutputsNumber()
+        {
+            return format[format.Length - 1];
+        }
         
     }
 

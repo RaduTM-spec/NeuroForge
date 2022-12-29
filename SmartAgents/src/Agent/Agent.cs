@@ -1,9 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using SmartAgents;
 using UnityEditor;
-using System.ComponentModel;
 
 namespace SmartAgents
 {
@@ -11,29 +9,129 @@ namespace SmartAgents
     public class Agent : MonoBehaviour
     {
         public BehaviorType behavior = BehaviorType.Passive;
-        public ArtificialNeuralNetwork Network;
+        [SerializeField] private ArtificialNeuralNetwork Network;
 
-        [Space(10)]
+        [Space]
+        [Min(1), SerializeField] private int SpaceSize = 2;
+        [Min(1), SerializeField] private int ActionSize = 2;
+        [SerializeField] private ActionType actionType = ActionType.Continuous;
+
+        [Space]
+        [SerializeField] private bool UseRaySensors = true;
         
-        public int SpaceSize = 2;
-        [Min(1)] public int ActionSize = 2;
-        public HiddenLayers HiddenSize = HiddenLayers.None;
-        public ActionType actionType = ActionType.Continuous;
 
-        HyperParameters hyperParamters;
-        private void Start()
+        private HyperParameters hyperParamters;
+        private List<RaySensor> raySensors = new List<RaySensor>();
+
+        private SensorBuffer sensorBuffer;
+        private ActionBuffer actionBuffer;
+
+        protected virtual void Awake()
         {
             hyperParamters = GetComponent<HyperParameters>();
             InitNetwork();
-
+            InitBuffers();
+            InitRaySensors(this.gameObject);  
         }
         void InitNetwork()
         {
             if (Network != null)
                 return;
 
-            Network = new ArtificialNeuralNetwork(SpaceSize, ActionSize, HiddenSize);
+            ActivationType activation = hyperParamters.activationType;
+            ActivationType outputActivation = hyperParamters.activationType;
+            LossType loss = hyperParamters.lossType;
+            
+            if (actionType == ActionType.Discrete)
+            {
+                outputActivation = ActivationType.SoftMax;
+                loss = LossType.CrossEntropy;
+                
+            }
+            else if (actionType == ActionType.Continuous)
+            {
+                outputActivation = ActivationType.Tanh;
+            }
+            
+            Network = new ArtificialNeuralNetwork(SpaceSize, ActionSize, hyperParamters.networkHiddenLayers, activation, outputActivation, loss);
             Network.Save();
+            
+        }
+        void InitBuffers()
+        {
+            sensorBuffer = new SensorBuffer(Network.GetInputsNumber());
+            actionBuffer = new ActionBuffer(Network.GetOutputsNumber());
+        }
+        void InitRaySensors(GameObject parent)
+        {
+            //adds all 
+            if (!UseRaySensors)
+                return;
+
+            raySensors.Add(GetComponent<RaySensor>());
+            foreach (Transform child in parent.transform)
+            {
+                InitRaySensors(child.gameObject);
+            }
+        }    
+
+        protected virtual void Update()
+        {
+            sensorBuffer.Clear();
+            sensorBuffer.Clear();
+            switch(behavior)
+            {
+                case BehaviorType.Active:
+                    ActiveAction();
+                    break;
+                case BehaviorType.Manual:
+                    ManualAction();
+                    break;
+                case BehaviorType.Learn:
+                    LearnAction();
+                    break;
+                case BehaviorType.Heuristic:
+                    HeuristicAction();
+                    break;
+                default:
+                    break;
+
+            }
+        }
+
+        void ActiveAction()
+        {
+            if(Network == null)
+            {
+                Debug.LogError("<color=red>Neural Network is missing. Agent cannot take any actions.</color>");
+                return;
+            }
+
+            if(UseRaySensors)
+            {
+                foreach (var raySensor in raySensors)
+                {
+                    sensorBuffer.AddObservation(raySensor);
+                }
+            }
+            
+            CollectObservations(sensorBuffer);
+            actionBuffer.actions = Network.ForwardPropagation(sensorBuffer.observations);
+            OnActionReceived(actionBuffer);
+
+        }
+        void ManualAction()
+        {
+            Heuristic(actionBuffer);
+            OnActionReceived(actionBuffer);
+        }
+        void LearnAction()
+        {
+
+        }
+        void HeuristicAction()
+        {
+
         }
 
         public virtual void CollectObservations(SensorBuffer sensorBuffer)

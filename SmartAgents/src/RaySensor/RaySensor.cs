@@ -3,7 +3,7 @@ using Unity.VisualScripting;
 using UnityEngine;
 using UnityEditor;
 
-namespace DRLAgents
+namespace SmartAgents
 {
     [AddComponentMenu("Smart Agents/Ray Sensor")]
     public class RaySensor : MonoBehaviour
