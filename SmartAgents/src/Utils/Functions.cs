@@ -188,7 +188,7 @@ namespace SmartAgents
         }
         public struct Cost
         {
-            public static double CalculateOutputLayerCost(NeuronLayer outNeurLayer, double[] expectedOuts, ActivationType outputActivation, LossType loss)
+            public static double CalculateOutputLayerCost(NeuronLayer outNeurLayer, double[] expectedOuts, ActivationType outputActivation, LossType loss, double advantageEstimate = 1)
             {
                 double cost = 0;
                 if(outputActivation != ActivationType.SoftMax)
@@ -198,16 +198,16 @@ namespace SmartAgents
                         switch(loss)
                         {
                             case LossType.MeanSquare:
-                                outNeurLayer.neurons[i].CostValue = MeanSquareDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * Derivative.DeriveValue(outNeurLayer.neurons[i].InValue, outputActivation);
+                                outNeurLayer.neurons[i].CostValue = MeanSquareDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * Derivative.DeriveValue(outNeurLayer.neurons[i].InValue, outputActivation) * advantageEstimate;
                                 cost += MeanSquare(outNeurLayer.neurons[i].OutValue, expectedOuts[i]);
                                 break;
                             case LossType.CrossEntropy:
-                                outNeurLayer.neurons[i].CostValue = CrossEntropyDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * Derivative.DeriveValue(outNeurLayer.neurons[i].InValue, outputActivation);
+                                outNeurLayer.neurons[i].CostValue = CrossEntropyDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * Derivative.DeriveValue(outNeurLayer.neurons[i].InValue, outputActivation) * advantageEstimate;
                                 double locCost = CrossEntropy(outNeurLayer.neurons[i].OutValue, expectedOuts[i]);
                                 cost += double.IsNaN(locCost) ? 0 : locCost;
                                 break;
                             case LossType.Absolute:
-                                outNeurLayer.neurons[i].CostValue = AbsoluteDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * Derivative.DeriveValue(outNeurLayer.neurons[i].InValue, outputActivation);
+                                outNeurLayer.neurons[i].CostValue = AbsoluteDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * Derivative.DeriveValue(outNeurLayer.neurons[i].InValue, outputActivation) * advantageEstimate;
                                 cost += Absolute(outNeurLayer.neurons[i].OutValue, expectedOuts[i]);
                                 break;
                             default:
@@ -229,16 +229,16 @@ namespace SmartAgents
                         switch (loss)
                         {
                             case LossType.MeanSquare:
-                                outNeurLayer.neurons[i].CostValue = MeanSquareDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * derivedInValuesBySoftMax[i];
+                                outNeurLayer.neurons[i].CostValue = MeanSquareDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * derivedInValuesBySoftMax[i] * advantageEstimate;
                                 cost += MeanSquare(outNeurLayer.neurons[i].OutValue, expectedOuts[i]);
                                 break;
                             case LossType.CrossEntropy:
-                                outNeurLayer.neurons[i].CostValue = CrossEntropyDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * derivedInValuesBySoftMax[i];
+                                outNeurLayer.neurons[i].CostValue = CrossEntropyDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * derivedInValuesBySoftMax[i] * advantageEstimate;
                                 double locCost = CrossEntropy(outNeurLayer.neurons[i].OutValue, expectedOuts[i]);
                                 cost += double.IsNaN(locCost) ? 0 : locCost;
                                 break;
                             case LossType.Absolute:
-                                outNeurLayer.neurons[i].CostValue = AbsoluteDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * derivedInValuesBySoftMax[i];
+                                outNeurLayer.neurons[i].CostValue = AbsoluteDerivative(outNeurLayer.neurons[i].OutValue, expectedOuts[i]) * derivedInValuesBySoftMax[i] * advantageEstimate;
                                 cost += Absolute(outNeurLayer.neurons[i].OutValue, expectedOuts[i]);
                                 break;
                             default:

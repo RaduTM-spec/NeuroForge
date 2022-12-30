@@ -5,6 +5,7 @@ using UnityEditor;
 using System;
 using System.Reflection.Emit;
 using System.Linq;
+using Unity.VisualScripting;
 
 namespace SmartAgents
 {
@@ -15,7 +16,7 @@ namespace SmartAgents
         public BehaviorType behavior = BehaviorType.Passive;
         [SerializeField] private ArtificialNeuralNetwork actorNetwork;
         [SerializeField] private ArtificialNeuralNetwork criticNetwork;
-        [SerializeField] private ExperienceRecord experienceRecord;
+        [SerializeField] private Memory memory;
 
         [Space,Min(1), SerializeField] private int SpaceSize = 2;
         [Min(1), SerializeField] private int ActionSize = 2;
@@ -25,32 +26,37 @@ namespace SmartAgents
         #endregion
 
         #region Private Fields
-        private HyperParameters hyperParamters;
+        private int Step = 0;
+        private double episodeCumulatedReward = 0;
+
+        private HyperParameters hyperParameters;
         private List<RaySensor> raySensors = new List<RaySensor>();
 
         private SensorBuffer sensorBuffer;
         private ActionBuffer actionBuffer;
         private double reward = 0;
 
-        private double totalReward = 0;
+        Sample lastFrameData = new Sample();
+        List<Transform> initialEnvironmentState = new List<Transform>();
         #endregion
 
         #region Setup
         protected virtual void Awake()
         {
-            hyperParamters = GetComponent<HyperParameters>();
+            hyperParameters = GetComponent<HyperParameters>();
             InitNetworks();
             InitBuffers();
-            InitRaySensors(this.gameObject);  
+            InitRaySensors(this.transform);
+            InitEnvironment(this.transform.parent);
         }
         private void InitNetworks()
         {
             if (actorNetwork != null)
                 return;
 
-            ActivationType activation = hyperParamters.activationType;
-            ActivationType outputActivation = hyperParamters.activationType;
-            LossType loss = hyperParamters.lossType;
+            ActivationType activation = hyperParameters.activationType;
+            ActivationType outputActivation = hyperParameters.activationType;
+            LossType loss = hyperParameters.lossType;
             
             if (actionType == ActionType.Discrete)
             {
@@ -62,27 +68,41 @@ namespace SmartAgents
             {
                 outputActivation = ActivationType.Tanh;
             }
-            actorNetwork = new ArtificialNeuralNetwork(SpaceSize, ActionSize, hyperParamters.networkHiddenLayers, activation, outputActivation, loss, true, "ActorNN");
-            criticNetwork = new ArtificialNeuralNetwork(SpaceSize + ActionSize, 1, hyperParamters.networkHiddenLayers, ActivationType.Tanh, ActivationType.Tanh, LossType.MeanSquare, true, "CriticNN");
-            experienceRecord = new ExperienceRecord("XPRecord");
+            actorNetwork = new ArtificialNeuralNetwork(SpaceSize, ActionSize, hyperParameters.networkHiddenLayers, activation, outputActivation, loss, true, "ActorNN");
+            criticNetwork = new ArtificialNeuralNetwork(SpaceSize + ActionSize, 1, hyperParameters.networkHiddenLayers, ActivationType.Tanh, ActivationType.Tanh, LossType.MeanSquare, true, "CriticNN");
+            memory = new Memory("RecordXP");
         }
         private void InitBuffers()
         {
             sensorBuffer = new SensorBuffer(actorNetwork.GetInputsNumber());
             actionBuffer = new ActionBuffer(actorNetwork.GetOutputsNumber());
         }
-        private void InitRaySensors(GameObject parent)
+        private void InitRaySensors(Transform parent)
         {
             //adds all 
             if (!UseRaySensors)
                 return;
 
             RaySensor sensorFound = GetComponent<RaySensor>();
-            if(sensorFound.enabled)
+            if(sensorFound != null && sensorFound.enabled)
                 raySensors.Add(sensorFound);
-            foreach (Transform child in parent.transform)
+            foreach (Transform child in parent)
             {
-                InitRaySensors(child.gameObject);
+                InitRaySensors(child);
+            }
+        }
+        private void InitEnvironment(Transform parent)
+        {
+            foreach(Transform child in parent)
+            {
+                Transform clone = new GameObject().transform;
+
+                clone.position = child.position;
+                clone.rotation = child.rotation;
+                clone.localScale = child.localScale;
+
+                initialEnvironmentState.Add(clone);
+                InitEnvironment(child);
             }
         }
         #endregion
@@ -104,7 +124,7 @@ namespace SmartAgents
                     LearnAction();
                     break;
                 case BehaviorType.Heuristic:
-                    HeuristicAction();
+                    LearnAction();
                     break;
                 default:
                     break;
@@ -139,35 +159,67 @@ namespace SmartAgents
         }
         private void LearnAction()
         {
-            //EVENTUALLY ADD OFFLINE LEARN(from ExperienceRecord)
             //Collect observations and Take action
-            CollectObservations(sensorBuffer);//agent collects observations
-            actionBuffer = new ActionBuffer(actorNetwork.ForwardPropagation(sensorBuffer.observations));//network predicts actions
-            OnActionReceived(actionBuffer); // agent takes action based on previous prediction
-
-            //Update critic network 
-            double[] criticInputs = sensorBuffer.observations.Concat(actionBuffer.actions).ToArray();
-            double tdTarget = reward +
-                              hyperParamters.discountFactor *
-                              criticNetwork.ForwardPropagation(criticInputs)[0];
-
-            double tdError = tdTarget - criticNetwork.ForwardPropagation(criticInputs)[0];
-
-            criticNetwork.BackPropagation(criticInputs, new double[] { tdError }, true, hyperParamters.learnRate, hyperParamters.momentum, hyperParamters.regularization);
-
-            //Update actor network
-        }
-        private void HeuristicAction()
-        {
             CollectObservations(sensorBuffer);
-            Heuristic(actionBuffer);
 
-            double[] predictions = actorNetwork.ForwardPropagation(sensorBuffer.observations);
-            ActionBuffer predictionsBuffer = new ActionBuffer(predictions.Length);
-            predictionsBuffer.actions = predictions;
+            #region Take Action
 
-            double error = actorNetwork.BackPropagation(sensorBuffer.observations, actionBuffer.actions, true, hyperParamters.learnRate, hyperParamters.momentum, hyperParamters.regularization);
-            Debug.Log("Error: " + error);
+            if (behavior == BehaviorType.Learn) //Get predicted outs
+            {
+                actionBuffer = new ActionBuffer(actorNetwork.ForwardPropagation(sensorBuffer.observations));
+                OnActionReceived(actionBuffer);
+            }
+            else // Get user outs
+            {
+                Heuristic(actionBuffer);
+                OnActionReceived(actionBuffer);
+            }
+
+            #endregion
+
+            #region Memory
+
+            //Complete Previous
+            lastFrameData.nextState = sensorBuffer.observations;
+            lastFrameData.nextAction = actionBuffer.actions;
+
+            //Add to memory
+            if (memory && hyperParameters.memoryCapacity != 0 && lastFrameData.IsComplete())
+            {
+                if (memory.GetSize() >= hyperParameters.memoryCapacity)
+                    memory.PopOldRecord();
+
+                memory.AddRecord(lastFrameData);
+            }
+
+            //Init Current 
+            lastFrameData.state = sensorBuffer.observations;
+            lastFrameData.action = actionBuffer.actions;
+            lastFrameData.reward = reward;
+
+            #endregion
+
+            if (!lastFrameData.IsComplete())
+                return;
+
+            #region Train Critic
+           
+            double[] criticInpFromLastFrame = lastFrameData.state.Concat(lastFrameData.action).ToArray();
+            double[] criticInpFromCurrFrame = sensorBuffer.observations.Concat(actionBuffer.actions).ToArray();
+
+            double tdTarget = reward + hyperParameters.discountFactor * criticNetwork.ForwardPropagation(criticInpFromCurrFrame)[0];
+            double tdError = tdTarget - criticNetwork.ForwardPropagation(criticInpFromLastFrame)[0];
+
+            criticNetwork.BackPropagation(criticInpFromLastFrame, new double[] { tdError }, true, hyperParameters.learnRate, hyperParameters.momentum, hyperParameters.regularization);
+            
+            #endregion
+
+            #region Train Actor
+
+            double AdvantageEstimate = tdTarget - actorNetwork.ForwardPropagation(lastFrameData.state).Average();
+            actorNetwork.BackPropagation(lastFrameData.state, lastFrameData.action, true, hyperParameters.learnRate, hyperParameters.momentum, hyperParameters.regularization, AdvantageEstimate);
+
+            #endregion
         }
         #endregion
 
@@ -189,13 +241,34 @@ namespace SmartAgents
         public void AddReward<T>(T reward) where T : struct
         {
             this.reward += Convert.ToDouble(reward);
+            this.episodeCumulatedReward += Convert.ToDouble(reward);
         }
         public void EndAction()
         {
-          
+            Step++;
+            int start = 0;
+            ResetEnvironment(this.transform.parent, ref start);
+            episodeCumulatedReward = 0;
+
+            Debug.Log("Step:" + Step + " | Cumulated reward: " + episodeCumulatedReward);
+        }
+        private void ResetEnvironment(Transform parent, ref int index)
+        {
+            for (int i = 0; i < parent.transform.childCount; i++)
+            {
+                Transform child = parent.transform.GetChild(i);
+                Transform initialTransform = initialEnvironmentState[index++];
+
+                child.position = initialTransform.position;
+                child.rotation = initialTransform.rotation;
+                child.localScale = initialTransform.localScale;
+
+                ResetEnvironment(child, ref index);
+
+            }
         }
 
-        
+
     }
     #region Custom Editor
     [CustomEditor(typeof(Agent), true), CanEditMultipleObjects]

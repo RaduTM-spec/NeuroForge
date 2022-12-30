@@ -13,7 +13,7 @@ namespace SmartAgents
         [SerializeField] public ArtificialNeuralNetwork criticNetwork;
         [SerializeField] private List<Sample> offlineTrainingData;
 
-        public CompoundNetwork(int inputs, int outputs, HiddenLayers size, ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, string? name = null) 
+        public CompoundNetwork(int inputs, int outputs, HiddenLayers size, ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, string name = null) 
         {
             actorNetwork = new ArtificialNeuralNetwork(inputs, outputs, size, activationFunction, outputActivationFunction, lossFunction, true, "Actor");
             criticNetwork = new ArtificialNeuralNetwork((inputs + outputs), 1, size, ActivationType.Tanh, ActivationType.Tanh, LossType.MeanSquare, true, "Critic");

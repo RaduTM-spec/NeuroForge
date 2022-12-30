@@ -7,6 +7,7 @@ using UnityEngine;
 public class HyperParameters : MonoBehaviour
 {
     public HiddenLayers networkHiddenLayers = HiddenLayers.OneLarge;
+    [Range(0, 100_000)] public int memoryCapacity = 0;
     [Space]
     [Range(0, 1f)] public float discountFactor = 0.1f;
     [Range(0f, 1f)] public float learnRate = 0.1f;
