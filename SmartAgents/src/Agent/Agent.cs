@@ -2,40 +2,50 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+using System;
+using System.Reflection.Emit;
+using System.Linq;
 
 namespace SmartAgents
 {
     [DisallowMultipleComponent, RequireComponent(typeof(HyperParameters))]
     public class Agent : MonoBehaviour
     {
+        #region Public Fields
         public BehaviorType behavior = BehaviorType.Passive;
-        [SerializeField] private ArtificialNeuralNetwork Network;
+        [SerializeField] private ArtificialNeuralNetwork actorNetwork;
+        [SerializeField] private ArtificialNeuralNetwork criticNetwork;
+        [SerializeField] private ExperienceRecord experienceRecord;
 
-        [Space]
-        [Min(1), SerializeField] private int SpaceSize = 2;
+        [Space,Min(1), SerializeField] private int SpaceSize = 2;
         [Min(1), SerializeField] private int ActionSize = 2;
         [SerializeField] private ActionType actionType = ActionType.Continuous;
 
-        [Space]
-        [SerializeField] private bool UseRaySensors = true;
-        
+        [Space, SerializeField] private bool UseRaySensors = true;
+        #endregion
 
+        #region Private Fields
         private HyperParameters hyperParamters;
         private List<RaySensor> raySensors = new List<RaySensor>();
 
         private SensorBuffer sensorBuffer;
         private ActionBuffer actionBuffer;
+        private double reward = 0;
 
+        private double totalReward = 0;
+        #endregion
+
+        #region Setup
         protected virtual void Awake()
         {
             hyperParamters = GetComponent<HyperParameters>();
-            InitNetwork();
+            InitNetworks();
             InitBuffers();
             InitRaySensors(this.gameObject);  
         }
-        void InitNetwork()
+        private void InitNetworks()
         {
-            if (Network != null)
+            if (actorNetwork != null)
                 return;
 
             ActivationType activation = hyperParamters.activationType;
@@ -52,29 +62,32 @@ namespace SmartAgents
             {
                 outputActivation = ActivationType.Tanh;
             }
-            
-            Network = new ArtificialNeuralNetwork(SpaceSize, ActionSize, hyperParamters.networkHiddenLayers, activation, outputActivation, loss);
-            Network.Save();
-            
+            actorNetwork = new ArtificialNeuralNetwork(SpaceSize, ActionSize, hyperParamters.networkHiddenLayers, activation, outputActivation, loss, true, "ActorNN");
+            criticNetwork = new ArtificialNeuralNetwork(SpaceSize + ActionSize, 1, hyperParamters.networkHiddenLayers, ActivationType.Tanh, ActivationType.Tanh, LossType.MeanSquare, true, "CriticNN");
+            experienceRecord = new ExperienceRecord("XPRecord");
         }
-        void InitBuffers()
+        private void InitBuffers()
         {
-            sensorBuffer = new SensorBuffer(Network.GetInputsNumber());
-            actionBuffer = new ActionBuffer(Network.GetOutputsNumber());
+            sensorBuffer = new SensorBuffer(actorNetwork.GetInputsNumber());
+            actionBuffer = new ActionBuffer(actorNetwork.GetOutputsNumber());
         }
-        void InitRaySensors(GameObject parent)
+        private void InitRaySensors(GameObject parent)
         {
             //adds all 
             if (!UseRaySensors)
                 return;
 
-            raySensors.Add(GetComponent<RaySensor>());
+            RaySensor sensorFound = GetComponent<RaySensor>();
+            if(sensorFound.enabled)
+                raySensors.Add(sensorFound);
             foreach (Transform child in parent.transform)
             {
                 InitRaySensors(child.gameObject);
             }
-        }    
+        }
+        #endregion
 
+        #region Loop
         protected virtual void Update()
         {
             sensorBuffer.Clear();
@@ -98,12 +111,11 @@ namespace SmartAgents
 
             }
         }
-
-        void ActiveAction()
+        private void ActiveAction()
         {
-            if(Network == null)
+            if(actorNetwork == null)
             {
-                Debug.LogError("<color=red>Neural Network is missing. Agent cannot take any actions.</color>");
+                Debug.LogError("<color=red>Compound network is missing. Agent cannot take any actions.</color>");
                 return;
             }
 
@@ -116,24 +128,50 @@ namespace SmartAgents
             }
             
             CollectObservations(sensorBuffer);
-            actionBuffer.actions = Network.ForwardPropagation(sensorBuffer.observations);
+            actionBuffer.actions = actorNetwork.ForwardPropagation(sensorBuffer.observations);
             OnActionReceived(actionBuffer);
 
         }
-        void ManualAction()
+        private void ManualAction()
         {
             Heuristic(actionBuffer);
             OnActionReceived(actionBuffer);
         }
-        void LearnAction()
+        private void LearnAction()
         {
+            //EVENTUALLY ADD OFFLINE LEARN(from ExperienceRecord)
+            //Collect observations and Take action
+            CollectObservations(sensorBuffer);//agent collects observations
+            actionBuffer = new ActionBuffer(actorNetwork.ForwardPropagation(sensorBuffer.observations));//network predicts actions
+            OnActionReceived(actionBuffer); // agent takes action based on previous prediction
 
+            //Update critic network 
+            double[] criticInputs = sensorBuffer.observations.Concat(actionBuffer.actions).ToArray();
+            double tdTarget = reward +
+                              hyperParamters.discountFactor *
+                              criticNetwork.ForwardPropagation(criticInputs)[0];
+
+            double tdError = tdTarget - criticNetwork.ForwardPropagation(criticInputs)[0];
+
+            criticNetwork.BackPropagation(criticInputs, new double[] { tdError }, true, hyperParamters.learnRate, hyperParamters.momentum, hyperParamters.regularization);
+
+            //Update actor network
         }
-        void HeuristicAction()
+        private void HeuristicAction()
         {
+            CollectObservations(sensorBuffer);
+            Heuristic(actionBuffer);
 
+            double[] predictions = actorNetwork.ForwardPropagation(sensorBuffer.observations);
+            ActionBuffer predictionsBuffer = new ActionBuffer(predictions.Length);
+            predictionsBuffer.actions = predictions;
+
+            double error = actorNetwork.BackPropagation(sensorBuffer.observations, actionBuffer.actions, true, hyperParamters.learnRate, hyperParamters.momentum, hyperParamters.regularization);
+            Debug.Log("Error: " + error);
         }
+        #endregion
 
+        #region Virtual
         public virtual void CollectObservations(SensorBuffer sensorBuffer)
         {
 
@@ -142,12 +180,24 @@ namespace SmartAgents
         {
 
         }
-        public virtual void Heuristic(ActionBuffer actionSet) 
+        public virtual void Heuristic(ActionBuffer actionSet)
         {
 
         }
-    }
+        #endregion
 
+        public void AddReward<T>(T reward) where T : struct
+        {
+            this.reward += Convert.ToDouble(reward);
+        }
+        public void EndAction()
+        {
+          
+        }
+
+        
+    }
+    #region Custom Editor
     [CustomEditor(typeof(Agent), true), CanEditMultipleObjects]
     class ScriptlessAgent : Editor
     {
@@ -162,4 +212,5 @@ namespace SmartAgents
             serializedObject.ApplyModifiedProperties();
         }
     }
+    #endregion
 }
