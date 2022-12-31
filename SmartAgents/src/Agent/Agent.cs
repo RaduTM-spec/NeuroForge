@@ -6,6 +6,8 @@ using System;
 using System.Reflection.Emit;
 using System.Linq;
 using Unity.VisualScripting;
+using UnityEditor.ProjectWindowCallback;
+using System.Text;
 
 namespace SmartAgents
 {
@@ -26,6 +28,7 @@ namespace SmartAgents
         #endregion
 
         #region Private Fields
+        private int Episode = 1;
         private int Step = 0;
         private double episodeCumulatedReward = 0;
 
@@ -110,19 +113,13 @@ namespace SmartAgents
         #region Loop
         protected virtual void Update()
         {
-            sensorBuffer.Clear();
-            sensorBuffer.Clear();
+            
             switch(behavior)
             {
                 case BehaviorType.Active:
                     ActiveAction();
                     break;
-                case BehaviorType.Manual:
-                    ManualAction();
-                    break;
-                case BehaviorType.Learn:
-                    LearnAction();
-                    break;
+                case BehaviorType.Inference:
                 case BehaviorType.Heuristic:
                     LearnAction();
                     break;
@@ -130,41 +127,45 @@ namespace SmartAgents
                     break;
 
             }
+
+            Step++;
+            if(hyperParameters.maxStep != 0 && Step > hyperParameters.maxStep)
+            {
+                //Add terminal reward
+                if(episodeCumulatedReward <= 0)
+                    AddReward(-1); 
+                
+                EndEpisode();
+            }
         }
         private void ActiveAction()
         {
             if(actorNetwork == null)
             {
-                Debug.LogError("<color=red>Compound network is missing. Agent cannot take any actions.</color>");
+                Debug.LogError("<color=red>Actor network is missing. Agent cannot take any actions.</color>");
                 return;
             }
 
-            if(UseRaySensors)
-            {
-                foreach (var raySensor in raySensors)
-                {
-                    sensorBuffer.AddObservation(raySensor);
-                }
-            }
+            CollectRaySensorObservations();
             
             CollectObservations(sensorBuffer);
             actionBuffer.actions = actorNetwork.ForwardPropagation(sensorBuffer.observations);
             OnActionReceived(actionBuffer);
 
-        }
-        private void ManualAction()
-        {
-            Heuristic(actionBuffer);
-            OnActionReceived(actionBuffer);
+            sensorBuffer.Clear();
+            actionBuffer.Clear();
+
         }
         private void LearnAction()
         {
-            //Collect observations and Take action
+            #region Collect Observation
+            CollectRaySensorObservations();
             CollectObservations(sensorBuffer);
+            #endregion
 
             #region Take Action
 
-            if (behavior == BehaviorType.Learn) //Get predicted outs
+            if (behavior == BehaviorType.Inference) //Get predicted outs
             {
                 actionBuffer = new ActionBuffer(actorNetwork.ForwardPropagation(sensorBuffer.observations));
                 OnActionReceived(actionBuffer);
@@ -220,6 +221,21 @@ namespace SmartAgents
             actorNetwork.BackPropagation(lastFrameData.state, lastFrameData.action, true, hyperParameters.learnRate, hyperParameters.momentum, hyperParameters.regularization, AdvantageEstimate);
 
             #endregion
+
+
+            sensorBuffer.Clear();
+            actionBuffer.Clear();
+            reward = 0;
+        }
+        private void CollectRaySensorObservations()
+        {
+            if (!UseRaySensors)
+                return;
+
+            foreach (var raySensor in raySensors)
+            {
+                sensorBuffer.AddObservation(raySensor.observations);
+            }
         }
         #endregion
 
@@ -232,7 +248,7 @@ namespace SmartAgents
         {
 
         }
-        public virtual void Heuristic(ActionBuffer actionSet)
+        public virtual void Heuristic(ActionBuffer actionBuffer)
         {
 
         }
@@ -243,14 +259,35 @@ namespace SmartAgents
             this.reward += Convert.ToDouble(reward);
             this.episodeCumulatedReward += Convert.ToDouble(reward);
         }
-        public void EndAction()
+        public void AddActionPenalty<T>(T penalty) where T : struct
         {
-            Step++;
+            double t = hyperParameters.maxStep == 0 ? 1 : hyperParameters.maxStep;
+            double ActionPenalty = -Math.Abs(Convert.ToDouble(penalty)) / t;
+            AddReward(ActionPenalty);
+        }
+        public void EndEpisode()
+        {
+            //DO Graph statistics for Cumulative reward foreach episode and EpisodeLength foreach env using localhost:port 
+            //Optimize training:
+            // In on action received (virtualized)
+             // AddReward(-1f/MaxStep) -> penalty agent foreach action it takes (only for optimizations)
+
+
             int start = 0;
             ResetEnvironment(this.transform.parent, ref start);
-            episodeCumulatedReward = 0;
 
-            Debug.Log("Step:" + Step + " | Cumulated reward: " + episodeCumulatedReward);
+            StringBuilder statistic = new StringBuilder();
+            statistic.Append("Episode: ");
+            statistic.Append(Episode);
+            statistic.Append(" | Steps: ");
+            statistic.Append(Step);
+            statistic.Append(" | Cumulated Reward: ");
+            statistic.Append(episodeCumulatedReward);
+            Debug.Log(statistic.ToString());
+
+            Episode++;
+            Step = 0;
+            episodeCumulatedReward = 0;
         }
         private void ResetEnvironment(Transform parent, ref int index)
         {
@@ -264,7 +301,6 @@ namespace SmartAgents
                 child.localScale = initialTransform.localScale;
 
                 ResetEnvironment(child, ref index);
-
             }
         }
 

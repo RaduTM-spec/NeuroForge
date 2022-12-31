@@ -25,8 +25,20 @@ namespace SmartAgents
                 return 0;
             else return observations.Length;
         }
-       
 
+        /// <summary>
+        /// Appends a bool value to the SensorBuffer. (it is converted into 0 for false and 1 for true)
+        /// </summary>
+        /// <param name="observation1">Value of the observation</param>
+        public void AddObservation(bool observation1)
+        {
+            if (currentSize == observations.Length)
+            {
+                Debug.LogError("SensorBuffer is full. Increase the space size or remove this observation.");
+                return;
+            }
+            observations[currentSize++] = observation1? 1 : 0;
+        }
         /// <summary>
         /// Appends a float value to the SensorBuffer.
         /// </summary>
@@ -128,7 +140,7 @@ namespace SmartAgents
             observations[currentSize++] = observation4.w;
         }
         /// <summary>
-        /// Appends a Quaternion value to the SensorBuffer.
+        /// Appends a Quaternion values to the SensorBuffer.
         /// </summary>
         /// <param name="observation4">Value of the observation</param>
         public void AddObservation(Quaternion observation4)
@@ -144,10 +156,10 @@ namespace SmartAgents
             observations[currentSize++] = observation4.w;
         }
         /// <summary>
-        /// Appends a Transform value to the SensorBuffer.
+        /// Appends a Transform values to the SensorBuffer.
         /// </summary>
         /// <param name="observation10">Value of the observation</param>
-        public void AddObservation(UnityEngine.Transform obsevation10)
+        public void AddObservation(Transform obsevation10)
         {
             if (observations.Length - currentSize < 10)
             {
@@ -191,7 +203,7 @@ namespace SmartAgents
             }
         }
         /// <summary>
-        /// Appends the distances of each RayCast by the RaySensor to SensorBuffer.
+        /// Appends the distances/infos of each RayCast by the RaySensor to SensorBuffer.
         /// </summary>
         /// <param name="raySensor">RaySensor object</param>
         public void AddObservation(RaySensor raySensor)
@@ -236,20 +248,21 @@ namespace SmartAgents
             this.actions = actions;
         }
 
-        public void Clear()
+        public void Set(int actionIndex, float actionValue)
         {
-            actions = new double[actions.Length];
+            actions[actionIndex] = actionValue;
         }
-        public int GetBufferCapacity()
+        public float Get(int actionIndex)
         {
-            return actions != null ? actions.Length : 0;
+            return (float)actions[actionIndex];
         }
+
 
         /// <summary>
         /// Get the index of discrete action (assuming that you already labeled possible actions with integers from 0 to n-1).
         /// </summary>
-        /// <returns>int value</returns>
-        public int Predict()
+        /// <returns>[int] index</returns>
+        public int RequestDiscreteAction()
         {
             double max = double.MinValue;
             int index = -1;
@@ -268,6 +281,10 @@ namespace SmartAgents
             return equal == true ? -1 : index;
 
         }
+        public void Clear()
+        {
+            actions = new double[actions.Length];
+        }
         public override string ToString()
         {
             StringBuilder stringBuilder = new StringBuilder();
@@ -283,7 +300,6 @@ namespace SmartAgents
             return stringBuilder.ToString();
         }
     }
-
     public interface IClearable
     {
         public void Clear();

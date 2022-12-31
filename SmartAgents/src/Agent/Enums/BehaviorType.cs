@@ -4,8 +4,7 @@ namespace SmartAgents
     { 
         Passive,//does nothing
         Active,//uses his nn
-        Manual,//controlled by user
-        Learn,//learns
+        Inference,//learns by inference
         Heuristic,//learns by user input
     }
 
