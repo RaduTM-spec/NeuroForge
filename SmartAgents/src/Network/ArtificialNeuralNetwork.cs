@@ -220,6 +220,29 @@ namespace SmartAgents {
         }
         
 
+        public double[] GetLogProbs(double[][] inputs, double[][] outputs)
+        {
+            double[] log_probs = new double[inputs.Length];
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                double[] action_probs = ForwardPropagation(outputs[i]);
+                double log_prob = 0;
+
+                for (int j = 0; j < outputs[i].Length; j++)
+                {
+                    if (outputs[i][j] == 1)
+                    {
+                        log_prob += Math.Log(action_probs[j]);
+                    }
+                    else
+                    {
+                        log_prob += Math.Log(1 - action_probs[j]);
+                    }
+                }
+                log_probs[i] = log_prob;
+            }
+            return log_probs;
+        }
         public int GetInputsNumber()
         {
             return format[0];

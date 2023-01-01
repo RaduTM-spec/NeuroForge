@@ -10,6 +10,7 @@ using UnityEditor.ProjectWindowCallback;
 using System.Text;
 using UnityEngine.Profiling;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace SmartAgents
 {
@@ -18,8 +19,8 @@ namespace SmartAgents
     {
         #region Public Fields
         public BehaviorType behavior = BehaviorType.Passive;
-        [SerializeField] private ArtificialNeuralNetwork actorNetwork;
-        [SerializeField] private ArtificialNeuralNetwork criticNetwork;
+        [SerializeField] private ArtificialNeuralNetwork actor;
+        [SerializeField] private ArtificialNeuralNetwork critic;
         [SerializeField] private Memory memory;
 
         [Space,Min(1), SerializeField] private int SpaceSize = 2;
@@ -32,7 +33,7 @@ namespace SmartAgents
         private int Step = 0;//do not modify it
         private double episodeCumulatedReward = 0;
 
-        private HyperParameters hyperParameters;
+        private HyperParameters hp;
         private List<RaySensor> raySensors = new List<RaySensor>();
         private List<CameraSensor> cameraSensors = new List<CameraSensor>();
 
@@ -46,7 +47,7 @@ namespace SmartAgents
         #region Setup
         protected virtual void Awake()
         {
-            hyperParameters = GetComponent<HyperParameters>();
+            hp = GetComponent<HyperParameters>();
             InitNetworks_InitMemory();
             InitBuffers();
             InitSensors(this.transform);
@@ -54,20 +55,20 @@ namespace SmartAgents
         }
         private void InitNetworks_InitMemory()
         {
-            if (actorNetwork != null)
+            if (actor != null)
             {
-                SpaceSize = actorNetwork.GetInputsNumber();
-                ActionSize = actorNetwork.GetOutputsNumber();
-                if (actorNetwork.outputActivationType == ActivationType.SoftMax)
+                SpaceSize = actor.GetInputsNumber();
+                ActionSize = actor.GetOutputsNumber();
+                if (actor.outputActivationType == ActivationType.SoftMax)
                     actionType = ActionType.Discrete;
                 else
                     actionType= ActionType.Continuous;
             }
                
 
-            ActivationType activation = hyperParameters.activationType;
-            ActivationType outputActivation = hyperParameters.activationType;
-            LossType loss = hyperParameters.lossType;
+            ActivationType activation = hp.activationType;
+            ActivationType outputActivation = hp.activationType;
+            LossType loss = hp.lossType;
             if (actionType == ActionType.Discrete)
             {
                 outputActivation = ActivationType.SoftMax;
@@ -79,9 +80,9 @@ namespace SmartAgents
                 outputActivation = ActivationType.Tanh;
             }
 
-            if(actorNetwork == null) actorNetwork = new ArtificialNeuralNetwork(SpaceSize, ActionSize, hyperParameters.networkHiddenLayers, activation, outputActivation, loss, GetActorName());
-            if(criticNetwork == null) criticNetwork = new ArtificialNeuralNetwork(SpaceSize + ActionSize, 1, hyperParameters.networkHiddenLayers, ActivationType.Tanh, ActivationType.Tanh, LossType.MeanSquare, GetCriticName());
-            if(memory == null) memory = new Memory(GetMemoryName());
+            if(actor == null) actor = new ArtificialNeuralNetwork(SpaceSize, ActionSize, hp.networkHiddenLayers, activation, outputActivation, loss, GetActorName());
+            if(critic == null) critic = new ArtificialNeuralNetwork(SpaceSize + ActionSize, 1, hp.networkHiddenLayers, ActivationType.Tanh, ActivationType.Tanh, LossType.MeanSquare, GetCriticName());
+            if (memory == null) memory = new Memory(GetMemoryName());
 
             string GetActorName()
             {
@@ -107,8 +108,8 @@ namespace SmartAgents
         }
         private void InitBuffers()
         {
-            sensorBuffer = new SensorBuffer(actorNetwork.GetInputsNumber());
-            actionBuffer = new ActionBuffer(actorNetwork.GetOutputsNumber());
+            sensorBuffer = new SensorBuffer(actor.GetInputsNumber());
+            actionBuffer = new ActionBuffer(actor.GetOutputsNumber());
         }
         private void InitSensors(Transform parent)
         {
@@ -152,39 +153,27 @@ namespace SmartAgents
                 case BehaviorType.Heuristic:
                     LearnAction();
                     break;
-
-
-                case BehaviorType.OfflineCollectData:
-                    CollectData(false);
-                    break;
-                case BehaviorType.OfflineTrainCritic:
-                    TrainCritic();
-                    break;
-                case BehaviorType.OfflineTrainActor:
-                    TrainActor();
-                    break;
                 default:
                     break;
 
             }
 
             Step++;
-            if(hyperParameters.maxStep != 0 && Step >= hyperParameters.maxStep && 
+            if(hp.maxStep != 0 && Step >= hp.maxStep && 
                 (behavior == BehaviorType.Inference || behavior == BehaviorType.Heuristic))
                 EndEpisode();
         }
         private void ActiveAction()
         {
-            if(actorNetwork == null)
+            if(actor == null)
             {
                 Debug.LogError("<color=red>Actor network is missing. Agent cannot take any actions.</color>");
                 return;
             }
 
-            CollectSensors();
-            
+            CollectSensors(sensorBuffer);
             CollectObservations(sensorBuffer);
-            actionBuffer.actions = actorNetwork.ForwardPropagation(sensorBuffer.observations);
+            actionBuffer.actions = actor.ForwardPropagation(sensorBuffer.observations);
             OnActionReceived(actionBuffer);
 
             sensorBuffer.Clear();
@@ -193,87 +182,161 @@ namespace SmartAgents
         }
         private void LearnAction()
         {
-           /* #region Collect Observation
-            CollectSensors();
-            CollectObservations(sensorBuffer);
-            #endregion
+            Collect_Action_Store(false);
 
-            #region Take Action
-
-            if (behavior == BehaviorType.Inference) //Get predicted outs
+            if (memory.IsFull(hp.memory_size) == true)
             {
-                actionBuffer = new ActionBuffer(actorNetwork.ForwardPropagation(sensorBuffer.observations));
-                OnActionReceived(actionBuffer);
+                TrainNetworks();
+                memory.Clear();
             }
-            else // Get user outs
-            {
-                Heuristic(actionBuffer);
-                OnActionReceived(actionBuffer);
-            }
-
-            #endregion
-
-            #region Memory
-
-            //Complete Previous
-            lastFrameData.nextState = sensorBuffer.observations;
-
-            //Add to memory
-            if (memory && hyperParameters.memoryCapacity != 0 && lastFrameData.IsComplete())
-            {
-                if (memory.GetSize() >= hyperParameters.memoryCapacity)
-                    memory.PopFirst();
-
-                memory.AddRecord(lastFrameData);
-            }
-
-            //Init Current 
-            lastFrameData.state = sensorBuffer.observations;
-            lastFrameData.action = actionBuffer.actions;
-            lastFrameData.reward = reward;
-
-            #endregion
-
-            if (!lastFrameData.IsComplete())
-                return;
-
-            #region Train Critic
-           
-            double[] criticInpFromLastFrame = lastFrameData.state.Concat(lastFrameData.action).ToArray();
-            double[] criticInpFromCurrFrame = sensorBuffer.observations.Concat(actionBuffer.actions).ToArray();
-
-            double tdTarget = reward + hyperParameters.discountFactor * criticNetwork.ForwardPropagation(criticInpFromCurrFrame)[0];
-            double tdError = tdTarget - criticNetwork.ForwardPropagation(criticInpFromLastFrame)[0];
-
-            criticNetwork.BackPropagation(criticInpFromLastFrame, new double[] { tdError });
-            criticNetwork.UpdateParameters(hyperParameters.learnRate, hyperParameters.momentum, hyperParameters.regularization);
-            #endregion
-
-            #region Train Actor
-
-            double AdvantageEstimate = tdTarget - actorNetwork.ForwardPropagation(lastFrameData.state).Average();
-            actorNetwork.BackPropagation(lastFrameData.state, lastFrameData.action, AdvantageEstimate);
-            actorNetwork.UpdateParameters(hyperParameters.learnRate, hyperParameters.momentum, hyperParameters.regularization);
-            #endregion
-
 
             sensorBuffer.Clear();
             actionBuffer.Clear();
-            reward = 0;*/
+            reward = 0;
+        }
+
+        #endregion
+
+        #region PPO
+        private void Collect_Action_Store(bool isEndOfEpisode)
+        {
+            CollectSensors(sensorBuffer);
+            CollectObservations(sensorBuffer);
+            if (behavior == BehaviorType.Inference)
+                actionBuffer.actions = actor.ForwardPropagation(sensorBuffer.observations);
+            else if (behavior == BehaviorType.Heuristic)
+                Heuristic(actionBuffer);
+            OnActionReceived(actionBuffer);
+
+            memory.Store(sensorBuffer.observations, actionBuffer.actions, reward, isEndOfEpisode);
+        }
+        void TrainNetworks()
+        {
+            GAE();
+          
+            for (int i = 0; i < hp.memory_size / hp.mini_batch_size; i++)
+            {
+                List<Sample> miniBatch = memory.records.GetRange(i, i + hp.mini_batch_size);
+                UpdateActor(miniBatch);
+                UpdateCritic(miniBatch);
+            }
+        }
+        void GAE()
+        {
+            List<Sample> data = memory.records;
+
+            //Calculate advantages
+            for (int i = 0; i < data.Count - 1; i++)
+            {
+                double value = critic.ForwardPropagation(data[i].state)[0];
+                double nextValue = critic.ForwardPropagation(data[i + 1].state)[0];
+
+                double reward = data[i].reward;
+                double advantage = 0;
+                if (data[i].done)
+                {
+                    advantage = reward - value;
+                }
+                else
+                {
+                    advantage = reward + hp.discountFactor * nextValue - value;
+                }
+                advantage *= hp.discountFactor * hp.gaeFactor;
+                data[i].advantage = advantage;
+            }
+
+
+            //Normalize advantages
+            double mean = data.Sum(x => x.advantage) / data.Count;
+            double std = Math.Sqrt(data.Sum(x => Math.Pow(x.advantage - mean, 2)) / data.Count);
+
+            for (int i = 0; i < data.Count; i++)
+            {
+                data[i].advantage = (data[i].advantage - mean) / std;
+            }
+
+        }
+        void UpdateActor(List<Sample> mini_batch)
+        {
+            //convert s,a,adv to tensors (double arrays)
+
+            double[][] states = mini_batch.Select(x => x.state).ToArray();    //this is a Tensor
+            double[][] actions = mini_batch.Select(x => x.action).ToArray();
+            double[] advantages = mini_batch.Select(x => x.advantage).ToArray();
+
+            double[] old_policy_log_probs = actor.GetLogProbs(states, actions);
+
+            //Gradient ascent
+            for (int i = 0; i < states.Length; i++)
+            {
+                //Calculate new policy log probabilities
+                double[] new_policy_log_probs = actor.GetLogProbs(new double[][] { states[i] }, new double[][] { actions[i] });
+
+                //Policies ratio
+                double r = Math.Exp(new_policy_log_probs[0] - old_policy_log_probs[i]);
+
+                //Calculate surrogate loss
+                double loss = -Math.Min(r * advantages[i], Math.Min(r,1 + hp.clipFactor) 
+                                * 
+                               Math.Max(r, 1- hp.clipFactor) * advantages[i]);
+
+                //Generate label
+                double[] expectedActions = new double[actions[i].Length];
+                for (int j = 0; j < expectedActions.Length; j++)
+                {
+                    if (actions[i][j] == 1)
+                        expectedActions[j] = loss;
+                    else
+                        expectedActions[j] = 0;
+                }
+
+                //Update the actor
+                actor.BackPropagation(states[i], expectedActions);
+            }
+        }
+        void UpdateCritic(List<Sample> mini_batch)
+        {
+            double[][] states = mini_batch.Select(x => x.state).ToArray();
+            double[][] actions = mini_batch.Select(x => x.action).ToArray();
+            double[] rewards = mini_batch.Select(x => x.reward).ToArray();
+            double[] discounted_sum_rewards = GetDiscountedRewards();
+
+            for (int i = 0; i < states.Length; i++)
+            {
+                double predicted_value = critic.ForwardPropagation(states[i].Concat(actions[i]).ToArray())[0];
+
+                double[] expectedValue = new double[] { discounted_sum_rewards[i] };
+
+                critic.BackPropagation(states[i].Concat(actions[i]).ToArray(), expectedValue);
+            }
+                
+                
+            double[] GetDiscountedRewards()
+            {
+                double[] discounted_sum_rewards = new double[rewards.Length];
+
+                double sum = 0;
+                for (int i = rewards.Length - 1; i >= 0; i++)
+                {
+                     sum = sum * hp.discountFactor + rewards[i];
+                     discounted_sum_rewards[i] = sum;
+                }
+                return discounted_sum_rewards;
+            }
         }
 
         #endregion
 
         #region Utils
-        private void CollectSensors()
+        private void CollectSensors(SensorBuffer buffer)
         {
             foreach (var raySensor in raySensors)
             {
-                sensorBuffer.AddObservation(raySensor.observations);
+                buffer.AddObservation(raySensor.observations);
             }
             foreach (var camSensor in cameraSensors)
             {
-                sensorBuffer.AddObservation(camSensor.FlatCapture());
+                buffer.AddObservation(camSensor.FlatCapture());
             }
         }
         public void AddReward<T>(T reward) where T : struct
@@ -283,14 +346,14 @@ namespace SmartAgents
         }
         public void AddStepPenalty<T>(T penalty) where T : struct
         {
-            double t = hyperParameters.maxStep == 0 ? 1 : hyperParameters.maxStep;
+            double t = hp.maxStep == 0 ? 1 : hp.maxStep;
             double ActionPenalty = -Math.Abs(Convert.ToDouble(penalty)) / t;
             AddReward(ActionPenalty);
         }
         public void EndEpisode()
         {
-            if (behavior == BehaviorType.OfflineCollectData)
-                CollectData(true);
+           
+            Collect_Action_Store(true);
 
             int transformsStart = 0;
             ResetEnvironment(this.transform.parent, ref transformsStart);
@@ -301,6 +364,19 @@ namespace SmartAgents
             Step = 0;
             reward = 0;
             episodeCumulatedReward = 0;
+
+
+            void PrintEpsiodeStatistic()
+            {
+                StringBuilder statistic = new StringBuilder();
+                statistic.Append("Episode: ");
+                statistic.Append(Episode);
+                statistic.Append(" | Steps: ");
+                statistic.Append(Step);
+                statistic.Append(" | Cumulated Reward: ");
+                statistic.Append(episodeCumulatedReward);
+                Debug.Log(statistic.ToString());
+            }
         }
         private void ResetEnvironment(Transform parent, ref int index)
         {
@@ -330,114 +406,6 @@ namespace SmartAgents
 
         }
         #endregion
-
-        
-
-
-        List<Sample> localData = new List<Sample>();
-        private void CollectData(bool isEndOfEpisode)
-        {
-            //End
-            if (localData.Count == hyperParameters.memoryCapacity)
-            {
-                localData.RemoveAt(localData.Count - 1);
-                Debug.Log("<color=#00ff2f>Memory fulfilled </color><color=blue>(" + hyperParameters.memoryCapacity + ")</color>");
-
-                #region Normalize Rewards
-                    double minReward = localData.Min(x => x.reward);
-                    double maxReward = localData.Max(x => x.reward);
-                    
-                    for (int i = 0; i < localData.Count; i++)
-                    {
-                        double normalizedReward;
-                        if (localData[i].reward < 0)
-                            normalizedReward = -(localData[i].reward / minReward);
-                        else
-                            normalizedReward = localData[i].reward / maxReward;
-                        localData[i].reward = normalizedReward;
-                    }
-                #endregion
-
-                memory.records = localData;
-                memory.CalculateDiscountedRewards(hyperParameters.discountFactor, criticNetwork);
-
-                EditorApplication.ExitPlaymode();
-                return;
-            }
-
-
-            #region STATE ACTION
-            CollectSensors();
-            CollectObservations(sensorBuffer);
-            Heuristic(actionBuffer);
-            OnActionReceived(actionBuffer);
-            #endregion
-
-            //Update previous frame
-            if (Step > 0)
-            {
-                Sample previousFrame = localData.Last<Sample>();
-                previousFrame.nextState = sensorBuffer.observations;
-                previousFrame.nextAction = actionBuffer.actions;
-            }
-            //Collect current frame
-            localData.Add(new Sample(sensorBuffer.observations, actionBuffer.actions, reward, isEndOfEpisode));
-            
-            sensorBuffer.Clear();
-            actionBuffer.Clear();
-            reward = 0;
-
-           
-        }
-        private void TrainCritic(float batchSplit = 0.1f)
-        {
-            // random MiniBatch
-            //Each frame is an epoch
-
-            double epochErr = 0;
-
-            int sampleId = 0;
-            int updateFlag = (int)(memory.records.Count * batchSplit);
-            
-            foreach (var sample in memory.records)
-            {
-                double[] inputs = sample.state.Concat(sample.action).ToArray();
-                double error = criticNetwork.BackPropagation(inputs, new double[] { sample.reward });
-                epochErr += error;
-               
-            }
-            criticNetwork.UpdateParameters(hyperParameters.learnRate, hyperParameters.momentum, hyperParameters.regularization);
-
-            
-            double accuracy = (1 - epochErr / memory.records.Count) * 100;
-            hyperParameters.progressChart.AddKey(Step, (float)accuracy);
-            hyperParameters.epoch++;
-            hyperParameters.accuracy = accuracy.ToString("0.00000") + "%";            
-        }
-        private void TrainActor()
-        {
-            //calculate expected returns using critic foreach sample
-            // expected Return = sample.reward + gamma * critic.Predict(s')
-
-
-            // advantage error = expectedReturn - critic.Predict(s,a)
-            // actor.BackProp(s,a, advantage_error);
-
-
-
-        }
-
-        private void PrintEpsiodeStatistic()
-        {
-            StringBuilder statistic = new StringBuilder();
-            statistic.Append("Episode: ");
-            statistic.Append(Episode);
-            statistic.Append(" | Steps: ");
-            statistic.Append(Step);
-            statistic.Append(" | Cumulated Reward: ");
-            statistic.Append(episodeCumulatedReward);
-            Debug.Log(statistic.ToString());
-        }
 
     }
     #region Custom Editor

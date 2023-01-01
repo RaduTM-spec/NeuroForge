@@ -6,9 +6,6 @@ namespace SmartAgents
         Active,//uses his nn
         Inference,//learns by inference
         Heuristic,//learns by user input
-        OfflineCollectData,
-        OfflineTrainCritic,
-        OfflineTrainActor
     }
 
 }

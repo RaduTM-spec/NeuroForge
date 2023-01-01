@@ -1,6 +1,8 @@
 using SmartAgents;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 
@@ -8,30 +10,34 @@ namespace SmartAgents
 {
     public class HyperParameters : MonoBehaviour
     {
-        [Header("Network")]
         public HiddenLayers networkHiddenLayers = HiddenLayers.OneLarge;
-        [Range(0.000001f, 1f)] public float learnRate = 0.1f;
-        [Range(0f, 1f)] public float momentum = 0.9f;
-        [Range(0f, 0.1f)] public float regularization = 0.001f;
         public ActivationType activationType = ActivationType.Tanh;
         public LossType lossType = LossType.MeanSquare;
 
-        [Header("Training")]
-        [Range(0, 100_000)] public int memoryCapacity = 0;
-        [Range(0, 1f)] public float discountFactor = 0.1f;
-        [Min(0)] public int maxStep = 0;
+        [Space]
+        [Range(0.000001f, 1f)] public float learnRate = 0.001f;
+        [Range(0.000001f, 1f)] public float momentum = 0.9f;
+        [Range(0.000001f, 0.1f)] public float regularization = 0.001f;
+        [Range(0.000001f, 1f)] public float discountFactor = 0.99f;
+        [Range(0.000001f, 1f)] public float gaeFactor = 0.95f;
+        [Range(0.000001f, 1f)] public float clipFactor = 0.2f;
 
         [Space]
-        public AnimationCurve progressChart = new AnimationCurve();
-        public int epoch = 0;
-        public string accuracy;
-        
+        [SerializeField] private MemorySize memorySize = MemorySize.size1024;    
+        [SerializeField] private MiniBatchSize miniBatchSize = MiniBatchSize.size64;
+        [Min(1)] public int epochs = 10;
+        [Min(0)] public int maxStep = 0;
 
-        public void ClearProgressChart()
+        [HideInInspector] public int memory_size = 1024;
+        [HideInInspector] public int mini_batch_size = 64;
+        private void Awake()
         {
-            for (int i = 0; i < progressChart.length; i++)
+            memory_size = (int)Math.Pow(2, (int)memorySize + 8);
+            mini_batch_size = (int)Math.Pow(2, (int)miniBatchSize + 5);
+            if (mini_batch_size > memory_size)
             {
-                progressChart.RemoveKey(i);
+                mini_batch_size = memory_size;
+                miniBatchSize = (MiniBatchSize)(int)memorySize + 3;
             }
         }
     }

@@ -5,91 +5,70 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-[System.Serializable]
-public class Memory : ScriptableObject
+namespace SmartAgents
 {
-    [SerializeField] public List<Sample> records;
-    public Memory(string name = null) { 
-         records = new List<Sample>();
-    
-         if (name == null)
-             name = "NewMemory";
-         name += "#" + UnityEngine.Random.Range(1, 1000) + ".asset";
-    
-         Debug.Log(name + " was created!");
-         AssetDatabase.CreateAsset(this, "Assets/" + name);
-         AssetDatabase.SaveAssets();
-         EditorGUIUtility.SetIconForObject(this, AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SmartAgents/doc/memory_icon.png"));
-    }
-
-    public void AddRecord(Sample sample)
+    [System.Serializable]
+    public class Memory : ScriptableObject, IClearable
     {
-        records.Add(sample);
-    }
-    public void NormalizeRewards()
-    {
-        double minReward = records.Min(x => x.reward);
-        double maxReward = records.Max(x => x.reward);
-        double range = maxReward - minReward;
-
-        for (int i = 0; i < records.Count; i++)
+        [SerializeField] public List<Sample> records;
+        public Memory(string name = null)
         {
-            double normalizedReward;
-            if (records[i].reward < 0)
-                normalizedReward = -(records[i].reward / minReward);
-            else
-                normalizedReward = records[i].reward / maxReward;
-            Sample unnormalizedSample = records[i];
-            unnormalizedSample.reward = normalizedReward;
+            records = new List<Sample>();
 
-            records[i] = unnormalizedSample;
+            if (name == null)
+                name = "NewMemory";
+            name += "#" + UnityEngine.Random.Range(1, 1000) + ".asset";
+
+            Debug.Log(name + " was created!");
+            AssetDatabase.CreateAsset(this, "Assets/" + name);
+            AssetDatabase.SaveAssets();
+            EditorGUIUtility.SetIconForObject(this, AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SmartAgents/doc/memory_icon.png"));
+        }
+        public void Store(Sample sample)
+        {
+            records.Add(sample);
+        }
+        public void Store(double[] state, double[] action, double reward, bool isEpisodeEnd)
+        {
+            records.Add(new Sample(state, action, reward, isEpisodeEnd));
+        }
+        public bool IsFull(int capacity)
+        {
+            return records.Count >= capacity;
+        }
+        public void Clear()
+        {
+            records.Clear();
         }
 
-    }
-    public void CalculateDiscountedRewards(float gamma, ArtificialNeuralNetwork critic)
-    {
-        for (int i = 0; i < records.Count - 1; i++)
+        public string ToString()
         {
-            Sample currentRecord = records[i];
-             currentRecord.discountedReward = currentRecord.reward + gamma * DiscountedReward(i+1, gamma, critic);
-        }
-        double DiscountedReward(int nextRecord, float gamma, ArtificialNeuralNetwork critic)
-        {
-            if (records[nextRecord].terminalState)
-                return records[nextRecord].reward;
-            else
-            {
-                return records[nextRecord].reward + gamma * DiscountedReward(nextRecord+1, gamma, critic);
-            }
+            return "Memory [" + records.Count + "] type (state,action,reward,advantage)";
         }
     }
-    
-
-
-    public void PopLast()
+    public enum MemorySize
     {
-        try
-        {
-            records.RemoveAt(records.Count - 1); 
-        }
-        catch { }
+        size256,
+        size512,
+        size1024,
+        size2048,
+        size4096,
+        size8192,
+        size16384,
+        size32768,
+        size65536
     }
-    public void PopFirst()
+    public enum MiniBatchSize
     {
-        try
-        {
-            records.RemoveAt(0);
-        }
-        catch { }
-    }
-
-    public bool IsEmpty()
-    {
-        if(records == null || records.Count == 0) return true;
-        return false;
-    }
-    public int GetSize()
-    {
-        return records.Count;
+        size32,
+        size64,
+        size128,
+        size256,
+        size512,
+        size1024,
+        size2048,
+        size4096,
+        size8192,
+        size16384,
     }
 }

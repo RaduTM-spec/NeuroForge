@@ -10,29 +10,15 @@ namespace SmartAgents
         [SerializeField] public double[] state;
         [SerializeField] public double[] action;
         [SerializeField] public double reward;
-        [SerializeField] public double[] nextState;
-        [SerializeField] public double[] nextAction;
+        [SerializeField] public double advantage;
+        [SerializeField] public bool done;
 
-        [Space, SerializeField] public bool terminalState;
-        [SerializeField] public double discountedReward;
-
-        public Sample(double[] state, double[] action, double reward, bool terminalState)
+        public Sample(double[] state, double[] action, double reward, bool isDone)
         {
             this.state = state;
             this.action = action;
             this.reward = reward;
-            this.nextState = null;
-            this.nextAction = null;
-            this.terminalState = terminalState;
-            this.discountedReward = 0;
-        }
-
-        public bool IsComplete()
-        {
-            if (state == null || state.Length == 0) return false;
-            if (action == null || action.Length == 0) return false;
-            if (nextState == null || nextState.Length == 0) return false;
-            return true;
+            this.done = isDone;
         }
 
         public override string ToString()
