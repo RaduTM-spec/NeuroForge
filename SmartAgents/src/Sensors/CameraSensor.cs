@@ -20,7 +20,7 @@ namespace SmartAgents
         {
             if(cam == null)
             {
-                Debug.LogError("<color=red>CameraSensor camera not set to an instance of an object.<color>");
+                Debug.LogError("<color=red>CameraSensor camera not set to an instance of an object.</color>");
                 return;
             }
             cam.targetTexture = new RenderTexture(Width, Height, 0);

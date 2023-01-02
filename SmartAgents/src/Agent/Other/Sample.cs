@@ -25,7 +25,7 @@ namespace SmartAgents
         {
             StringBuilder sb = new StringBuilder();
 
-            sb.Append("s:[ ");
+            sb.Append("[ s:[ ");
             foreach (var item in state)
             {
                 sb.Append(item);
@@ -45,7 +45,7 @@ namespace SmartAgents
 
             sb.Append("r: [ ");
             sb.Append(reward);
-            sb.Append(" ]");
+            sb.Append(" ] ]");
 
             return sb.ToString();
 

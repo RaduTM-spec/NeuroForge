@@ -160,8 +160,8 @@ public class NetDebugger : MonoBehaviour
     {
         for (int i = 0; i < memory.records.Count; i++)
         {
-            if (memory.records[i].reward > 0)
-                Debug.Log("Found reward on step: "  + i + " reward# " + memory.records[i].reward);
+            if (memory.records[i].reward != 0)
+                Debug.Log("Found reward on Element: "  + i + " / " + memory.records.Count + "  ---> Reward# " + memory.records[i].reward);
         }
     }
 

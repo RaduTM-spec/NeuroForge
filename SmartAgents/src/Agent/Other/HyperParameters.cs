@@ -15,12 +15,13 @@ namespace SmartAgents
         public LossType lossType = LossType.MeanSquare;
 
         [Space]
-        [Range(0.000001f, 1f)] public float learnRate = 0.001f;
-        [Range(0.000001f, 1f)] public float momentum = 0.9f;
+        [Range(0.000001f, 1.0f)] public float learnRate = 0.001f;
+        [Range(0.000001f, 1.0f)] public float momentum = 0.9f;
         [Range(0.000001f, 0.1f)] public float regularization = 0.001f;
-        [Range(0.000001f, 1f)] public float discountFactor = 0.99f;
-        [Range(0.000001f, 1f)] public float gaeFactor = 0.95f;
-        [Range(0.000001f, 1f)] public float clipFactor = 0.2f;
+        [Range(0.000001f, 1.0f)] public float discountFactor = 0.99f;
+        [Range(0.000001f, 1.0f)] public float gaeFactor = 0.95f;
+        [Range(0.000001f, 1.0f)] public float clipFactor = 0.2f;
+        [Range(0.000000f, 0.1f)] public float actionNoise = 0f;
 
         [Space]
         [SerializeField] private MemorySize memorySize = MemorySize.size1024;    

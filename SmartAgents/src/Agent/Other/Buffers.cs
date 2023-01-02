@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using UnityEngine;
 
@@ -16,7 +17,7 @@ namespace SmartAgents
         }
         public void Clear()
         {
-            observations = new double[observations.Length];
+            observations = Enumerable.Repeat(0.0, observations.Length).ToArray();
             currentSize = 0;
         }
         public int GetBufferCapacity()
@@ -283,7 +284,7 @@ namespace SmartAgents
         }
         public void Clear()
         {
-            actions = new double[actions.Length];
+            actions = Enumerable.Repeat(0.0, actions.Length).ToArray();
         }
         public override string ToString()
         {

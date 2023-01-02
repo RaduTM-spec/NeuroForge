@@ -40,7 +40,6 @@ namespace SmartAgents
         {
             records.Clear();
         }
-
         public string ToString()
         {
             return "Memory [" + records.Count + "] type (state,action,reward,advantage)";

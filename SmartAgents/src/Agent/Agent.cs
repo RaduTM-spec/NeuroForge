@@ -65,7 +65,6 @@ namespace SmartAgents
                     actionType= ActionType.Continuous;
             }
                
-
             ActivationType activation = hp.activationType;
             ActivationType outputActivation = hp.activationType;
             LossType loss = hp.lossType;
@@ -83,6 +82,8 @@ namespace SmartAgents
             if(actor == null) actor = new ArtificialNeuralNetwork(SpaceSize, ActionSize, hp.networkHiddenLayers, activation, outputActivation, loss, GetActorName());
             if(critic == null) critic = new ArtificialNeuralNetwork(SpaceSize + ActionSize, 1, hp.networkHiddenLayers, ActivationType.Tanh, ActivationType.Tanh, LossType.MeanSquare, GetCriticName());
             if (memory == null) memory = new Memory(GetMemoryName());
+
+            memory.Clear();
 
             string GetActorName()
             {
@@ -155,9 +156,7 @@ namespace SmartAgents
                     break;
                 default:
                     break;
-
             }
-
             Step++;
             if(hp.maxStep != 0 && Step >= hp.maxStep && 
                 (behavior == BehaviorType.Inference || behavior == BehaviorType.Heuristic))
@@ -186,50 +185,68 @@ namespace SmartAgents
 
             if (memory.IsFull(hp.memory_size) == true)
             {
-                TrainNetworks();
+                GAE();
+
+                for (int i = 0; i < hp.memory_size / hp.mini_batch_size; i++)
+                {
+                    List<Sample> miniBatch = memory.records.GetRange(i, i + hp.mini_batch_size);
+                    UpdateActor(miniBatch);
+                    UpdateCritic(miniBatch);
+                }
                 memory.Clear();
             }
-
-            sensorBuffer.Clear();
-            actionBuffer.Clear();
             reward = 0;
         }
-
-        #endregion
-
-        #region PPO
         private void Collect_Action_Store(bool isEndOfEpisode)
         {
+            
+            sensorBuffer.Clear();
+            actionBuffer.Clear();
+
             CollectSensors(sensorBuffer);
             CollectObservations(sensorBuffer);
             if (behavior == BehaviorType.Inference)
+            {
                 actionBuffer.actions = actor.ForwardPropagation(sensorBuffer.observations);
+                AddNoiseToActions(actionBuffer);
+            }
             else if (behavior == BehaviorType.Heuristic)
+            {
                 Heuristic(actionBuffer);
+            }
             OnActionReceived(actionBuffer);
 
             memory.Store(sensorBuffer.observations, actionBuffer.actions, reward, isEndOfEpisode);
         }
-        void TrainNetworks()
-        {
-            GAE();
-          
-            for (int i = 0; i < hp.memory_size / hp.mini_batch_size; i++)
-            {
-                List<Sample> miniBatch = memory.records.GetRange(i, i + hp.mini_batch_size);
-                UpdateActor(miniBatch);
-                UpdateCritic(miniBatch);
-            }
-        }
-        void GAE()
+        #endregion
+
+        #region PPO
+        private void GAE()
         {
             List<Sample> data = memory.records;
 
-            //Calculate advantages
-            for (int i = 0; i < data.Count - 1; i++)
+            //Normalize rewards
+            double minReward = data.Min(s => s.reward);
+            double maxReward = data.Max(s => s.reward);
+            for(int i = 0; i < data.Count; i++)
             {
-                double value = critic.ForwardPropagation(data[i].state)[0];
-                double nextValue = critic.ForwardPropagation(data[i + 1].state)[0];
+                if (data[i].reward == 0)
+                    continue;
+                if (data[i].reward < 0)
+                    data[i].reward /= -minReward;
+                else
+                    data[i].reward /= maxReward;
+            }
+
+            //Calculate advantages
+            for (int i = data.Count - 1; i >= 0; i--)
+            {
+                double value = critic.ForwardPropagation(data[i].state.Concat(data[i].action).ToArray())[0];
+                double nextValue;
+                if (i != data.Count - 1)
+                    nextValue = critic.ForwardPropagation(data[i + 1].state.Concat(data[i + 1].action).ToArray())[0];
+                else
+                    nextValue = 0;
 
                 double reward = data[i].reward;
                 double advantage = 0;
@@ -256,7 +273,38 @@ namespace SmartAgents
             }
 
         }
-        void UpdateActor(List<Sample> mini_batch)
+        private void UpdateCritic(List<Sample> mini_batch)
+        {
+            double[][] states = mini_batch.Select(x => x.state).ToArray();
+            double[][] actions = mini_batch.Select(x => x.action).ToArray();
+            double[] rewards = mini_batch.Select(x => x.reward).ToArray();
+            double[] discounted_sum_rewards = GetDiscountedRewards();
+
+            for (int i = 0; i < states.Length; i++)
+            {
+                double predicted_value = critic.ForwardPropagation(states[i].Concat(actions[i]).ToArray())[0];
+
+                double[] expectedValue = new double[] { discounted_sum_rewards[i] };
+
+                critic.BackPropagation(states[i].Concat(actions[i]).ToArray(), expectedValue);
+            }
+            critic.UpdateParameters(hp.learnRate, hp.momentum, hp.regularization);
+
+
+            double[] GetDiscountedRewards()
+            {
+                double[] discounted_sum_rewards = new double[rewards.Length];
+
+                double sum = 0;
+                for (int i = rewards.Length - 1; i >= 0; i--)
+                {
+                    sum = sum * hp.discountFactor + rewards[i];
+                    discounted_sum_rewards[i] = sum;
+                }
+                return discounted_sum_rewards;
+            }
+        }
+        private void UpdateActor(List<Sample> mini_batch)
         {
             //convert s,a,adv to tensors (double arrays)
 
@@ -293,37 +341,9 @@ namespace SmartAgents
                 //Update the actor
                 actor.BackPropagation(states[i], expectedActions);
             }
+            actor.UpdateParameters(hp.learnRate, hp.momentum, hp.regularization);
         }
-        void UpdateCritic(List<Sample> mini_batch)
-        {
-            double[][] states = mini_batch.Select(x => x.state).ToArray();
-            double[][] actions = mini_batch.Select(x => x.action).ToArray();
-            double[] rewards = mini_batch.Select(x => x.reward).ToArray();
-            double[] discounted_sum_rewards = GetDiscountedRewards();
-
-            for (int i = 0; i < states.Length; i++)
-            {
-                double predicted_value = critic.ForwardPropagation(states[i].Concat(actions[i]).ToArray())[0];
-
-                double[] expectedValue = new double[] { discounted_sum_rewards[i] };
-
-                critic.BackPropagation(states[i].Concat(actions[i]).ToArray(), expectedValue);
-            }
-                
-                
-            double[] GetDiscountedRewards()
-            {
-                double[] discounted_sum_rewards = new double[rewards.Length];
-
-                double sum = 0;
-                for (int i = rewards.Length - 1; i >= 0; i++)
-                {
-                     sum = sum * hp.discountFactor + rewards[i];
-                     discounted_sum_rewards[i] = sum;
-                }
-                return discounted_sum_rewards;
-            }
-        }
+        
 
         #endregion
 
@@ -391,6 +411,15 @@ namespace SmartAgents
 
                 ResetEnvironment(child, ref index);
             }
+        }
+        private void AddNoiseToActions(ActionBuffer actionBuffer)
+        {
+            if (hp.actionNoise == 0)
+                return;
+            for (int i = 0; i < actionBuffer.actions.Length; i++)
+            {
+                actionBuffer.actions[i] += Functions.RandomGaussian(0, hp.actionNoise);
+            } 
         }
 
         public virtual void CollectObservations(SensorBuffer sensorBuffer)
