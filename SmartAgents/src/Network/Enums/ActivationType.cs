@@ -3,6 +3,7 @@ namespace SmartAgents
 {
     public enum ActivationType
     {
+        None,
         BinaryStep,
         Sigmoid,
         Tanh,

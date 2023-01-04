@@ -1,12 +1,13 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using UnityEngine;
 
 namespace SmartAgents
 {
     [Serializable]
-    public class BiasLayer
+    public class BiasLayer : ICloneable
     {
         [SerializeField] public double[] biases;
         public BiasLayer(int noBiases, bool zeroes = false)
@@ -19,6 +20,16 @@ namespace SmartAgents
                 else
                     biases[i] = Functions.RandomGaussian();
             }
+        }
+        public object Clone()
+        {
+            BiasLayer clone = new BiasLayer(biases.Length);
+            clone.biases = new double[this.biases.Length];
+            for (int i = 0; i < clone.biases.Length; i++)
+            {
+                clone.biases[i] = this.biases[i];
+            }
+            return clone;
         }
     }
 }

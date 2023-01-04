@@ -2,10 +2,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using Unity.VisualScripting.Antlr3.Runtime;
 using UnityEditor;
 using UnityEngine;
-
+using UnityEngine.Windows;
+using static System.Collections.Specialized.BitVector32;
 
 namespace SmartAgents {
 
@@ -27,10 +29,10 @@ namespace SmartAgents {
         private BiasLayer[] biasMomentums;
 
         int backPropagationsCount = 0;
-        public ArtificialNeuralNetwork(int inputs, int outputs, HiddenLayers size, ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, string name)
+        public ArtificialNeuralNetwork(int inputs, int outputs, HiddenLayers hiddenSize, ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, bool createAsset, string name)
         {
             //DECIDE FORMAT
-            switch(size)
+            switch(hiddenSize)
             {
                 case HiddenLayers.None:
                     format = new int[2];
@@ -87,15 +89,65 @@ namespace SmartAgents {
                 weightLayers[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1]);
             }
 
-
+            if (!createAsset)
+                return;
             Debug.Log(name + " was created!");
             AssetDatabase.CreateAsset(this, "Assets/" + name + ".asset");
             AssetDatabase.SaveAssets();
-            EditorGUIUtility.SetIconForObject(this, AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SmartAgents/doc/network_icon.png"));
+            //EditorGUIUtility.SetIconForObject(this, AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SmartAgents/doc/network_icon.png"));*/
             
         }
-       
+        public ArtificialNeuralNetwork(ArtificialNeuralNetwork other, bool createAsset, string name)
+        {
+            this.format = new int[other.format.Length];
+            this.neuronLayers = new NeuronLayer[other.neuronLayers.Length];
+            this.biasLayers = new BiasLayer[other.biasLayers.Length];
+            this.weightLayers = new WeightLayer[other.weightLayers.Length];
 
+            for (int i = 0; i < neuronLayers.Length; i++)
+            {
+                neuronLayers[i] = new NeuronLayer(format[i]);
+                biasLayers[i] = new BiasLayer(format[i]);
+
+            }
+            for (int i = 0; i < neuronLayers.Length - 1; i++)
+            {
+                weightLayers[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1]);
+            }
+
+            SetParametersFrom(other);
+
+            if (!createAsset)
+                return;
+            Debug.Log(name + " was created!");
+            AssetDatabase.CreateAsset(this, "Assets/" + name + ".asset");
+            AssetDatabase.SaveAssets();
+        }
+        public void SetParametersFrom(ArtificialNeuralNetwork other)
+        {
+            for (int i = 0; i < format.Length; i++)
+            {
+                this.format[i] = other.format[i];
+            }
+            for (int i = 0; i < neuronLayers.Length; i++)
+            {
+                this.neuronLayers[i] = (NeuronLayer)other.neuronLayers[i].Clone();
+            }
+            for (int i = 0; i < biasLayers.Length; i++)
+            {
+                this.biasLayers[i] = (BiasLayer)other.biasLayers[i].Clone();
+            }
+            for (int i = 0; i < weightLayers.Length; i++)
+            {
+                this.weightLayers[i] = (WeightLayer)other.weightLayers[i].Clone();
+            }
+
+            this.activationType = other.activationType;
+            this.outputActivationType = other.outputActivationType;
+            this.lossType = other.lossType;
+        }
+
+        #region TRAIN
         public double[] ForwardPropagation(double[] inputs)
         {
             neuronLayers[0].SetOutValues(inputs);
@@ -126,13 +178,13 @@ namespace SmartAgents {
 
             return neuronLayers[neuronLayers.Length - 1].GetOutValues();
         }
-        public double BackPropagation(double[] inputs, double[] labels, double advantageEstimate = 1)
+        public double BackwardPropagation(double[] inputs, double[] labels)
         {
             if (weightGradients == null || weightGradients.Length == 0)
                 InitGradients_InitMomentums();
 
             ForwardPropagation(inputs);
-            double error = Functions.Cost.CalculateOutputLayerCost(neuronLayers[neuronLayers.Length-1], labels, outputActivationType, lossType, advantageEstimate);
+            double error = Functions.Cost.CalculateOutputLayerCost(neuronLayers[neuronLayers.Length-1], labels, outputActivationType, lossType);
 
             for (int wLayer = weightLayers.Length - 1; wLayer >= 0; wLayer--)
             {
@@ -142,7 +194,26 @@ namespace SmartAgents {
             backPropagationsCount++;
             return error;
         }
-        public void UpdateParameters(float learningRate = 0.1f, float momentum = 0.9f, float regularization = 0.001f)
+        public void BackwardPropagation(double[] inputs, double surrogateLoss)
+        {
+            if (weightGradients == null || weightGradients.Length == 0)
+                InitGradients_InitMomentums();
+            ForwardPropagation(inputs);
+            NeuronLayer outLayer = neuronLayers[neuronLayers.Length - 1];
+
+            for (int i = 0; i < outLayer.neurons.Length; i++)
+            {
+                outLayer.neurons[i].CostValue = surrogateLoss * Functions.Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
+            }
+
+            for (int wLayer = weightLayers.Length - 1; wLayer >= 0; wLayer--)
+            {
+                UpdateGradients(weightGradients[wLayer], biasGradients[wLayer + 1], neuronLayers[wLayer], neuronLayers[wLayer + 1]);
+                Functions.Cost.CalculateLayerCost(neuronLayers[wLayer], weightLayers[wLayer], neuronLayers[wLayer + 1], activationType);
+            }
+            backPropagationsCount++;
+        }
+        public void UpdateParameters(float learningRate, float momentum, float regularization)
         {
             ApplyGradients(learningRate / backPropagationsCount, momentum, regularization);
             backPropagationsCount = 0;
@@ -218,29 +289,45 @@ namespace SmartAgents {
                 }
             }
         }
-        
 
-        public double[] GetLogProbs(double[][] inputs, double[][] outputs)
+        #endregion
+
+
+        #region OTHER
+
+      
+        public double[] GetLogGaussianProb(double[] inputs)
         {
-            double[] log_probs = new double[inputs.Length];
-            for (int i = 0; i < inputs.Length; i++)
-            {
-                double[] action_probs = ForwardPropagation(inputs[i]);
-                double log_prob = 0;
+            double[] rawOutput = ForwardPropagation(inputs);
 
-                for (int j = 0; j < outputs[i].Length; j++)
-                {
-                    if (outputs[i][j] == 1)
-                    {
-                        log_prob += Math.Log(action_probs[j]);
-                    }
-                    else
-                    {
-                        log_prob += Math.Log(1 - action_probs[j]);
-                    }
-                }
-                log_probs[i] = log_prob;
+            double[] means = new double[rawOutput.Length /2];
+            double[] stds = new double[rawOutput.Length / 2];
+            for (int i = 0; i < rawOutput.Length; i+=2)
+            {
+                means[i/2] = rawOutput[i];
+                stds[i/2] = rawOutput[i+1]*0.5 + 0.5 + 0.00000001; // force > 0 (transformes tanh to sigmoid for std dev)
             }
+
+            
+            double[] actions = new double[rawOutput.Length / 2];
+            for (int i = 0; i < actions.Length/2; i++)
+            {
+                
+                double mean = means[i];
+                double std = stds[i];
+                actions[i] = Functions.RandomGaussian(mean, std);
+            }
+
+            double[] log_probs = new double[rawOutput.Length / 2];
+            for (int i = 0; i < log_probs.Length; i++)
+            {
+                double mean = means[i];
+                double std = stds[i];
+                double act = actions[i];
+
+                log_probs[i] = -0.5 * Math.Log(2 * Math.PI * std * std) - Math.Pow(act - mean, 2) / (2 * std * std);
+            }
+
             return log_probs;
         }
         public int GetInputsNumber()
@@ -250,8 +337,14 @@ namespace SmartAgents {
         public int GetOutputsNumber()
         {
             return format[format.Length - 1];
-        }       
+        }
+        #endregion
     }
 
-   
+    public enum Optimizer
+    {
+        GD,
+        Adam//not implemented
+    }
+
 }

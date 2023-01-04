@@ -6,7 +6,7 @@ using UnityEngine;
 namespace SmartAgents
 {
     [Serializable]
-    public class NeuronLayer
+    public class NeuronLayer:ICloneable
     {
         public Neuron[] neurons;
         public NeuronLayer(int noNeurons)
@@ -16,6 +16,15 @@ namespace SmartAgents
             {
                 neurons[i] = new Neuron();
             }
+        }
+        public object Clone()
+        {
+            NeuronLayer clone = new NeuronLayer(this.neurons.Length);
+            for (int i = 0; i < this.neurons.Length; i++)
+            {
+                clone.neurons[i] = (Neuron)this.neurons[i].Clone();
+            }
+            return clone;
         }
 
         public void SetInValues(double[] values)

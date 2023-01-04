@@ -9,7 +9,7 @@ namespace SmartAgents
     [Serializable]
     public class CompoundNetwork : ScriptableObject
     {
-        [SerializeField] public ArtificialNeuralNetwork actorNetwork;
+        /*[SerializeField] public ArtificialNeuralNetwork actorNetwork;
         [SerializeField] public ArtificialNeuralNetwork criticNetwork;
         [SerializeField] private List<Sample> offlineTrainingData;
 
@@ -38,7 +38,7 @@ namespace SmartAgents
         public int GetActorOutputsNumber()
         {
             return actorNetwork.GetOutputsNumber();
-        }
+        }*/
 
 
     }

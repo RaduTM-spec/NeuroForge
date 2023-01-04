@@ -12,7 +12,7 @@ using System.Text;
 public class NetDebugger : MonoBehaviour
 {
     public ArtificialNeuralNetwork Network;
-    public Memory memory;
+    public ExperienceBuffer memory;
 
     [Space] public bool findRewardinMem = false;
     [Space]
@@ -28,11 +28,6 @@ public class NetDebugger : MonoBehaviour
     List<double[]> labelsData = new List<double[]>();
     List<float> progress = new List<float>();
     
-    private void Awake()
-    {
-        InitNetwork();
-        
-    }
     private void Start()
     {
         if(findRewardinMem) 
@@ -70,21 +65,6 @@ public class NetDebugger : MonoBehaviour
         }*/
     }
 
-    private void InitNetwork()
-    {
-        if (Network != null)
-            return;
-
-        Network = new ArtificialNeuralNetwork(2, 1, HiddenLayers.OneLarge, ActivationType.Tanh, ActivationType.Tanh, LossType.MeanSquare, GetName());
-
-        string GetName()
-        {
-            short id = 1;
-            while (AssetDatabase.LoadAssetAtPath<ArtificialNeuralNetwork>("Assets/TestCriticNN#" + id + ".asset") != null)
-                id++;
-            return "TestCriticNN#" + id;
-        }
-    }
     private void TrainNetwork()
     {
         for (int epoch = 0; epoch < 1000; epoch++)
@@ -92,7 +72,7 @@ public class NetDebugger : MonoBehaviour
             double epochErr = 0;
             for (int i = 0; i < inputsData.Count; i++)
             {
-                epochErr += Network.BackPropagation(inputsData[i], labelsData[i]);
+                epochErr += Network.BackwardPropagation(inputsData[i], labelsData[i]);
             }
             Debug.Log("Epoch [" + epoch + "] Error -> " + epochErr/inputsData.Count);
             progress.Add((float)epochErr/inputsData.Count);

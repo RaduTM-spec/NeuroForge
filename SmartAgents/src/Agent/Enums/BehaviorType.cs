@@ -5,7 +5,7 @@ namespace SmartAgents
         Passive,//does nothing
         Active,//uses his nn
         Inference,//learns by inference
-        Heuristic,//learns by user input
+        //Heuristic deprecated for now
     }
 
 }

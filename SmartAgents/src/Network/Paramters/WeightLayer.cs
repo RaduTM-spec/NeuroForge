@@ -6,7 +6,7 @@ using UnityEngine;
 namespace SmartAgents
 {
     [Serializable]
-    public class WeightLayer: ISerializationCallbackReceiver
+    public class WeightLayer: ISerializationCallbackReceiver, ICloneable
     {
         public double[][] weights;
 
@@ -30,6 +30,25 @@ namespace SmartAgents
                 }
             }
 
+        }
+        private WeightLayer() { }
+        public object Clone()
+        {
+            WeightLayer clone = new WeightLayer();
+            clone.weights = new double[this.weights.Length][];
+            for (int i = 0; i < this.weights.Length; i++)
+            {
+                clone.weights[i] = new double[this.weights[i].Length];
+                for (int j = 0; j < this.weights[i].Length; j++)
+                {
+                    clone.weights[i][j] = this.weights[i][j];
+                }
+            }
+
+            clone.prevNeurons = this.prevNeurons;
+            clone.nextNeurons = this.nextNeurons;
+
+            return clone;
         }
 
         public void OnBeforeSerialize()
