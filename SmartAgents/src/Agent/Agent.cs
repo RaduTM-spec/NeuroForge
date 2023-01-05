@@ -22,7 +22,6 @@ namespace SmartAgents
         public BehaviorType behavior = BehaviorType.Passive;
 
         [SerializeField] private ArtificialNeuralNetwork policyNetwork;
-                         private ArtificialNeuralNetwork oldPolicyNetwork;
         [SerializeField] private ArtificialNeuralNetwork criticNetwork;
 
         [Space, SerializeField] private ExperienceBuffer experienceBuffer;
@@ -34,7 +33,7 @@ namespace SmartAgents
 
         #region Private Fields
         private int Episode = 1;
-        private int Step = 0;//do not modify
+        private int Step = 0;
         private double episodeCumulatedReward = 0;
 
         private HyperParameters hp;
@@ -84,11 +83,11 @@ namespace SmartAgents
             else // Continuous
             {
                 actorOutputs = ActionSize * 2;
-                outputActivation = ActivationType.Tanh;
+                outputActivation = ActivationType.Tanh_and_Softplus;
             }
             
             if(policyNetwork == null) policyNetwork = new ArtificialNeuralNetwork(SpaceSize, actorOutputs, hp.networkHiddenLayers, activation, outputActivation, lossFunc, true, GetPolicyName());
-            if(oldPolicyNetwork == null) oldPolicyNetwork = new ArtificialNeuralNetwork(policyNetwork, false, GetOldPolicyName());
+            //if(oldPolicyNetwork == null) oldPolicyNetwork = new ArtificialNeuralNetwork(policyNetwork, false, GetOldPolicyName());
             
             if (criticNetwork == null) criticNetwork = new ArtificialNeuralNetwork(SpaceSize, 1, hp.networkHiddenLayers, activation, ActivationType.None, LossType.MeanSquare, true, GetCriticName());
             if (experienceBuffer == null) experienceBuffer = new ExperienceBuffer(GetMemoryName(), true);
@@ -204,25 +203,18 @@ namespace SmartAgents
             Collect_Action_Store(false);
 
             if (experienceBuffer.IsFull(hp.buffer_size) == true)
-            {
+            {         
+                double[] returns = GAE();
                 
-                
-                GAE(); // Normalize Rewards + Calculate Advantages + Normalize Advantages (should work fine)
-
-                for (int i = 0; i < hp.buffer_size / hp.batch_size; i++) //Foreach miniBatch
+                for (int i = 0; i < hp.buffer_size / hp.batch_size; i++) 
                 {
                     List<Sample> miniBatch = experienceBuffer.records.GetRange(i, i + hp.batch_size);
                     
-                    lock(policyNetwork)lock(oldPolicyNetwork)lock(criticNetwork)
+                    lock(policyNetwork)lock(criticNetwork)
                     {
-                        UpdateActor(miniBatch);
-                        UpdateCritic(miniBatch);
-                    }
-                                 
-                }
-                
-                oldPolicyNetwork.SetParametersFrom(policyNetwork);
-
+                        UpdateActorCritic(miniBatch, returns);
+                    }                                
+                }     
                 experienceBuffer.Clear();
             }
             reward = 0;
@@ -230,7 +222,7 @@ namespace SmartAgents
 
         #endregion
 
-        #region PPO
+        #region PPO Training
         private void Collect_Action_Store(bool episodeDone)
         {
             sensorBuffer.Clear();
@@ -239,23 +231,26 @@ namespace SmartAgents
             CollectSensors(sensorBuffer);
             CollectObservations(sensorBuffer);
 
-            double[] outs = policyNetwork.ForwardPropagation(sensorBuffer.observations);
-            experienceBuffer.Store(sensorBuffer.observations, outs, reward, episodeDone);
+            double[] rawOutputs = policyNetwork.ForwardPropagation(sensorBuffer.observations);
+            
+            //Discrete output form: 1branch(x,y,z) x+y+z = 1 (softmax)
+            //Continous output form: (mean, stddev) (mean, stddev) (mean, stddev) => 3 continuous actions
 
-            //Output form: (mean, stddev) (mean, stddev) (mean, stddev) => 3 continuous actions
+            double[] log_probs = GetLogProbs(rawOutputs);
+            double value = criticNetwork.ForwardPropagation(sensorBuffer.observations)[0];
 
-            //Probability to Action
-            if(actionType == ActionType.Continuous)
-                for (int i = 0; i < outs.Length; i+=2)
-                {
-                    actionBuffer.actions[i/2] = Functions.RandomGaussian(outs[i], outs[i + 1]); //UnityEngine.Random.Range(-1.0f, 1.0f) * outs[i+1] + outs[i]; 
-                }
+            experienceBuffer.Store(sensorBuffer.observations, rawOutputs, reward, log_probs, value, episodeDone);
 
+            FillActionBuffer(rawOutputs);
             OnActionReceived(actionBuffer);  
         }
-        private void GAE()
+        private double[] GAE()
         {
+            //Advantages are stored inside the buffer
             List<Sample> data = experienceBuffer.records;
+
+            //Returns are returned
+            List<double> returns = new List<double>();
 
             //Normalize rewards 
             double minReward = data.Min(s => s.reward);
@@ -271,120 +266,154 @@ namespace SmartAgents
             }
 
             //Calculate advantages
-            double advantage = 0.0;          
+            double advantage = 0.0;  //or gae value
             for (int i = data.Count - 1; i >= 0; i--)
             {
-                double value = criticNetwork.ForwardPropagation(data[i].state.Concat(data[i].action).ToArray())[0];
+                double value = criticNetwork.ForwardPropagation(data[i].state)[0];
+                double nextValue = i == data.Count-1? 
+                                        0 : 
+                                        criticNetwork.ForwardPropagation(data[i + 1].state)[0];
 
-                double nextValue;
-                if (i != data.Count - 1)
-                { nextValue = criticNetwork.ForwardPropagation(data[i + 1].state.Concat(data[i + 1].action).ToArray())[0]; }
-                else
-                { nextValue = 0; }
 
-                double delta;
-                if (data[i].done)
-                {
-                    delta = data[i].reward - value;
-                }
-                else
-                {
-                    delta = reward + hp.discountFactor * nextValue - value;
-                }
+                double delta = data[i].done? 
+                                data[i].reward - value :
+                                reward + hp.discountFactor * nextValue - value; //Bellman equation
+
                 advantage = advantage * hp.discountFactor * hp.gaeFactor + delta;
 
-                data[i].advantage = advantage;
+                returns.Add(advantage + value);
             }
-
-
-            //Normalize advantages
-            double mean = data.Sum(x => x.advantage) / data.Count;
-            double std = Math.Sqrt(data.Sum(x => Math.Pow(x.advantage - mean, 2)) / data.Count);
-            for (int i = 0; i < data.Count; i++)
-            {
-                data[i].advantage = (data[i].advantage - mean) / (std + 0.00000001);
-            }
+            returns.Reverse();
+            return returns.ToArray();
         }
-        private void UpdateActor(List<Sample> mini_batch)
+        private void UpdateActorCritic(List<Sample> mini_batch, double[] returns)
         {
             //convert s,a,adv to tensors (double arrays)
             double[][] states = mini_batch.Select(x => x.state).ToArray();
             double[][] actions = mini_batch.Select(x => x.action).ToArray();
-            double[] advantages = mini_batch.Select(x => x.advantage).ToArray();
 
-            for (int t = 0; t < states.Length; t++)
+            //calculate and normalize advantages
+            double[] advantages = mini_batch.Select(x => -x.value).ToArray();
+            for (int i = 0; i < advantages.Length; i++)
             {
-                double[] old_log_policy_probs = oldPolicyNetwork.GetLogGaussianProb(states[t]);
-                double[] new_log_policy_probs = policyNetwork.GetLogGaussianProb(states[t]);
+                advantages[i] += returns[i];
+            }
+            NormalizeAdvantages(advantages, mini_batch.Count);
+
+            //Train
+            for (int t = 0; t < mini_batch.Count; t++)
+            {
+                double[] rawOutput = policyNetwork.ForwardPropagation(mini_batch[t].state);
+                double value = criticNetwork.ForwardPropagation(mini_batch[t].state)[0];
+
+                double[] old_policy_log_probs = mini_batch[t].log_probs;
+                double[] new_policy_log_probs = GetLogProbs(rawOutput);
 
                 //RATIO
-                double ratio = 1;
-                for (int p = 0; p < old_log_policy_probs.Length; p++)
+                double[] ratios = new double[old_policy_log_probs.Length];
+                for (int p = 0; p < old_policy_log_probs.Length; p++)
                 {
-                    ratio += new_log_policy_probs[p] - old_log_policy_probs[p];
+                    ratios[p] = new_policy_log_probs[p] - old_policy_log_probs[p];
                 }
 
-                //CLIPPED RATIO
-                double clipped_ratio = Math.Min
+                double[] surrogate_losses = new double[ratios.Length];
+                for (int r = 0; r < ratios.Length; r++)
+                {
+                    surrogate_losses[r] = -Math.Min
                                        (
-                                             ratio * advantages[t],
-                                             Math.Clamp(ratio, 1 - hp.clipFactor, 1 + hp.clipFactor) * advantages[t]
+                                             ratios[r] * advantages[t],
+                                             Math.Clamp(ratios[r], 1 - hp.clipFactor, 1 + hp.clipFactor) * advantages[t]
                                        );
+                }
 
                 //ENTROPY
-                double entropy = 0;
-                for (int p = 0; p < old_log_policy_probs.Length; p++)
+                List<double> entrops = new List<double>();
+                for (int o = 0; o < rawOutput.Length; o+=2)
                 {
-                    double ex = Math.Exp(new_log_policy_probs[p]);
-                    entropy += -ex * Math.Log(ex);
+                    double mu = rawOutput[o];
+                    double sigma = rawOutput[o + 1];
+                    entrops.Add(0.5 * Math.Log(2 * Math.PI * Math.E * sigma * sigma));
                 }
-               
+                double[] entropies = entrops.ToArray();
 
-                //SURROGATE
-                double surrogate_loss = clipped_ratio + hp.entropyRegularization * entropy;
+                //SURROGATE LOSS
+                double[] critic_loss = new double[] { returns[t] - value };
 
-               
+                double[] actor_loss = new double[rawOutput.Length];
+                for (int i = 0; i < actor_loss.Length; i++)
+                {
+                    actor_loss[i] = surrogate_losses[i/2] + hp.entropyRegularization * entropies[i/2];
 
-                //SGD -> no Adam :(
-                policyNetwork.BackwardPropagation(states[t], surrogate_loss);
+                }
+
+                //SGD
+                criticNetwork.BackwardPropagation(states[t], critic_loss);
+                criticNetwork.UpdateParameters(hp.learnRate, hp.momentum, hp.regularization);
+                
+                policyNetwork.BackwardPropagation(states[t], actor_loss);
                 policyNetwork.UpdateParameters(hp.learnRate, hp.momentum, hp.regularization);
             }
 
 
         }
-        private void UpdateCritic(List<Sample> mini_batch)
-        {
-            double[][] states = mini_batch.Select(x => x.state).ToArray();
-            double[][] actions = mini_batch.Select(x => x.action).ToArray();
-            double[] rewards = mini_batch.Select(x => x.reward).ToArray();
-            double[] discounted_sum_rewards = CalculateDiscountedRewards(rewards);
-
-            for (int i = 0; i < states.Length; i++)
-            {
-                double predicted_value = criticNetwork.ForwardPropagation(states[i])[0];
-
-                double[] expectedValue = new double[] { discounted_sum_rewards[i] };
-
-                //SGD
-                criticNetwork.BackwardPropagation(states[i], expectedValue);
-                criticNetwork.UpdateParameters(hp.learnRate, hp.momentum, hp.regularization);
-            }
-            
-        }
         
-        double[] CalculateDiscountedRewards(double[] rewards)
+        void NormalizeAdvantages(double[] advantages, int dataCount)
         {
-            double[] d_s_m = new double[rewards.Length];
-
-            double sum = 0;
-            for (int i = rewards.Length - 1; i >= 0; i--)
+            //Normalize advantages
+            double mean = advantages.Sum() / advantages.Length;
+            double std = Math.Sqrt(advantages.Sum(x => Math.Pow(x - mean, 2) / advantages.Length));
+            for (int i = 0; i < dataCount; i++)
             {
-                sum = sum * hp.discountFactor + rewards[i];
-                d_s_m[i] = sum;
+                advantages[i] = (advantages[i] - mean) / (std + 0.00000001);
             }
-            return d_s_m;
         }
+        double[] GetLogProbs(double[] rawOutputs)
+        {
+            List<double> log_probs = new List<double>();
+            if (actionType == ActionType.Discrete)
+            {
+                // to be completed
+            }
+            else if (actionType == ActionType.Continuous)
+            {
+                for (int i = 0; i < rawOutputs.Length; i += 2)
+                {
+                    double mean = rawOutputs[i];
+                    double stddev = rawOutputs[i + 1];
 
+                    double actionSample = Math.Clamp(Functions.RandomGaussian(mean, stddev),-1,1);
+
+                    double log_prob = LogProb(actionSample, mean, stddev);
+                    log_probs.Add(log_prob);
+
+                }
+            }
+            return log_probs.ToArray();
+
+            double LogProb(double action, double mu, double sigma)
+            {
+                double logProb = -0.5 * Math.Log(2 * Math.PI * sigma * sigma) - ((action - mu) * (action - mu)) / (2 * sigma * sigma);
+                return logProb;
+            }
+        }
+        void FillActionBuffer(double[] rawOutputs)
+        {
+            if (actionType == ActionType.Discrete)
+            {
+                actionBuffer.actions = rawOutputs;
+            }
+            else if (actionType == ActionType.Continuous)
+            {
+                for (int i = 0; i < rawOutputs.Length; i += 2)
+                {
+                    double mean = rawOutputs[i];
+                    double stddev = rawOutputs[i + 1];
+
+                    double actionSample = Functions.RandomGaussian(mean, stddev);
+                    actionBuffer.actions[i / 2] = Math.Clamp(actionSample,-1.0,1.0);
+                }
+            }
+        }
         #endregion
 
         #region Utils

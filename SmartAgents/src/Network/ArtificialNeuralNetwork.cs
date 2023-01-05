@@ -198,12 +198,13 @@ namespace SmartAgents {
         {
             if (weightGradients == null || weightGradients.Length == 0)
                 InitGradients_InitMomentums();
-            ForwardPropagation(inputs);
+            double[] outputs = ForwardPropagation(inputs);
             NeuronLayer outLayer = neuronLayers[neuronLayers.Length - 1];
 
+            //Calculate the error
             for (int i = 0; i < outLayer.neurons.Length; i++)
             {
-                outLayer.neurons[i].CostValue = surrogateLoss * Functions.Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
+                outLayer.neurons[i].CostValue = (outputs[i] - surrogateLoss) * Functions.Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
             }
 
             for (int wLayer = weightLayers.Length - 1; wLayer >= 0; wLayer--)
@@ -295,21 +296,52 @@ namespace SmartAgents {
 
         #region OTHER
 
-      
-        public double[] GetLogGaussianProb(double[] inputs)
+        public static double[] GetLogProb(double[] rawOutputs)
         {
-            double[] rawOutput = ForwardPropagation(inputs);
-
-            double[] means = new double[rawOutput.Length /2];
-            double[] stds = new double[rawOutput.Length / 2];
-            for (int i = 0; i < rawOutput.Length; i+=2)
+            double[] means = new double[rawOutputs.Length / 2];
+            double[] stds = new double[rawOutputs.Length / 2];
+            for (int i = 0; i < rawOutputs.Length; i += 2)
             {
-                means[i/2] = rawOutput[i];
-                stds[i/2] = rawOutput[i+1]*0.5 + 0.5 + 0.00000001; // force > 0 (transformes tanh to sigmoid for std dev)
+                means[i / 2] = rawOutputs[i];
+                stds[i / 2] = rawOutputs[i + 1] + 0.00000001;
+            }
+
+
+            double[] actions = new double[rawOutputs.Length / 2];
+            for (int i = 0; i < actions.Length / 2; i++)
+            {
+
+                double mean = means[i];
+                double std = stds[i];
+                actions[i] = Functions.RandomGaussian(mean, std);
+            }
+
+            double[] log_probs = new double[rawOutputs.Length / 2];
+            for (int i = 0; i < log_probs.Length; i++)
+            {
+                double mean = means[i];
+                double std = stds[i];
+                double act = actions[i];
+
+                // probably mulitply the log with 0.5
+                log_probs[i] = -Math.Log(2 * Math.PI * std * std) - Math.Pow(act - mean, 2) / (2 * std * std);
+            }
+
+            return log_probs;
+        }
+        public double[] GetGaussianLogProb(double[] inputs)
+        {
+            double[] rawOutputs = ForwardPropagation(inputs);
+            double[] means = new double[rawOutputs.Length /2];
+            double[] stds = new double[rawOutputs.Length / 2];
+            for (int i = 0; i < rawOutputs.Length; i+=2)
+            {
+                means[i/2] = rawOutputs[i];
+                stds[i/2] = rawOutputs[i+1] + 0.00000001;
             }
 
             
-            double[] actions = new double[rawOutput.Length / 2];
+            double[] actions = new double[rawOutputs.Length / 2];
             for (int i = 0; i < actions.Length/2; i++)
             {
                 
@@ -318,18 +350,20 @@ namespace SmartAgents {
                 actions[i] = Functions.RandomGaussian(mean, std);
             }
 
-            double[] log_probs = new double[rawOutput.Length / 2];
+            double[] log_probs = new double[rawOutputs.Length / 2];
             for (int i = 0; i < log_probs.Length; i++)
             {
                 double mean = means[i];
                 double std = stds[i];
                 double act = actions[i];
 
-                log_probs[i] = -0.5 * Math.Log(2 * Math.PI * std * std) - Math.Pow(act - mean, 2) / (2 * std * std);
+                // probably mulitply the log with 0.5
+                log_probs[i] = -Math.Log(2 * Math.PI * std * std) - Math.Pow(act - mean, 2) / (2 * std * std);
             }
 
             return log_probs;
         }
+
         public int GetInputsNumber()
         {
             return format[0];

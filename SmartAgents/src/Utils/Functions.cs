@@ -26,17 +26,28 @@ namespace SmartAgents
             /// <param name="activationFunction"></param>
             public static void ActivateLayer(NeuronLayer neuronLayer, ActivationType activationFunction)
             {
-                if (activationFunction != ActivationType.SoftMax) 
+                if (activationFunction == ActivationType.SoftMax)
+                {
+                    neuronLayer.SetOutValues(SoftMax(neuronLayer.GetInValues()));
+                }
+                else if(activationFunction == ActivationType.Tanh_and_Softplus)
+                {
+                    for (int i = 0; i < neuronLayer.neurons.Length; i++)
+                    {
+                        neuronLayer.neurons[i].OutValue =
+                            i % 2 == 0 ?
+                            ActivateValue(neuronLayer.neurons[i].InValue, ActivationType.Tanh) :     // mu
+                            ActivateValue(neuronLayer.neurons[i].InValue, ActivationType.SoftPlus);  // sigma
+                    }
+                }
+                else //Casual activation
                 {
                     foreach (Neuron neuron in neuronLayer.neurons)
                     {
                         neuron.OutValue = ActivateValue(neuron.InValue, activationFunction);
                     }
                 } 
-                else
-                {
-                    neuronLayer.SetOutValues(SoftMax(neuronLayer.GetInValues()));
-                }
+
             }
 
             private static double ActivateValue(double value, ActivationType activationFunction)
@@ -61,6 +72,7 @@ namespace SmartAgents
                 }
                 
             }
+
             private static double BinaryStep(double value)
             {
                 if (value < 0)
@@ -89,6 +101,10 @@ namespace SmartAgents
             {
                 return value * Sigmoid(value);
             }
+            private static double SoftPlus(double value)
+            {
+                return Math.Log(1 + Math.Exp(value));
+            }
             internal static double[] SoftMax(double[] values)
             {
                 double sum = 0;
@@ -109,16 +125,26 @@ namespace SmartAgents
             /// <param name="activationFunction"></param>
             public static void DeriveLayer(NeuronLayer neuronLayer, ActivationType activationFunction)
             {
-                if (activationFunction != ActivationType.SoftMax)
+                if (activationFunction == ActivationType.SoftMax)
+                {
+                    neuronLayer.SetValues(DerivativeSoftMax(neuronLayer.GetOutValues()));
+                }
+                else if(activationFunction == ActivationType.Tanh_and_Softplus)
+                {
+                    for (int i = 0; i < neuronLayer.neurons.Length; i++)
+                    {
+                        neuronLayer.neurons[i].CostValue =
+                            i % 2 == 0 ?
+                            DeriveValue(neuronLayer.neurons[i].OutValue, ActivationType.Tanh) :     // mu
+                            DeriveValue(neuronLayer.neurons[i].OutValue, ActivationType.SoftPlus);  // sigma
+                    }
+                }
+                else
                 {
                     foreach (Neuron neuron in neuronLayer.neurons)
                     {
                         neuron.CostValue = DeriveValue(neuron.OutValue, activationFunction);
                     }
-                }
-                else
-                {
-                    neuronLayer.SetValues(DerivativeSoftMax(neuronLayer.GetOutValues()));
                 }
             }
             static public double DeriveValue(double value, ActivationType activationFunction)
@@ -170,6 +196,10 @@ namespace SmartAgents
             {
                 return (1 + Mathf.Exp((float)-value) + value * Mathf.Exp((float)-value)) / Mathf.Pow((1 + Mathf.Exp((float)-value)), 2);
                 //return ActivationFunctionSigmoid(value) * (1 + value * (1 - ActivationFunctionSigmoid(value))); -> works the same
+            }
+            static public double DerivativeSoftPlus(double value)
+            {
+                return Activation.Sigmoid(value);
             }
             static public double[] DerivativeSoftMax(double[] values)
             {

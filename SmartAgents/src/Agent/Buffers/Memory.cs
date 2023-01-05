@@ -26,9 +26,9 @@ namespace SmartAgents
             AssetDatabase.SaveAssets();
         }
 
-        public void Store(double[] state, double[] action, double reward, bool isEpisodeEnd)
+        public void Store(double[] state, double[] action, double reward, double[] log_probs,double value, bool isEpisodeEnd)
         {
-            records.Add(new Sample(state, action, reward, isEpisodeEnd));
+            records.Add(new Sample(state, action, reward, log_probs, value, isEpisodeEnd));
         }
         public bool IsFull(int capacity)
         {

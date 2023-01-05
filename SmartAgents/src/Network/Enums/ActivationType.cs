@@ -10,6 +10,8 @@ namespace SmartAgents
         Relu,
         LeakyRelu,
         Silu,
-        SoftMax
+        SoftPlus,
+        SoftMax,
+        Tanh_and_Softplus
     }
 }
