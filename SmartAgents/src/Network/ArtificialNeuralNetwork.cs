@@ -15,6 +15,7 @@ namespace SmartAgents {
     public class ArtificialNeuralNetwork: ScriptableObject
     {
         [SerializeField] public int[] format;
+        [SerializeField] public int[] outputBranchFormat;
         [SerializeField] public NeuronLayer[] neuronLayers;
         [SerializeField] public WeightLayer[] weightLayers;
         [SerializeField] public BiasLayer[] biasLayers;
@@ -29,50 +30,10 @@ namespace SmartAgents {
         private BiasLayer[] biasMomentums;
 
         int backPropagationsCount = 0;
-        public ArtificialNeuralNetwork(int inputs, int outputs, HiddenLayers hiddenSize, ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, bool createAsset, string name)
+        public ArtificialNeuralNetwork(int inputs, int[] outputBranchFormat, int hiddenUnits, int hiddenLayersNumber, ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, bool createAsset, string name)
         {
-            //DECIDE FORMAT
-            switch(hiddenSize)
-            {
-                case HiddenLayers.None:
-                    format = new int[2];
-                    format[0] = inputs;
-                    format[1] = outputs;
-                    break;
-                case HiddenLayers.OneSmall:
-                    format = new int[3];
-                    format[0] = inputs;
-                    format[1] = (inputs+outputs)/2;
-                    format[2] = outputs;
-                    break;
-                case HiddenLayers.OneLarge:
-                    format = new int[3];
-                    format[0] = inputs;
-                    format[1] = inputs + outputs;
-                    format[2] = outputs;
-                    break;
-                case HiddenLayers.TwoSmall:
-                    format = new int[4];
-                    format[0] = inputs;
-                    format[1] = (inputs + outputs)/2;
-                    format[2] = (inputs + outputs)/2;
-                    format[3] = outputs;
-                    break;
-                case HiddenLayers.TwoLarge:
-                    format = new int[4];
-                    format[0] = inputs;
-                    format[1] = inputs + outputs;
-                    format[2] = inputs + outputs;
-                    format[3] = outputs;
-                    break;
-                
-                default: //None
-                    format = new int[2];
-                    format[0] = inputs;
-                    format[1] = outputs;
-                    break;
-            }
-
+            this.format = GetFormat(inputs, outputBranchFormat.Sum(), hiddenUnits, hiddenLayersNumber);
+            this.outputBranchFormat = outputBranchFormat;
             //CONSTRUCTOR
             neuronLayers = new NeuronLayer[format.Length];
             biasLayers = new BiasLayer[format.Length];
@@ -86,7 +47,7 @@ namespace SmartAgents {
             }
             for (int i = 0; i < neuronLayers.Length - 1; i++)
             {
-                weightLayers[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1]);
+                weightLayers[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], 1); //Xavier initialization is not ok
             }
 
             if (!createAsset)
@@ -94,8 +55,6 @@ namespace SmartAgents {
             Debug.Log(name + " was created!");
             AssetDatabase.CreateAsset(this, "Assets/" + name + ".asset");
             AssetDatabase.SaveAssets();
-            //EditorGUIUtility.SetIconForObject(this, AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SmartAgents/doc/network_icon.png"));*/
-            
         }
         public ArtificialNeuralNetwork(ArtificialNeuralNetwork other, bool createAsset, string name)
         {
@@ -171,14 +130,96 @@ namespace SmartAgents {
                 //Activate output neuron layer
                 else
                 {
-                    Functions.Activation.ActivateLayer(neuronLayers[l], outputActivationType);
+                    Functions.Activation.ActivateOutputLayer(neuronLayers[l], outputActivationType, outputBranchFormat);
                 }
             }
 
 
             return neuronLayers[neuronLayers.Length - 1].GetOutValues();
         }
-        public double BackwardPropagation(double[] inputs, double[] labels)
+        public double[] ForwardPropagation_Parallel(double[] inputs)
+        {
+            double[][] neurons = new double[format.Length][];
+            for (int i = 0; i < format.Length; i++)
+            {
+                neurons[i] = new double[format[i]];
+            }
+
+            for (int lay = 1; lay < neurons.Length; lay++)
+            {
+                for (int neur = 0; neur < neurons[lay].Length; neur++)
+                {
+                    double sum = biasLayers[lay].biases[neur];
+                    for (int prev = 0; prev < neurons[lay-1].Length; prev++)
+                    {
+                        sum += neurons[lay - 1][prev] * weightLayers[lay - 1].weights[prev][neur];
+                    }
+                    neurons[lay][neur] = sum;
+                }
+                if (lay < neurons.Length)
+                    ActivateLayer(neurons[lay]);
+                else
+                    ActivateOutputLayer(neurons[lay]);
+            }
+
+            return neurons[neurons.Length - 1];
+
+            void ActivateLayer(double[] layerX)
+            {
+                for (int i = 0; i < layerX.Length; i++)
+                {
+                    layerX[i] = Functions.Activation.ActivateValue(layerX[i], activationType);
+                }
+            }
+            void ActivateOutputLayer(double[] layerX)
+            {
+                if (outputActivationType == ActivationType.BranchedSoftMaxActivation)
+                {
+                    // Get all raw values
+                    List<double> rawValues = layerX.Select(x => x).ToList();
+
+                    int index = 0;
+
+                    // Foreach branch, activate the branch values
+                    foreach (var branch in outputBranchFormat)
+                    {
+                        // Get the branch from raw values
+                        double[] branchValues = rawValues.GetRange(index, index + branch).ToArray();
+
+                        // Activate the branch
+                        Functions.Activation.SoftMax(branchValues);
+
+                        // Place the activated branch on OutValues
+                        for (int i = index; i < index + branch; i++)
+                        {
+                            layerX[i] = branchValues[i - index];
+                        }
+
+                        index += branch;
+                    }
+
+
+                }
+                else if (outputActivationType == ActivationType.PairedTanhSoftPlusActivation)
+                {
+                    for (int i = 0; i < layerX.Length; i++)
+                    {
+                        layerX[i] =
+                            i % 2 == 0 ?
+                            Functions.Activation.ActivateValue(layerX[i], ActivationType.Tanh) :     // mu
+                            Functions.Activation.ActivateValue(layerX[i], ActivationType.SoftPlus);  // sigma
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < layerX.Length; i++)
+                    {
+                        layerX[i] = Functions.Activation.ActivateValue(layerX[i], activationType);
+                    }
+                }
+            }
+        }
+        public double BackPropagation(double[] inputs, double[] labels)
         {
             if (weightGradients == null || weightGradients.Length == 0)
                 InitGradients_InitMomentums();
@@ -194,7 +235,7 @@ namespace SmartAgents {
             backPropagationsCount++;
             return error;
         }
-        public void BackwardPropagation(double[] inputs, double surrogateLoss)
+        public void BackPropagation_LossCalculated(double[] inputs, double[] loss)
         {
             if (weightGradients == null || weightGradients.Length == 0)
                 InitGradients_InitMomentums();
@@ -204,7 +245,7 @@ namespace SmartAgents {
             //Calculate the error
             for (int i = 0; i < outLayer.neurons.Length; i++)
             {
-                outLayer.neurons[i].CostValue = (outputs[i] - surrogateLoss) * Functions.Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
+                outLayer.neurons[i].CostValue = (outputs[i] - loss[i]) * Functions.Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
             }
 
             for (int wLayer = weightLayers.Length - 1; wLayer >= 0; wLayer--)
@@ -214,9 +255,12 @@ namespace SmartAgents {
             }
             backPropagationsCount++;
         }
-        public void UpdateParameters(float learningRate, float momentum, float regularization)
+        public void OptimizeParameters(float learningRate, float momentum, float regularization, bool descent)
         {
-            ApplyGradients(learningRate / backPropagationsCount, momentum, regularization);
+            if(descent == true)
+                ApplyGradients(learningRate / backPropagationsCount, momentum, regularization, -1);
+            else //ascent
+                ApplyGradients(learningRate / backPropagationsCount, momentum, regularization, 1);
             backPropagationsCount = 0;
         }
 
@@ -236,8 +280,8 @@ namespace SmartAgents {
             }
             for (int i = 0; i < neuronLayers.Length - 1; i++)
             {
-                weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], true);
-                weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], true);
+                weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], 1, true);
+                weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], 1, true);
             }
 
 
@@ -264,7 +308,7 @@ namespace SmartAgents {
                 }
             }
         }
-        private void ApplyGradients(float modifiedLearnRate, float momentum, float regularization)
+        private void ApplyGradients(float modifiedLearnRate, float momentum, float regularization, double direction)
         {
             //Related to UpdateParameters
             double weightDecay = 1 - regularization * modifiedLearnRate;
@@ -274,8 +318,13 @@ namespace SmartAgents {
                 {
                     for (int j = 0; j < weightLayers[l].weights[i].Length; j++)
                     {
-                        weightMomentums[l].weights[i][j] = weightMomentums[l].weights[i][j] * momentum - weightGradients[l].weights[i][j] * modifiedLearnRate;
-                        weightLayers[l].weights[i][j] = weightLayers[l].weights[i][j] * weightDecay + weightMomentums[l].weights[i][j];
+                        double weight = weightLayers[l].weights[i][j];
+                        double veloc = weightMomentums[l].weights[i][j] * momentum + weightGradients[l].weights[i][j] * modifiedLearnRate * direction;
+
+                        weightMomentums[l].weights[i][j] = veloc;
+                        weightLayers[l].weights[i][j] = weight * weightDecay + veloc;
+
+                        //Reset the gradient
                         weightGradients[l].weights[i][j] = 0;
                     }
                 }
@@ -284,8 +333,12 @@ namespace SmartAgents {
             {
                 for (int j = 0; j < biasLayers[i].biases.Length; j++)
                 {
-                    biasMomentums[i].biases[j] = biasMomentums[i].biases[j] * momentum - biasGradients[i].biases[j] * modifiedLearnRate;
-                    biasLayers[i].biases[j] += biasMomentums[i].biases[j];
+                    double bias = biasLayers[i].biases[j];
+                    double veloc = biasMomentums[i].biases[j] * momentum + biasGradients[i].biases[j] * modifiedLearnRate * direction;
+
+                    biasMomentums[i].biases[j] = veloc;
+                    biasLayers[i].biases[j] += veloc;
+
                     biasGradients[i].biases[j] = 0;
                 }
             }
@@ -295,7 +348,6 @@ namespace SmartAgents {
 
 
         #region OTHER
-
         public static double[] GetLogProb(double[] rawOutputs)
         {
             double[] means = new double[rawOutputs.Length / 2];
@@ -364,6 +416,19 @@ namespace SmartAgents {
             return log_probs;
         }
 
+        private int[] GetFormat(int inputs, int outputs, int hidden_units, int hidden_lay_num)
+        {
+            int[] form = new int[2 + hidden_lay_num];
+
+            form[0] = inputs;
+            for (int i = 1; i <= hidden_lay_num; i++)
+            {
+                form[i] = hidden_units;
+            }
+            form[form.Length - 1] = outputs;
+
+            return form;
+        }
         public int GetInputsNumber()
         {
             return format[0];
@@ -372,13 +437,9 @@ namespace SmartAgents {
         {
             return format[format.Length - 1];
         }
+
         #endregion
     }
 
-    public enum Optimizer
-    {
-        GD,
-        Adam//not implemented
-    }
 
 }

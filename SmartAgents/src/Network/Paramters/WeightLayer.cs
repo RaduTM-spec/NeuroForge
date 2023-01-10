@@ -15,7 +15,7 @@ namespace SmartAgents
         [SerializeField] private int prevNeurons;
         [SerializeField] private int nextNeurons;
 
-        public WeightLayer(NeuronLayer firstLayer, NeuronLayer secondLayer, bool zeroes = false)
+        public WeightLayer(NeuronLayer firstLayer, NeuronLayer secondLayer, double stddev = 1, bool zeroes = false)
         {
             weights = new double[firstLayer.neurons.Length][];
             for (int i = 0; i < weights.Length; i++)
@@ -26,7 +26,7 @@ namespace SmartAgents
                     if (zeroes)
                         weights[i][j] = 0;
                     else
-                        weights[i][j] = Functions.RandomGaussian();
+                        weights[i][j] = Functions.RandomGaussian(0, stddev);
                 }
             }
 

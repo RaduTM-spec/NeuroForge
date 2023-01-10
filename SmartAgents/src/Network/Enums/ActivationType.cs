@@ -3,7 +3,7 @@ namespace SmartAgents
 {
     public enum ActivationType
     {
-        None,
+        Linear,
         BinaryStep,
         Sigmoid,
         Tanh,
@@ -12,6 +12,7 @@ namespace SmartAgents
         Silu,
         SoftPlus,
         SoftMax,
-        Tanh_and_Softplus
+        PairedTanhSoftPlusActivation,
+        BranchedSoftMaxActivation
     }
 }

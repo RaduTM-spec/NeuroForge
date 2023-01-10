@@ -20,13 +20,13 @@ public class MoveToGoal : Agent
     }
     public override void OnActionReceived(in ActionBuffer actionBuffer)
     {
-        transform.position += new Vector3(actionBuffer.Get(0), 0, actionBuffer.Get(1)) * Time.deltaTime * speed;
+        transform.position += new Vector3(actionBuffer.continuousActions[0], 0, actionBuffer.continuousActions[1]) * Time.deltaTime * speed;
         
     }
     public override void Heuristic(ActionBuffer actionSet)
     {
-        actionSet.Set(0,Input.GetAxisRaw("Horizontal"));
-        actionSet.Set(1,Input.GetAxisRaw("Vertical"));
+        actionSet.continuousActions[0] = Input.GetAxisRaw("Horizontal");
+        actionSet.continuousActions[1] = Input.GetAxisRaw("Vertical");
     }
     public void OnCollisionEnter(Collision collision)
     {

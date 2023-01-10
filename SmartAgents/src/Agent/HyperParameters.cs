@@ -11,12 +11,12 @@ namespace SmartAgents
     public class HyperParameters : MonoBehaviour
     {
         [Header("MLP")]
-        public HiddenLayers networkHiddenLayers = HiddenLayers.OneLarge;
+        [Range(32,128)]public int HiddenLayerUnits = 64;
+        [Range(1,3)]public int HiddenLayersNumber = 2;
         public ActivationType activationType = ActivationType.Relu;
-        public LossType lossType = LossType.MeanSquare;
    
         [Range(0.00001f, 0.001f), Tooltip("alpha")] public float learnRate = 0.0003f;
-        [Range(0.000001f, 1.0f), Tooltip("mu")] public float momentum = 0.9f;
+        [Range(0.000001f, 1.0f), Tooltip("mu")] public float momentum = 0.0f;
         [Range(0.000001f, 0.1f), Tooltip("beta")] public float regularization = 0.001f;
 
         [Header("PPO")]
@@ -29,7 +29,6 @@ namespace SmartAgents
         [SerializeField] private BatchSize bufferSize = BatchSize.size2048;    
         [SerializeField] private MiniBatchSize batchSize = MiniBatchSize.size512;
         [Min(1)] public int epochs = 10;
-        [Min(0)] public int maxStep = 500_000;
 
         [HideInInspector] public int buffer_size;
         [HideInInspector] public int batch_size;
@@ -58,8 +57,6 @@ namespace SmartAgents
     }
     public enum MiniBatchSize
     {
-        //For continuos 512-5120
-        //For discrete 32-512
         size256,
         size512,
         size1024,

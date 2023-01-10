@@ -1,5 +1,7 @@
+using System;
 using System.Linq;
 using System.Text;
+using Unity.VisualScripting;
 using UnityEngine;
 
 namespace SmartAgents
@@ -14,7 +16,7 @@ namespace SmartAgents
             for (int i = 0; i < capacity; i++)
                 observations[i] = 0;
             counter = 0;
-        }
+        }        
         public void Clear()
         {
             observations = Enumerable.Repeat(0.0, observations.Length).ToArray();
@@ -214,12 +216,12 @@ namespace SmartAgents
                 Debug.LogError("<color=red>RaySensor added as an observation is null!.</color>");
                 return;
             }
-            if (this.observations.Length - counter < raySensor.observations.Length)
+            if (this.observations.Length - counter < raySensor.GetObservationSize())
             {
                 Debug.LogError("SensorBuffer available space is " + (this.observations.Length - counter) + ". Sensor's observations array is too large.");
                 return;
             }
-            AddObservation(raySensor.observations);
+            AddObservation(raySensor.GetObservations());
         }
 
         public override string ToString()

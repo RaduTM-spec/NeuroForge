@@ -3,7 +3,7 @@ namespace SmartAgents
 {
     public enum LossType
     {
-        Absolute,
+        MeanAbsolute,
         MeanSquare,
         CrossEntropy
     }

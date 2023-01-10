@@ -1,40 +1,40 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEditor;
 using System;
-using System.Reflection.Emit;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using Unity.VisualScripting;
-using UnityEditor.ProjectWindowCallback;
 using System.Text;
-using UnityEngine.Profiling;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-using System.Collections.ObjectModel;
+using UnityEditor;
+using UnityEngine;
 
 namespace SmartAgents
 {
     [DisallowMultipleComponent, RequireComponent(typeof(HyperParameters))]
     public class Agent : MonoBehaviour
     {
-        #region Public Fields
+        #region Visible Fields
         public BehaviorType behavior = BehaviorType.Passive;
 
         [SerializeField] private ArtificialNeuralNetwork policyNetwork;
         [SerializeField] private ArtificialNeuralNetwork criticNetwork;
+        [SerializeField] private ExperienceBuffer Memory;
 
-        [Space, SerializeField] private ExperienceBuffer experienceBuffer;
 
-        [Space,Min(1), SerializeField] private int SpaceSize = 2;
-        [Min(1), SerializeField] private int ActionSize = 2;
+        [Space, Min(1), SerializeField] private int observationSize = 2;
+        
         [SerializeField] private ActionType actionType = ActionType.Continuous;
+        [Min(1), SerializeField] private int ContinuousSize;
+        [Min(1), SerializeField] private int[] DiscreteBranches;
+
+        [Space, Min(0)] public int timeHorizon = 180_000;
+        [SerializeField] private OnEpisodeEndType OnEpisodeEnd = OnEpisodeEndType.ResetEnvironment;
+
         #endregion
 
-        #region Private Fields
+        #region Hidden Fields
         private int Episode = 1;
         private int Step = 0;
-        private double episodeCumulatedReward = 0;
+        private double stepReward = 0;
+        private double episodeReward = 0;
 
         private HyperParameters hp;
         private List<RaySensor> raySensors = new List<RaySensor>();
@@ -42,57 +42,65 @@ namespace SmartAgents
 
         private SensorBuffer sensorBuffer;
         private ActionBuffer actionBuffer;
-        private double reward = 0;
+        
 
-        List<Transform> initialEnvironmentState = new List<Transform>();
+        //Input normalization
+        double[] mins;
+        double[] maxs;
+
+
+        List<Transform> initialTransforms = new List<Transform>();
+
         #endregion
 
         #region Setup
         protected virtual void Awake()
         {
             hp = GetComponent<HyperParameters>();
-            InitNetworks_InitMemory();
-            InitBuffers();
+            
+            InitNetworks_InitMemory_InitBuffers();
             InitSensors(this.transform);
-            InitEnvironment(this.transform.parent);
+            if(OnEpisodeEnd == OnEpisodeEndType.ResetEnvironment)
+                InitInitialTransforms(this.transform.parent);
+            else if(OnEpisodeEnd == OnEpisodeEndType.ResetAgent)
+                InitInitialTransforms(this.transform);
         }
-        private void InitNetworks_InitMemory()
+        private void InitNetworks_InitMemory_InitBuffers()
         {
-            if (policyNetwork != null)
+            if (policyNetwork)
             {
-                SpaceSize = policyNetwork.GetInputsNumber();
-                ActionSize = policyNetwork.GetOutputsNumber();
+                observationSize = policyNetwork.GetInputsNumber();
+                ContinuousSize = policyNetwork.GetOutputsNumber();
                 if (policyNetwork.outputActivationType == ActivationType.SoftMax)
                     actionType = ActionType.Discrete;
                 else
-                    actionType= ActionType.Continuous;
+                    actionType = ActionType.Continuous;
             }
-               
-            ActivationType activation = hp.activationType;
-            ActivationType outputActivation = hp.activationType;
-            LossType lossFunc = hp.lossType;
 
-            int actorOutputs = ActionSize;
+            sensorBuffer = new SensorBuffer(ContinuousSize);
+            actionBuffer = new ActionBuffer(observationSize);
+
+            ActivationType activation = hp.activationType;
+            ActivationType outputActivation;
+
+            int[] actorOutputs;
+
             if (actionType == ActionType.Discrete)
             {
-                actorOutputs = ActionSize;
-                outputActivation = ActivationType.SoftMax;
-                lossFunc = LossType.CrossEntropy;
-                
+                actorOutputs = DiscreteBranches;
+                outputActivation = ActivationType.BranchedSoftMaxActivation;
             }
-            else // Continuous
+            else //actionType == ActionType.Continuous
             {
-                actorOutputs = ActionSize * 2;
-                outputActivation = ActivationType.Tanh_and_Softplus;
+                actorOutputs = new int[] { ContinuousSize };
+                outputActivation = ActivationType.PairedTanhSoftPlusActivation;
             }
-            
-            if(policyNetwork == null) policyNetwork = new ArtificialNeuralNetwork(SpaceSize, actorOutputs, hp.networkHiddenLayers, activation, outputActivation, lossFunc, true, GetPolicyName());
-            //if(oldPolicyNetwork == null) oldPolicyNetwork = new ArtificialNeuralNetwork(policyNetwork, false, GetOldPolicyName());
-            
-            if (criticNetwork == null) criticNetwork = new ArtificialNeuralNetwork(SpaceSize, 1, hp.networkHiddenLayers, activation, ActivationType.None, LossType.MeanSquare, true, GetCriticName());
-            if (experienceBuffer == null) experienceBuffer = new ExperienceBuffer(GetMemoryName(), true);
 
-            experienceBuffer.Clear();
+            if (policyNetwork == null) policyNetwork = new ArtificialNeuralNetwork(observationSize, actorOutputs, hp.HiddenLayerUnits,hp.HiddenLayersNumber, activation, outputActivation, LossType.MeanSquare, true, GetPolicyName());
+            if (criticNetwork == null) criticNetwork = new ArtificialNeuralNetwork(observationSize, new int[] {1}, hp.HiddenLayerUnits,hp.HiddenLayersNumber, activation, ActivationType.Tanh, LossType.MeanSquare, true, GetCriticName());
+            if (Memory == null) Memory = new ExperienceBuffer(GetMemoryName(), true);
+
+            Memory.Clear();
 
             string GetPolicyName()
             {
@@ -100,13 +108,6 @@ namespace SmartAgents
                 while (AssetDatabase.LoadAssetAtPath<ArtificialNeuralNetwork>("Assets/Policy#" + id + ".asset") != null)
                     id++;
                 return "PolicyNN#" + id;
-            }
-            string GetOldPolicyName()
-            {
-                short id = 1;
-                while (AssetDatabase.LoadAssetAtPath<ArtificialNeuralNetwork>("Assets/OldPolicyNN#" + id + ".asset") != null)
-                    id++;
-                return "OldPolicyNN#" + id;
             }
             string GetCriticName()
             {
@@ -123,27 +124,22 @@ namespace SmartAgents
                 return "MemoryXP#" + id;
             }
         }
-        private void InitBuffers()
-        {
-            sensorBuffer = new SensorBuffer(policyNetwork.GetInputsNumber());
-            actionBuffer = new ActionBuffer(policyNetwork.GetOutputsNumber());
-        }
         private void InitSensors(Transform parent)
         {
             RaySensor rayFound = GetComponent<RaySensor>();
             CameraSensor camFound = GetComponent<CameraSensor>();
-            if(rayFound != null && rayFound.enabled)
+            if (rayFound != null && rayFound.enabled)
                 raySensors.Add(rayFound);
-            if(camFound != null && camFound.enabled)
+            if (camFound != null && camFound.enabled)
                 cameraSensors.Add(camFound);
             foreach (Transform child in parent)
             {
                 InitSensors(child);
             }
         }
-        private void InitEnvironment(Transform parent)
+        private void InitInitialTransforms(Transform parent)
         {
-            foreach(Transform child in parent)
+            foreach (Transform child in parent)
             {
                 Transform clone = new GameObject().transform;
 
@@ -151,17 +147,17 @@ namespace SmartAgents
                 clone.rotation = child.rotation;
                 clone.localScale = child.localScale;
 
-                initialEnvironmentState.Add(clone);
-                InitEnvironment(child);
+                initialTransforms.Add(clone);
+                InitInitialTransforms(child);
             }
         }
+
         #endregion
 
         #region Loop
         protected virtual void Update()
         {
-            
-            switch(behavior)
+            switch (behavior)
             {
                 case BehaviorType.Active:
                     ActiveAction();
@@ -169,11 +165,9 @@ namespace SmartAgents
                 case BehaviorType.Inference:
                     LearnAction();
                     break;
-                default:
-                    break;
             }
             Step++;
-            if(hp.maxStep != 0 && Step >= hp.maxStep && behavior == BehaviorType.Inference) 
+            if (timeHorizon != 0 && Step >= timeHorizon && behavior == BehaviorType.Inference)
                 EndEpisode();
         }
         private void ActiveAction()
@@ -181,18 +175,20 @@ namespace SmartAgents
             sensorBuffer.Clear();
             actionBuffer.Clear();
 
-            CollectSensors(sensorBuffer);
+            CollectSensorsObservations(sensorBuffer);
             CollectObservations(sensorBuffer);
+            NormalizeObservations(sensorBuffer);
 
-            double[] outs = policyNetwork.ForwardPropagation(sensorBuffer.observations);
+            double[] rawOutput = policyNetwork.ForwardPropagation(sensorBuffer.observations);
 
-            //Output form: (mean, stddev) (mean, stddev) (mean, stddev) => 3 continuous actions
-
-            //Probability to Action
+            // Continuous output form: (mean, stddev) (mean, stddev) (mean, stddev) ...
             if (actionType == ActionType.Continuous)
-                for (int i = 0; i < outs.Length; i += 2)
+                for (int i = 0; i < rawOutput.Length; i += 2)
                 {
-                    actionBuffer.actions[i / 2] = Functions.RandomGaussian(outs[i], outs[i + 1]); //UnityEngine.Random.Range(-1.0f, 1.0f) * outs[i+1] + outs[i]; 
+                    double mean = rawOutput[i];
+                    double stddev = rawOutput[i+ 1];
+
+                    actionBuffer.continuousActions[i / 2] = (float)Math.Clamp(Functions.RandomGaussian(mean, stddev),-1.0,1.0); 
                 }
 
             OnActionReceived(actionBuffer);
@@ -202,22 +198,23 @@ namespace SmartAgents
         {
             Collect_Action_Store(false);
 
-            if (experienceBuffer.IsFull(hp.buffer_size) == true)
-            {         
-                double[] returns = GAE();
-                
-                for (int i = 0; i < hp.buffer_size / hp.batch_size; i++) 
+            if (!Memory.IsFull(hp.buffer_size))
+                return;
+            
+            var ret_and_adv = GAE();
+
+            for (int i = 0; i < hp.buffer_size / hp.batch_size; i++)
+            {
+                List<Sample> miniBatch = Memory.records.GetRange(i, i + hp.batch_size);
+                List<double> returns = ret_and_adv.Item1.GetRange(i, i + hp.batch_size);
+                List<double> advantages = ret_and_adv.Item2.GetRange(i, i + hp.batch_size);
+                lock (policyNetwork) lock (criticNetwork)
                 {
-                    List<Sample> miniBatch = experienceBuffer.records.GetRange(i, i + hp.batch_size);
-                    
-                    lock(policyNetwork)lock(criticNetwork)
-                    {
-                        UpdateActorCritic(miniBatch, returns);
-                    }                                
-                }     
-                experienceBuffer.Clear();
+                    UpdateActorCritic(miniBatch, returns, advantages);
+                }
             }
-            reward = 0;
+
+            Memory.Clear();   
         }
 
         #endregion
@@ -228,79 +225,73 @@ namespace SmartAgents
             sensorBuffer.Clear();
             actionBuffer.Clear();
 
-            CollectSensors(sensorBuffer);
+            CollectSensorsObservations(sensorBuffer);
             CollectObservations(sensorBuffer);
+            NormalizeObservations(sensorBuffer);
 
             double[] rawOutputs = policyNetwork.ForwardPropagation(sensorBuffer.observations);
-            
+
             //Discrete output form: 1branch(x,y,z) x+y+z = 1 (softmax)
-            //Continous output form: (mean, stddev) (mean, stddev) (mean, stddev) => 3 continuous actions
+            //Continous output form: (mean, stddev) (mean, stddev) (mean, stddev) ...
 
             double[] log_probs = GetLogProbs(rawOutputs);
             double value = criticNetwork.ForwardPropagation(sensorBuffer.observations)[0];
 
-            experienceBuffer.Store(sensorBuffer.observations, rawOutputs, reward, log_probs, value, episodeDone);
+            Memory.Store(sensorBuffer.observations, rawOutputs, stepReward, log_probs, value, episodeDone);
+            stepReward = 0;
 
-            FillActionBuffer(rawOutputs);
-            OnActionReceived(actionBuffer);  
+            Fill_ActionBuffer(rawOutputs);
+            OnActionReceived(actionBuffer);
         }
-        private double[] GAE()
+        private (List<double>, List<double>) GAE()
         {
-            //Advantages are stored inside the buffer
-            List<Sample> data = experienceBuffer.records;
+            List<Sample> iteration_data = Memory.records;
 
-            //Returns are returned
+            //returns = discounted rewards
             List<double> returns = new List<double>();
+            List<double> advantages = new List<double>();
 
             //Normalize rewards 
-            double minReward = data.Min(s => s.reward);
-            double maxReward = data.Max(s => s.reward);
-            for(int i = 0; i < data.Count; i++)
+            double minReward = iteration_data.Min(s => s.reward);
+            double maxReward = iteration_data.Max(s => s.reward);
+            for(int i = 0; i < iteration_data.Count; i++)
             {
-                if (data[i].reward == 0)
+                if (iteration_data[i].reward == 0)
                     continue;
-                if (data[i].reward < 0)
-                    data[i].reward /= -minReward;
+                if (iteration_data[i].reward < 0)
+                    iteration_data[i].reward /= -minReward;
                 else
-                    data[i].reward /= maxReward;
+                    iteration_data[i].reward /= maxReward;
             }
 
-            //Calculate advantages
-            double advantage = 0.0;  //or gae value
-            for (int i = data.Count - 1; i >= 0; i--)
+            //Calculate returns and advantages
+            double advantage = 0;
+            for (int i = iteration_data.Count - 1; i >= 0; i--)
             {
-                double value = criticNetwork.ForwardPropagation(data[i].state)[0];
-                double nextValue = i == data.Count-1? 
+                double value = criticNetwork.ForwardPropagation(iteration_data[i].state)[0];
+                double nextValue = i == iteration_data.Count-1? 
                                         0 : 
-                                        criticNetwork.ForwardPropagation(data[i + 1].state)[0];
+                                        criticNetwork.ForwardPropagation(iteration_data[i + 1].state)[0];
 
 
-                double delta = data[i].done? 
-                                data[i].reward - value :
-                                reward + hp.discountFactor * nextValue - value; //Bellman equation
+                double delta = iteration_data[i].done? 
+                               iteration_data[i].reward - value :
+                               iteration_data[i].reward + hp.discountFactor * nextValue - value;
 
                 advantage = advantage * hp.discountFactor * hp.gaeFactor + delta;
 
+                advantages.Add(advantage);
                 returns.Add(advantage + value);
             }
+            NormalizeAdvantages(advantages);
+
+            advantages.Reverse();           
             returns.Reverse();
-            return returns.ToArray();
+
+            return (returns,advantages);
         }
-        private void UpdateActorCritic(List<Sample> mini_batch, double[] returns)
+        private void UpdateActorCritic(List<Sample> mini_batch, List<double> mb_returns, List<double> mb_advantages)
         {
-            //convert s,a,adv to tensors (double arrays)
-            double[][] states = mini_batch.Select(x => x.state).ToArray();
-            double[][] actions = mini_batch.Select(x => x.action).ToArray();
-
-            //calculate and normalize advantages
-            double[] advantages = mini_batch.Select(x => -x.value).ToArray();
-            for (int i = 0; i < advantages.Length; i++)
-            {
-                advantages[i] += returns[i];
-            }
-            NormalizeAdvantages(advantages, mini_batch.Count);
-
-            //Train
             for (int t = 0; t < mini_batch.Count; t++)
             {
                 double[] rawOutput = policyNetwork.ForwardPropagation(mini_batch[t].state);
@@ -321,8 +312,8 @@ namespace SmartAgents
                 {
                     surrogate_losses[r] = -Math.Min
                                        (
-                                             ratios[r] * advantages[t],
-                                             Math.Clamp(ratios[r], 1 - hp.clipFactor, 1 + hp.clipFactor) * advantages[t]
+                                             ratios[r] * mb_advantages[t],
+                                             Math.Clamp(ratios[r], 1 - hp.clipFactor, 1 + hp.clipFactor) * mb_advantages[t]
                                        );
                 }
 
@@ -336,33 +327,63 @@ namespace SmartAgents
                 }
                 double[] entropies = entrops.ToArray();
 
-                //SURROGATE LOSS
-                double[] critic_loss = new double[] { returns[t] - value };
 
+                criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
+                
+                //SURROGATE LOSS
                 double[] actor_loss = new double[rawOutput.Length];
                 for (int i = 0; i < actor_loss.Length; i++)
                 {
                     actor_loss[i] = surrogate_losses[i/2] + hp.entropyRegularization * entropies[i/2];
 
-                }
-
-                //SGD
-                criticNetwork.BackwardPropagation(states[t], critic_loss);
-                criticNetwork.UpdateParameters(hp.learnRate, hp.momentum, hp.regularization);
-                
-                policyNetwork.BackwardPropagation(states[t], actor_loss);
-                policyNetwork.UpdateParameters(hp.learnRate, hp.momentum, hp.regularization);
+                }               
+                policyNetwork.BackPropagation_LossCalculated(mini_batch[t].state, actor_loss);
+               
             }
 
+            criticNetwork.OptimizeParameters(hp.learnRate, hp.momentum, hp.regularization, true);  // Gradient descent
+            policyNetwork.OptimizeParameters(hp.learnRate, hp.momentum, hp.regularization, false); // Gradient ascent
 
         }
-        
-        void NormalizeAdvantages(double[] advantages, int dataCount)
+
+        private void NormalizeObservations(SensorBuffer sensorBuff)
+        {
+            double[] obs = sensorBuff.observations;
+
+            //Init
+            if (mins == null || maxs == null)
+            {
+                mins = new double[obs.Length];
+                maxs = new double[obs.Length];
+                for (int i = 0; i < obs.Length; i++)
+                {
+                    mins[i] = double.MaxValue;
+                    maxs[i] = double.MinValue;
+                }
+            }
+
+            //Find new min or max
+            for (int i = 0; i < obs.Length; i++)
+            {
+                if (obs[i] < mins[i])
+                    mins[i] = obs[i];
+                else if (obs[i] > maxs[i])
+                    maxs[i] = obs[i];
+            }
+
+            //normalize the obs (-1,1)
+            for (int i = 0; i < obs.Length; i++)
+            {
+                obs[i] = 2 * (obs[i] - mins[i]) / (maxs[i] - mins[i]) - 1;
+            }
+
+        }
+        void NormalizeAdvantages(List<double> advantages)
         {
             //Normalize advantages
-            double mean = advantages.Sum() / advantages.Length;
-            double std = Math.Sqrt(advantages.Sum(x => Math.Pow(x - mean, 2) / advantages.Length));
-            for (int i = 0; i < dataCount; i++)
+            double mean = advantages.Sum() / advantages.Count;
+            double std = Math.Sqrt(advantages.Sum(x => Math.Pow(x - mean, 2) / advantages.Count));
+            for (int i = 0; i < advantages.Count; i++)
             {
                 advantages[i] = (advantages[i] - mean) / (std + 0.00000001);
             }
@@ -372,9 +393,12 @@ namespace SmartAgents
             List<double> log_probs = new List<double>();
             if (actionType == ActionType.Discrete)
             {
-                // to be completed
+                for (int i = 0; i < rawOutputs.Length; i++)
+                {
+                    log_probs.Add(Math.Log(rawOutputs[i]));
+                }
             }
-            else if (actionType == ActionType.Continuous)
+            else // actionType == ActionType.Continuous
             {
                 for (int i = 0; i < rawOutputs.Length; i += 2)
                 {
@@ -385,6 +409,7 @@ namespace SmartAgents
 
                     double log_prob = LogProb(actionSample, mean, stddev);
                     log_probs.Add(log_prob);
+                    
 
                 }
             }
@@ -396,11 +421,26 @@ namespace SmartAgents
                 return logProb;
             }
         }
-        void FillActionBuffer(double[] rawOutputs)
+        void Fill_ActionBuffer(double[] rawOutputs)
         {
             if (actionType == ActionType.Discrete)
             {
-                actionBuffer.actions = rawOutputs;
+                actionBuffer.discreteActions = new int[] { DiscreteBranches.Length};
+
+                for (int branchNo = 0; branchNo < DiscreteBranches.Length; branchNo++)
+                {
+                    double max = double.MinValue;
+                    int index = -1;
+                    for (int branchElem = 0; branchElem < DiscreteBranches[branchNo]; branchElem++)
+                    {
+                        if (rawOutputs[branchNo + branchElem] > max)
+                        {
+                            max = rawOutputs[branchNo + branchElem];
+                            index = branchElem;
+                        } 
+                    }
+                    actionBuffer.discreteActions[branchNo] = index;
+                }
             }
             else if (actionType == ActionType.Continuous)
             {
@@ -410,79 +450,58 @@ namespace SmartAgents
                     double stddev = rawOutputs[i + 1];
 
                     double actionSample = Functions.RandomGaussian(mean, stddev);
-                    actionBuffer.actions[i / 2] = Math.Clamp(actionSample,-1.0,1.0);
+                    actionBuffer.continuousActions[i / 2] = (float)Math.Clamp(actionSample,-1.0,1.0);
                 }
             }
         }
+        public int DecideDiscreteBranchAction(double[] rawBranchOutputs)
+        {
+            //discreteActions will contain a the highest probable action from a branch
+            int index = -1;
+            double max = double.MinValue;
+            for (int i = 0; i < rawBranchOutputs.Length; i++)
+                if (rawBranchOutputs[i] > max)
+                {
+                    max = rawBranchOutputs[i];
+                    index = i;
+                }
+            return index;
+        }
+
         #endregion
 
-        #region Utils
-        private void CollectSensors(SensorBuffer buffer)
+        #region Utils     
+        private void CollectSensorsObservations(SensorBuffer buffer)
         {
             foreach (var raySensor in raySensors)
             {
-                buffer.AddObservation(raySensor.observations);
+                buffer.AddObservation(raySensor.GetObservations());
             }
             foreach (var camSensor in cameraSensors)
             {
                 buffer.AddObservation(camSensor.FlatCapture());
             }
         }
-        public void AddReward<T>(T reward) where T : struct
-        {
-            this.reward += Convert.ToDouble(reward);
-            this.episodeCumulatedReward += Convert.ToDouble(reward);
-        }
-        public void AddStepPenalty<T>(T penalty) where T : struct
-        {
-            double t = hp.maxStep == 0 ? 1 : hp.maxStep;
-            double ActionPenalty = -Math.Abs(Convert.ToDouble(penalty)) / t;
-            AddReward(ActionPenalty);
-        }
-        public void EndEpisode()
-        {
-           
-            Collect_Action_Store(true);
-
-            int transformsStart = 0;
-            ResetEnvironment(this.transform.parent, ref transformsStart);
-
-            PrintEpsiodeStatistic();
-
-            Episode++;
-            Step = 0;
-            reward = 0;
-            episodeCumulatedReward = 0;
-
-
-            void PrintEpsiodeStatistic()
-            {
-                StringBuilder statistic = new StringBuilder();
-                statistic.Append("Episode: ");
-                statistic.Append(Episode);
-                statistic.Append(" | Steps: ");
-                statistic.Append(Step);
-                statistic.Append(" | Cumulated Reward: ");
-                statistic.Append(episodeCumulatedReward);
-                Debug.Log(statistic.ToString());
-            }
-        }
-        private void ResetEnvironment(Transform parent, ref int index)
+        private void ResetToInitialTransforms(Transform parent, ref int index)
         {
             for (int i = 0; i < parent.transform.childCount; i++)
             {
                 Transform child = parent.transform.GetChild(i);
-                Transform initialTransform = initialEnvironmentState[index++];
+                Transform initialTransform = initialTransforms[index++];
 
                 child.position = initialTransform.position;
                 child.rotation = initialTransform.rotation;
                 child.localScale = initialTransform.localScale;
 
-                ResetEnvironment(child, ref index);
+                ResetToInitialTransforms(child, ref index);
             }
         }
 
+        // Used by the User
+        public virtual void OnEpisodeBegin()
+        {
 
+        }
         public virtual void CollectObservations(SensorBuffer sensorBuffer)
         {
 
@@ -495,21 +514,61 @@ namespace SmartAgents
         {
 
         }
+        public void AddReward<T>(T reward) where T : struct
+        {
+            this.stepReward += Convert.ToDouble(reward);
+            this.episodeReward += stepReward;
+        }
+        public void EndEpisode()
+        {
+            // Collect last data piece (including the terminal reward)
+            Collect_Action_Store(true);
+
+            int transformsStart = 0;
+            if (OnEpisodeEnd == OnEpisodeEndType.ResetEnvironment)
+                ResetToInitialTransforms(this.transform.parent, ref transformsStart);
+            else if (OnEpisodeEnd == OnEpisodeEndType.ResetAgent)
+                ResetToInitialTransforms(this.transform, ref transformsStart);
+
+            OnEpisodeBegin();
+            PrintEpsiodeStatistic();
+
+            Episode++;
+            Step = 0;
+            episodeReward = 0;
+
+
+            void PrintEpsiodeStatistic()
+            {
+                StringBuilder statistic = new StringBuilder();
+                statistic.Append("Episode: ");
+                statistic.Append(Episode);
+                statistic.Append(" | Steps: ");
+                statistic.Append(Step);
+                statistic.Append(" | Cumulated Reward: ");
+                statistic.Append(episodeReward);
+                UnityEngine.Debug.Log(statistic.ToString());
+            }
+        }
 
         #endregion
-
     }
     #region Custom Editor
     [CustomEditor(typeof(Agent), true), CanEditMultipleObjects]
     class ScriptlessAgent : Editor
     {
-        private static readonly string[] _dontIncludeMe = new string[] { "m_Script" };
-
         public override void OnInspectorGUI()
         {
-            serializedObject.Update();
+            SerializedProperty actType = serializedObject.FindProperty("actionType");
+            if (actType.enumValueIndex == (int)ActionType.Continuous)
+            {
+                DrawPropertiesExcluding(serializedObject, new string[] { "m_Script", "DiscreteBranches" });
 
-            DrawPropertiesExcluding(serializedObject, _dontIncludeMe);
+            }
+            else
+            {
+                DrawPropertiesExcluding(serializedObject, new string[] { "m_Script", "ContinuousSize" });
+            }
 
             serializedObject.ApplyModifiedProperties();
         }
