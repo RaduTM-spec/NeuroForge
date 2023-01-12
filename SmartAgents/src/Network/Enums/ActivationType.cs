@@ -12,7 +12,5 @@ namespace SmartAgents
         Silu,
         SoftPlus,
         SoftMax,
-        PairedTanhSoftPlusActivation,
-        BranchedSoftMaxActivation
     }
 }

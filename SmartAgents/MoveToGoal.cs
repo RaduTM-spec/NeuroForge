@@ -15,12 +15,35 @@ public class MoveToGoal : Agent
     }
     public override void CollectObservations(SensorBuffer sensorBuffer)
     {
+        //6 inputs
         sensorBuffer.AddObservation(transform.localPosition);
         sensorBuffer.AddObservation(target.localPosition);
     }
     public override void OnActionReceived(in ActionBuffer actionBuffer)
     {
-        transform.position += new Vector3(actionBuffer.continuousActions[0], 0, actionBuffer.continuousActions[1]) * Time.deltaTime * speed;
+        switch(actionBuffer.discreteActions[0])
+        {
+            case 0:
+                transform.position += Vector3.left * Time.deltaTime * speed;
+                break;
+            case 1:
+                transform.position += Vector3.forward * Time.deltaTime * speed;
+                break;
+            case 2:
+                transform.position += Vector3.right * Time.deltaTime * speed;
+                break;
+            case 3:
+                transform.position += Vector3.back * Time.deltaTime * speed;
+                break;
+        }
+        switch(actionBuffer.discreteActions[1])
+        {
+            case 0:
+                break;
+            case 1:               
+                break;
+
+        }
         
     }
     public override void Heuristic(ActionBuffer actionSet)

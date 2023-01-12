@@ -114,7 +114,6 @@ namespace SmartAgents
         /// <param name="observation3">Value of the observation</param>
         public void AddObservation(Vector3 observation3)
         {
-
             if (observations.Length - counter < 3)
             {
                 Debug.LogError("SensorBuffer available space is " + (observations.Length - counter) + ". Vector3 observation of size 3 is too large.");

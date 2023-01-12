@@ -14,6 +14,20 @@ namespace SmartAgents
             discreteActions = new int[capacity];
         }
 
+        public double[] ActionsToDouble(ActionType type)
+        {
+
+            switch(type)
+            {
+                case ActionType.Continuous:
+                    return continuousActions.Select(x => (double)x).ToArray();
+                case ActionType.Discrete:
+                    return discreteActions.Select(x => (double)x).ToArray();
+                default:
+                    throw new System.Exception("invalid actions type");
+            }
+
+        }
         public void Clear()
         {
             continuousActions = Enumerable.Repeat(0f, continuousActions.Length).ToArray();

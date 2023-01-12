@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using UnityEngine;
 
 namespace SmartAgents
@@ -15,8 +16,20 @@ namespace SmartAgents
             float x2 = (float)(1 - rng.NextDouble());
 
             double y1 = Mathf.Sqrt(-2.0f * Mathf.Log(x1)) * Mathf.Cos(2.0f * (float)Math.PI * x2);
-            return y1 * standardDeviation + mean;
-            
+            return y1 * standardDeviation + mean;          
+        }
+        public static void PrintArray(Array array)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("[ ");
+            foreach (var item in array)
+            {
+                sb.Append(item.ToString());
+                sb.Append(", ");
+            }
+            sb.Remove(sb.Length - 2, 1);
+            sb.Append("]");
+            Debug.Log(sb.ToString());
         }
         public struct Activation
         {
@@ -29,41 +42,13 @@ namespace SmartAgents
             }
             public static void ActivateOutputLayer(NeuronLayer outNeurLayer, ActivationType outActivationFunction, int[] outputFormat)
             {
-                if (outActivationFunction == ActivationType.BranchedSoftMaxActivation)
+                if (outActivationFunction == ActivationType.SoftMax)
                 {
-                    // Get all raw values
-                    List<double> rawValues = outNeurLayer.neurons.Select(x => x.InValue).ToList();
-
-                    int index = 0;
-
-                    // Foreach branch, activate the branch values
-                    foreach (var branch in outputFormat)
+                    double[] InValuesToActivate = outNeurLayer.neurons.Select(x => x.InValue).ToArray();
+                    Activation.SoftMax(InValuesToActivate);
+                    for (int i = 0; i < InValuesToActivate.Length; i++)
                     {
-                        // Get the branch from raw values
-                        double[] branchValues = rawValues.GetRange(index, index + branch).ToArray();
-
-                        // Activate the branch
-                        SoftMax(branchValues);
-
-                        // Place the activated branch on OutValues
-                        for (int i = index; i < index + branch; i++)
-                        {
-                            outNeurLayer.neurons[i].OutValue = branchValues[i - index];
-                        }
-
-                        index += branch;
-                    }
-
-
-                }
-                else if (outActivationFunction == ActivationType.PairedTanhSoftPlusActivation)
-                {
-                    for (int i = 0; i < outNeurLayer.neurons.Length; i++)
-                    {
-                        outNeurLayer.neurons[i].OutValue =
-                            i % 2 == 0 ?
-                            ActivateValue(outNeurLayer.neurons[i].InValue, ActivationType.Tanh) :     // mu
-                            ActivateValue(outNeurLayer.neurons[i].InValue, ActivationType.SoftPlus);  // sigma
+                        outNeurLayer.neurons[i].OutValue = InValuesToActivate[i];
                     }
                 }
                 else
@@ -74,7 +59,7 @@ namespace SmartAgents
                     }
                 }
             }
-            public static double ActivateValue(double value, ActivationType activationFunction)
+            internal static double ActivateValue(double value, ActivationType activationFunction)
             {
                 switch(activationFunction)
                 {
@@ -106,19 +91,20 @@ namespace SmartAgents
             public static double LeakyReLU(double value, double alpha = 0.2) => value > 0 ? value : value * alpha;
             public static double SiLU(double value) => value * Sigmoid(value);
             public static double SoftPlus(double value) => Math.Log(1 + Math.Exp(value));
-            public static double[] SoftMax(ICollection<double> values)
+            public static void SoftMax(double[] values)
             {
-                double[] returns = new double[values.Count];
-                values.CopyTo(returns, 0);
-                double sum = 0;
-                for (int i = 0; i < values.Count; i++)
+                double exp_sum = 0;
+                for (int i = 0; i < values.Length; i++)
                 {
-                    returns[i] = Mathf.Exp((float)returns[i]);
-                    sum += returns[i];
+                    values[i] = Math.Exp(values[i]);
+                    exp_sum += values[i];
                 }
-                return returns;
-            }
 
+                for (int i = 0; i < values.Length; i++)
+                {
+                    values[i] /= exp_sum;
+                }
+            }
         }
         public struct Derivative
         {
@@ -132,40 +118,9 @@ namespace SmartAgents
             }
             public static void DeriveOutputLayer(NeuronLayer outNeurLayer, ActivationType outActivationFunc, int[] outputFormat)
             {
-                if (outActivationFunc == ActivationType.BranchedSoftMaxActivation)
+                if (outActivationFunc == ActivationType.SoftMax)
                 {
-                    // Get all out values
-                    List<double> rawValues = outNeurLayer.neurons.Select(x => x.OutValue).ToList();
-
-                    int index = 0;
-
-                    // Foreach branch, derive the out branch values
-                    foreach (var branch in outputFormat)
-                    {
-                        // Get the branch from activated values
-                        double[] branchValues = rawValues.GetRange(index, index + branch).ToArray();
-
-                        // Derive the branch values
-                        DerivativeSoftMax(branchValues);
-
-                        // Place the derived branch values in CostValues
-                        for (int i = index; i < index + branch; i++)
-                        {
-                            outNeurLayer.neurons[i].CostValue = branchValues[i - index];
-                        }
-
-                        index += branch;
-                    }
-                }
-                else if (outActivationFunc == ActivationType.PairedTanhSoftPlusActivation)
-                {
-                    for (int i = 0; i < outNeurLayer.neurons.Length; i++)
-                    {
-                        outNeurLayer.neurons[i].CostValue =
-                            i % 2 == 0 ?
-                            DeriveValue(outNeurLayer.neurons[i].OutValue, ActivationType.Tanh) :     // mu
-                            DeriveValue(outNeurLayer.neurons[i].OutValue, ActivationType.SoftPlus);  // sigma
-                    }
+                    //TODO
                 }
                 else
                 {
@@ -176,7 +131,7 @@ namespace SmartAgents
                 }
             }
 
-            static public double DeriveValue(double value, ActivationType activationFunction)
+            static internal double DeriveValue(double value, ActivationType activationFunction)
             {
                 switch (activationFunction)
                 {
@@ -199,51 +154,28 @@ namespace SmartAgents
                 }
             }
 
-            static public double DerivativeTanh(double  value)
+            static public double DerivativeTanh(double  value) => 1f - Math.Pow(Math.Tanh(value), 2);
+            static public double DerivativeSigmoid(double value) => Activation.Sigmoid(value) * (1 - Activation.Sigmoid(value));
+            static public double DerivativeBinaryStep(double value) => 0;
+            static public double DerivativeReLU(double value) => value < 0 ? 0 : 1;
+            static public double DerivativeLeakyReLU(double value, double alpha = 0.2f) => value < 0 ? alpha : 1;
+            static public double DerivativeSiLU(double value) => (1 + Mathf.Exp((float)-value) + value * Mathf.Exp((float)-value)) / Mathf.Pow((1 + Mathf.Exp((float)-value)), 2);
+            static public double DerivativeSoftPlus(double value) => Activation.Sigmoid(value);
+            static public void DerivativeSoftMax(double[] values)
             {
-                return 1f - Math.Pow(Math.Tanh(value), 2);
-            }
-            static public double DerivativeSigmoid(double value)
-            {
-                return Activation.Sigmoid(value) * (1 - Activation.Sigmoid(value));
-            }
-            static public double DerivativeBinaryStep(double value)
-            {
-                return 0;
-            }
-            static public double DerivativeReLU(double value)
-            {
-                if (value < 0)
-                    return 0;
-                else return 1;
-            }
-            static public double DerivativeLeakyReLU(double value, double alpha = 0.2f)
-            {
-                if (value < 0)
-                    return alpha;
-                else return 1;
-            }
-            static public double DerivativeSiLU(double value)
-            {
-                return (1 + Mathf.Exp((float)-value) + value * Mathf.Exp((float)-value)) / Mathf.Pow((1 + Mathf.Exp((float)-value)), 2);
-                //return ActivationFunctionSigmoid(value) * (1 + value * (1 - ActivationFunctionSigmoid(value))); -> works the same
-            }
-            static public double DerivativeSoftPlus(double value)
-            {
-                return Activation.Sigmoid(value);
-            }
-            static public double[] DerivativeSoftMax(double[] values)
-            {
-                 double[] valuesIn = new double[values.Length];
-                Array.Copy(values, valuesIn, values.Length);
+                double exp_sum = 0;
+                for (int i = 0; i < values.Length; i++)
+                {
+                    values[i] = Math.Exp(values[i]);
+                    exp_sum += values[i];
+                }
 
-                Functions.Activation.SoftMax(valuesIn);//values in are now softmaxed
+                double squared_sum = exp_sum*exp_sum;
 
                 for (int i = 0; i < values.Length; i++)
                 {
-                    values[i] = valuesIn[i] * (1 - valuesIn[i]);
+                    values[i] = values[i] * exp_sum - values[i] * values[i] / squared_sum;
                 }
-                return values;
             }
         }
         public struct Cost
@@ -282,7 +214,7 @@ namespace SmartAgents
                     for (int i = 0; i < derivedInValuesBySoftMax.Length; i++)
                         derivedInValuesBySoftMax[i] = outNeurLayer.neurons[i].InValue;
 
-                    derivedInValuesBySoftMax = Derivative.DerivativeSoftMax(derivedInValuesBySoftMax);
+                    Derivative.DerivativeSoftMax(derivedInValuesBySoftMax);
 
                     for (int i = 0; i < outNeurLayer.neurons.Length; i++)
                     {
@@ -355,5 +287,7 @@ namespace SmartAgents
                 return (-prediction + label) / (prediction * (prediction - 1));
             }
         }
+
+       
     }
 }

@@ -12,22 +12,22 @@ namespace SmartAgents
     public class Agent : MonoBehaviour
     {
         #region Visible Fields
-        public BehaviorType behavior = BehaviorType.Passive;
+        public BehaviorType behavior = BehaviorType.Inference;
 
-        [SerializeField] private ArtificialNeuralNetwork policyNetwork;
-        [SerializeField] private ArtificialNeuralNetwork criticNetwork;
+        [SerializeField] private ActorNetwork actorNetwork;
+        [SerializeField] private NeuralNetwork criticNetwork;
         [SerializeField] private ExperienceBuffer Memory;
 
-
-        [Space, Min(1), SerializeField] private int observationSize = 2;
-        
-        [SerializeField] private ActionType actionType = ActionType.Continuous;
+        [Space]
+        [Min(1), SerializeField] private int observationSize = 2;
+        [SerializeField] private ActionType actionSpace = ActionType.Continuous;
         [Min(1), SerializeField] private int ContinuousSize;
         [Min(1), SerializeField] private int[] DiscreteBranches;
 
-        [Space, Min(0)] public int timeHorizon = 180_000;
+        [Space]
+        [Min(0)] public int timeHorizon = 180_000;
         [SerializeField] private OnEpisodeEndType OnEpisodeEnd = OnEpisodeEndType.ResetEnvironment;
-
+        
         #endregion
 
         #region Hidden Fields
@@ -43,8 +43,7 @@ namespace SmartAgents
         private SensorBuffer sensorBuffer;
         private ActionBuffer actionBuffer;
         
-
-        //Input normalization
+        // Input normalization
         double[] mins;
         double[] maxs;
 
@@ -58,71 +57,64 @@ namespace SmartAgents
         {
             hp = GetComponent<HyperParameters>();
             
-            InitNetworks_InitMemory_InitBuffers();
+            InitNetworks();
+            InitMemory();
+            InitBuffers();
+
             InitSensors(this.transform);
             if(OnEpisodeEnd == OnEpisodeEndType.ResetEnvironment)
                 InitInitialTransforms(this.transform.parent);
             else if(OnEpisodeEnd == OnEpisodeEndType.ResetAgent)
                 InitInitialTransforms(this.transform);
         }
-        private void InitNetworks_InitMemory_InitBuffers()
+        private void InitNetworks()
         {
-            if (policyNetwork)
+            if (actorNetwork)
             {
-                observationSize = policyNetwork.GetInputsNumber();
-                ContinuousSize = policyNetwork.GetOutputsNumber();
-                if (policyNetwork.outputActivationType == ActivationType.SoftMax)
-                    actionType = ActionType.Discrete;
-                else
-                    actionType = ActionType.Continuous;
-            }
+                observationSize = actorNetwork.GetObservationsNumber();
+                
 
-            sensorBuffer = new SensorBuffer(ContinuousSize);
-            actionBuffer = new ActionBuffer(observationSize);
+                if (actorNetwork.actionSpace == ActionType.Continuous)
+                {
+                    actionSpace = ActionType.Continuous;
+                    ContinuousSize = actorNetwork.GetActionsNumber();
+                }
+                else
+                {
+                    actionSpace = ActionType.Discrete;
+                    DiscreteBranches = actorNetwork.outputShape;
+                }
+            }
 
             ActivationType activation = hp.activationType;
-            ActivationType outputActivation;
 
-            int[] actorOutputs;
+            if (actorNetwork == null) actorNetwork = actionSpace == ActionType.Continuous ?
+                        new ActorNetwork(observationSize, ContinuousSize, hp.hiddenUnits, hp.layersNumber, activation) :
+                        new ActorNetwork(observationSize, DiscreteBranches, hp.hiddenUnits, hp.layersNumber, activation);
 
-            if (actionType == ActionType.Discrete)
-            {
-                actorOutputs = DiscreteBranches;
-                outputActivation = ActivationType.BranchedSoftMaxActivation;
-            }
-            else //actionType == ActionType.Continuous
-            {
-                actorOutputs = new int[] { ContinuousSize };
-                outputActivation = ActivationType.PairedTanhSoftPlusActivation;
-            }
-
-            if (policyNetwork == null) policyNetwork = new ArtificialNeuralNetwork(observationSize, actorOutputs, hp.HiddenLayerUnits,hp.HiddenLayersNumber, activation, outputActivation, LossType.MeanSquare, true, GetPolicyName());
-            if (criticNetwork == null) criticNetwork = new ArtificialNeuralNetwork(observationSize, new int[] {1}, hp.HiddenLayerUnits,hp.HiddenLayersNumber, activation, ActivationType.Tanh, LossType.MeanSquare, true, GetCriticName());
-            if (Memory == null) Memory = new ExperienceBuffer(GetMemoryName(), true);
-
-            Memory.Clear();
-
-            string GetPolicyName()
-            {
-                short id = 1;
-                while (AssetDatabase.LoadAssetAtPath<ArtificialNeuralNetwork>("Assets/Policy#" + id + ".asset") != null)
-                    id++;
-                return "PolicyNN#" + id;
-            }
+            if (criticNetwork == null) criticNetwork = new NeuralNetwork(observationSize, 1, hp.hiddenUnits,hp.layersNumber, activation, ActivationType.Linear, LossType.MeanSquare, true, GetCriticName());
+            
             string GetCriticName()
             {
                 short id = 1;
-                while (AssetDatabase.LoadAssetAtPath<ArtificialNeuralNetwork>("Assets/CriticNN#" + id + ".asset") != null)
+                while (AssetDatabase.LoadAssetAtPath<NeuralNetwork>("Assets/CriticNN#" + id + ".asset") != null)
                     id++;
                 return "CriticNN#" + id;
             }
-            string GetMemoryName()
-            {
-                short id = 1;
-                while (AssetDatabase.LoadAssetAtPath<ArtificialNeuralNetwork>("Assets/BufferXP#" + id + ".asset") != null)
-                    id++;
-                return "MemoryXP#" + id;
-            }
+            
+        }
+        private void InitMemory()
+        {
+            if (Memory == null) Memory = new ExperienceBuffer(true);
+
+            Memory.Clear();
+
+            
+        }
+        private void InitBuffers()
+        {
+            sensorBuffer = new SensorBuffer(observationSize);
+            actionBuffer = new ActionBuffer(actorNetwork.GetActionsNumber());
         }
         private void InitSensors(Transform parent)
         {
@@ -159,16 +151,23 @@ namespace SmartAgents
         {
             switch (behavior)
             {
-                case BehaviorType.Active:
+                case BehaviorType.Self:
                     ActiveAction();
                     break;
                 case BehaviorType.Inference:
-                    LearnAction();
+                    InferenceAction();
+                    break;
+                case BehaviorType.Manual:
+                    ManualAction();
                     break;
             }
             Step++;
             if (timeHorizon != 0 && Step >= timeHorizon && behavior == BehaviorType.Inference)
                 EndEpisode();
+        }
+        private void ManualAction()
+        {
+
         }
         private void ActiveAction()
         {
@@ -179,22 +178,18 @@ namespace SmartAgents
             CollectObservations(sensorBuffer);
             NormalizeObservations(sensorBuffer);
 
-            double[] rawOutput = policyNetwork.ForwardPropagation(sensorBuffer.observations);
-
-            // Continuous output form: (mean, stddev) (mean, stddev) (mean, stddev) ...
-            if (actionType == ActionType.Continuous)
-                for (int i = 0; i < rawOutput.Length; i += 2)
-                {
-                    double mean = rawOutput[i];
-                    double stddev = rawOutput[i+ 1];
-
-                    actionBuffer.continuousActions[i / 2] = (float)Math.Clamp(Functions.RandomGaussian(mean, stddev),-1.0,1.0); 
-                }
-
+            if(actionSpace == ActionType.Continuous)
+            {
+                actionBuffer.continuousActions = actorNetwork.ContinuousForwardPropagation(sensorBuffer.observations).Item2;           
+            }
+            else
+            {
+                actionBuffer.discreteActions = actorNetwork.DiscreteForwardPropagation(sensorBuffer.observations).Item2;
+            }
             OnActionReceived(actionBuffer);
 
         }
-        private void LearnAction()
+        private void InferenceAction()
         {
             Collect_Action_Store(false);
 
@@ -208,7 +203,7 @@ namespace SmartAgents
                 List<Sample> miniBatch = Memory.records.GetRange(i, i + hp.batch_size);
                 List<double> returns = ret_and_adv.Item1.GetRange(i, i + hp.batch_size);
                 List<double> advantages = ret_and_adv.Item2.GetRange(i, i + hp.batch_size);
-                lock (policyNetwork) lock (criticNetwork)
+                lock (actorNetwork) lock (criticNetwork)
                 {
                     UpdateActorCritic(miniBatch, returns, advantages);
                 }
@@ -229,19 +224,28 @@ namespace SmartAgents
             CollectObservations(sensorBuffer);
             NormalizeObservations(sensorBuffer);
 
-            double[] rawOutputs = policyNetwork.ForwardPropagation(sensorBuffer.observations);
-
-            //Discrete output form: 1branch(x,y,z) x+y+z = 1 (softmax)
-            //Continous output form: (mean, stddev) (mean, stddev) (mean, stddev) ...
-
-            double[] log_probs = GetLogProbs(rawOutputs);
             double value = criticNetwork.ForwardPropagation(sensorBuffer.observations)[0];
+            double[] log_probs;
 
-            Memory.Store(sensorBuffer.observations, rawOutputs, stepReward, log_probs, value, episodeDone);
+            if(actionSpace == ActionType.Continuous)
+            {
+                (double[], float[]) outs_acts = actorNetwork.ContinuousForwardPropagation(sensorBuffer.observations);
+                log_probs = actorNetwork.GetContinuousLogProbs(outs_acts.Item1, outs_acts.Item2);
+                actionBuffer.continuousActions = outs_acts.Item2;
+                Memory.Store(sensorBuffer.observations, outs_acts.Item1, stepReward, log_probs, value, episodeDone);
+            }
+            else
+            {
+                (double[],int[]) dist_acts = actorNetwork.DiscreteForwardPropagation(sensorBuffer.observations);
+                log_probs = ActorNetwork.GetDiscreteLogProbs(dist_acts.Item1);
+                actionBuffer.discreteActions = dist_acts.Item2;
+                Memory.Store(sensorBuffer.observations, dist_acts.Item1, stepReward, log_probs, value, episodeDone);
+
+            }
+
             stepReward = 0;
-
-            Fill_ActionBuffer(rawOutputs);
-            OnActionReceived(actionBuffer);
+       
+            OnActionReceived(actionBuffer);   
         }
         private (List<double>, List<double>) GAE()
         {
@@ -292,57 +296,98 @@ namespace SmartAgents
         }
         private void UpdateActorCritic(List<Sample> mini_batch, List<double> mb_returns, List<double> mb_advantages)
         {
-            for (int t = 0; t < mini_batch.Count; t++)
+            if(actionSpace == ActionType.Continuous)
             {
-                double[] rawOutput = policyNetwork.ForwardPropagation(mini_batch[t].state);
-                double value = criticNetwork.ForwardPropagation(mini_batch[t].state)[0];
-
-                double[] old_policy_log_probs = mini_batch[t].log_probs;
-                double[] new_policy_log_probs = GetLogProbs(rawOutput);
-
-                //RATIO
-                double[] ratios = new double[old_policy_log_probs.Length];
-                for (int p = 0; p < old_policy_log_probs.Length; p++)
+                for (int t = 0; t < mini_batch.Count; t++)
                 {
-                    ratios[p] = new_policy_log_probs[p] - old_policy_log_probs[p];
+                    (double[], float[]) forwardPropagation = actorNetwork.ContinuousForwardPropagation(mini_batch[t].state);
+
+                    double[] old_log_probs = mini_batch[t].log_probs;
+                    double[] new_log_probs = actorNetwork.GetContinuousLogProbs(forwardPropagation.Item1, forwardPropagation.Item2);
+
+                    double[] ratios = new double[new_log_probs.Length];
+                    for (int r = 0; r < ratios.Length; r++)
+                    {
+                        ratios[r] = Math.Exp(new_log_probs[r] - old_log_probs[r]);
+                    }
+
+                    double[] surrogate_losses = new double[ratios.Length];
+                    for (int r = 0; r < ratios.Length; r++)
+                    {
+                        surrogate_losses[r] = -Math.Min
+                                           (
+                                                 ratios[r] * mb_advantages[t],
+                                                 Math.Clamp(ratios[r], 1 - hp.clipFactor, 1 + hp.clipFactor) * mb_advantages[t]
+                                           );
+                    }
+
+                    double[] entropies = new double[ratios.Length];
+                    for (int e = 0; e < entropies.Length; e++)
+                    {
+                        double mu = forwardPropagation.Item1[e * 2];
+                        double sigma = forwardPropagation.Item1[e * 2 + 1];
+                        entropies[e] = 0.5 * Math.Log(2 * Math.PI * Math.E * sigma * sigma);
+                    }
+
+                    double[] actor_losses = new double[forwardPropagation.Item1.Length];
+
+                    for (int l = 0; l < actor_losses.Length; l++)
+                    {
+                        actor_losses[l] = surrogate_losses[l] + hp.entropyRegularization * entropies[l];
+                    }    
+
+                    actorNetwork.BackPropagation(mini_batch[t].state, actor_losses);
+                    criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
                 }
-
-                double[] surrogate_losses = new double[ratios.Length];
-                for (int r = 0; r < ratios.Length; r++)
+            }else
+            if(actionSpace == ActionType.Discrete)
+            {
+                for (int t = 0; t < mini_batch.Count; t++)
                 {
-                    surrogate_losses[r] = -Math.Min
-                                       (
-                                             ratios[r] * mb_advantages[t],
-                                             Math.Clamp(ratios[r], 1 - hp.clipFactor, 1 + hp.clipFactor) * mb_advantages[t]
-                                       );
+                    double[] dist = actorNetwork.DiscreteForwardPropagation(mini_batch[t].state).Item1;
+
+                    double[] old_log_probs = mini_batch[t].log_probs;
+                    double[] new_log_probs = ActorNetwork.GetDiscreteLogProbs(dist);
+
+                    double[] ratios = new double[new_log_probs.Length];
+                    for (int r = 0; r < ratios.Length; r++)
+                    {
+                        ratios[r] = Math.Exp(new_log_probs[r] - old_log_probs[r]);
+                    }
+
+                    double[] surrogate_losses = new double[ratios.Length];
+                    for (int r = 0; r < ratios.Length; r++)
+                    {
+                        surrogate_losses[r] = -Math.Min
+                                           (
+                                                 ratios[r] * mb_advantages[t],
+                                                 Math.Clamp(ratios[r], 1 - hp.clipFactor, 1 + hp.clipFactor) * mb_advantages[t]
+                                           );
+                    }
+
+                    double[] entropies = new double[ratios.Length];
+                    for (int e = 0; e < entropies.Length; e++)
+                    {
+                        entropies[e] = - new_log_probs[e] * Math.Exp(new_log_probs[e]);
+                    }
+
+                    double[] actor_losses = new double[dist.Length];
+
+                    for (int l = 0; l < actor_losses.Length; l++)
+                    {
+                        actor_losses[l] = surrogate_losses[l] + hp.entropyRegularization * entropies[l];
+                    }
+
+                    actorNetwork.BackPropagation(mini_batch[t].state, actor_losses);
+                    criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
+
+                    
                 }
-
-                //ENTROPY
-                List<double> entrops = new List<double>();
-                for (int o = 0; o < rawOutput.Length; o+=2)
-                {
-                    double mu = rawOutput[o];
-                    double sigma = rawOutput[o + 1];
-                    entrops.Add(0.5 * Math.Log(2 * Math.PI * Math.E * sigma * sigma));
-                }
-                double[] entropies = entrops.ToArray();
-
-
-                criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
-                
-                //SURROGATE LOSS
-                double[] actor_loss = new double[rawOutput.Length];
-                for (int i = 0; i < actor_loss.Length; i++)
-                {
-                    actor_loss[i] = surrogate_losses[i/2] + hp.entropyRegularization * entropies[i/2];
-
-                }               
-                policyNetwork.BackPropagation_LossCalculated(mini_batch[t].state, actor_loss);
-               
             }
 
-            criticNetwork.OptimizeParameters(hp.learnRate, hp.momentum, hp.regularization, true);  // Gradient descent
-            policyNetwork.OptimizeParameters(hp.learnRate, hp.momentum, hp.regularization, false); // Gradient ascent
+            actorNetwork.OptimizeParameters(hp.actorLearnRate, hp.momentum, hp.regularization, false);
+            criticNetwork.OptimizeParameters(hp.criticLearnRate, hp.momentum, hp.regularization, true);
+
 
         }
 
@@ -367,18 +412,21 @@ namespace SmartAgents
             {
                 if (obs[i] < mins[i])
                     mins[i] = obs[i];
-                else if (obs[i] > maxs[i])
+                if (obs[i] > maxs[i]) //if i place else i remain with NaN value on (max)
                     maxs[i] = obs[i];
             }
 
             //normalize the obs (-1,1)
             for (int i = 0; i < obs.Length; i++)
             {
+                if (maxs[i] == mins[i])
+                    continue;
+
                 obs[i] = 2 * (obs[i] - mins[i]) / (maxs[i] - mins[i]) - 1;
             }
 
         }
-        void NormalizeAdvantages(List<double> advantages)
+        private void NormalizeAdvantages(List<double> advantages)
         {
             //Normalize advantages
             double mean = advantages.Sum() / advantages.Count;
@@ -387,85 +435,6 @@ namespace SmartAgents
             {
                 advantages[i] = (advantages[i] - mean) / (std + 0.00000001);
             }
-        }
-        double[] GetLogProbs(double[] rawOutputs)
-        {
-            List<double> log_probs = new List<double>();
-            if (actionType == ActionType.Discrete)
-            {
-                for (int i = 0; i < rawOutputs.Length; i++)
-                {
-                    log_probs.Add(Math.Log(rawOutputs[i]));
-                }
-            }
-            else // actionType == ActionType.Continuous
-            {
-                for (int i = 0; i < rawOutputs.Length; i += 2)
-                {
-                    double mean = rawOutputs[i];
-                    double stddev = rawOutputs[i + 1];
-
-                    double actionSample = Math.Clamp(Functions.RandomGaussian(mean, stddev),-1,1);
-
-                    double log_prob = LogProb(actionSample, mean, stddev);
-                    log_probs.Add(log_prob);
-                    
-
-                }
-            }
-            return log_probs.ToArray();
-
-            double LogProb(double action, double mu, double sigma)
-            {
-                double logProb = -0.5 * Math.Log(2 * Math.PI * sigma * sigma) - ((action - mu) * (action - mu)) / (2 * sigma * sigma);
-                return logProb;
-            }
-        }
-        void Fill_ActionBuffer(double[] rawOutputs)
-        {
-            if (actionType == ActionType.Discrete)
-            {
-                actionBuffer.discreteActions = new int[] { DiscreteBranches.Length};
-
-                for (int branchNo = 0; branchNo < DiscreteBranches.Length; branchNo++)
-                {
-                    double max = double.MinValue;
-                    int index = -1;
-                    for (int branchElem = 0; branchElem < DiscreteBranches[branchNo]; branchElem++)
-                    {
-                        if (rawOutputs[branchNo + branchElem] > max)
-                        {
-                            max = rawOutputs[branchNo + branchElem];
-                            index = branchElem;
-                        } 
-                    }
-                    actionBuffer.discreteActions[branchNo] = index;
-                }
-            }
-            else if (actionType == ActionType.Continuous)
-            {
-                for (int i = 0; i < rawOutputs.Length; i += 2)
-                {
-                    double mean = rawOutputs[i];
-                    double stddev = rawOutputs[i + 1];
-
-                    double actionSample = Functions.RandomGaussian(mean, stddev);
-                    actionBuffer.continuousActions[i / 2] = (float)Math.Clamp(actionSample,-1.0,1.0);
-                }
-            }
-        }
-        public int DecideDiscreteBranchAction(double[] rawBranchOutputs)
-        {
-            //discreteActions will contain a the highest probable action from a branch
-            int index = -1;
-            double max = double.MinValue;
-            for (int i = 0; i < rawBranchOutputs.Length; i++)
-                if (rawBranchOutputs[i] > max)
-                {
-                    max = rawBranchOutputs[i];
-                    index = i;
-                }
-            return index;
         }
 
         #endregion
@@ -559,7 +528,7 @@ namespace SmartAgents
     {
         public override void OnInspectorGUI()
         {
-            SerializedProperty actType = serializedObject.FindProperty("actionType");
+            SerializedProperty actType = serializedObject.FindProperty("actionSpace");
             if (actType.enumValueIndex == (int)ActionType.Continuous)
             {
                 DrawPropertiesExcluding(serializedObject, new string[] { "m_Script", "DiscreteBranches" });

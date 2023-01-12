@@ -10,22 +10,23 @@ namespace SmartAgents
 {
     public class HyperParameters : MonoBehaviour
     {
-        [Header("MLP")]
-        [Range(32,128)]public int HiddenLayerUnits = 64;
-        [Range(1,3)]public int HiddenLayersNumber = 2;
+        [Range(16,128)]public int hiddenUnits = 64;
+        [Range(1,5)]public int layersNumber = 2;
         public ActivationType activationType = ActivationType.Relu;
-   
-        [Range(0.00001f, 0.001f), Tooltip("alpha")] public float learnRate = 0.0003f;
-        [Range(0.000001f, 1.0f), Tooltip("mu")] public float momentum = 0.0f;
-        [Range(0.000001f, 0.1f), Tooltip("beta")] public float regularization = 0.001f;
 
-        [Header("PPO")]
+        [Header("-------------------------------------------------")]
+        [Range(0.00001f, 0.01f), Tooltip("alpha")] public float actorLearnRate = 0.0003f;
+        [Range(0.00001f, 0.1f), Tooltip("alpha'")] public float criticLearnRate = 0.001f;
+        [Range(0.0f, 1.0f), Tooltip("mu")] public float momentum = 0.9f;
+        [Range(0.0f, 0.1f), Tooltip("beta")] public float regularization = 0.001f;
+
+        [Header("-------------------------------------------------")]
         [Range(0.8f, 0.995f), Tooltip("gamma")] public float discountFactor = 0.99f;
         [Range(0.9f, 0.95f), Tooltip("lambda")] public float gaeFactor = 0.95f;
         [Range(0.1f, 0.3f), Tooltip("epsilon")] public float clipFactor = 0.2f;
         [Range(0.0001f, 0.01f), Tooltip("beta")] public float entropyRegularization = 0.0001f;
 
-        [Space]
+        [Header("-------------------------------------------------")]
         [SerializeField] private BatchSize bufferSize = BatchSize.size2048;    
         [SerializeField] private MiniBatchSize batchSize = MiniBatchSize.size512;
         [Min(1)] public int epochs = 10;
