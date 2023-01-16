@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Serialization;
 using UnityEngine;
 
 public class ClassificationDebugger : MonoBehaviour
@@ -31,19 +32,28 @@ public class ClassificationDebugger : MonoBehaviour
     List<double[]> inputsData = new List<double[]>();
     List<double[]> labelsData = new List<double[]>();
 
-    List<double[]> inputsTest = new List<double[]>();
-    List<double[]> labelsTest = new List<double[]>();
+    double[] minsInputs;
+    double[] maxsInputs;
+
+    double[] minsLabels;
+    double[] maxsLabels;
 
     List<(double, double, int)> objectsToClassify = new List<(double, double, int)>();
 
     private void Start()
     {
-        net = new NeuralNetwork(2, 2, hiddenUnits, layerNum, activation, ActivationType.Tanh, LossType.MeanSquare, true, "classificationTest");
+        net = new NeuralNetwork(2, 2, hiddenUnits, layerNum, activation, ActivationType.Tanh, LossType.MeanSquare, InitializationType.He,InitializationType.He,true, "classificationTest");
+        
         Generate_Data();
-        Normalize_Data(inputsData);
-        Normalize_Data(labelsData);
-        Normalize_Data(inputsTest);
-        Normalize_Data(labelsTest);
+
+        minsInputs = new double[inputsData[0].Length];
+        maxsInputs = new double[inputsData[0].Length];
+
+        minsLabels = new double[labelsData[0].Length];
+        maxsLabels = new double[labelsData[0].Length];
+
+        FindMinMax();
+        Normalize_Inputs_and_Labels();
     }
     private void Update()
     {
@@ -101,65 +111,50 @@ public class ClassificationDebugger : MonoBehaviour
             inputsData.Add(new double[] { x, y });
             labelsData.Add(label);
         }
-        for (int i = 0; i < batch_size; i++)
-        {
-            double x = Functions.RandomGaussian(0, XStddev);
-            double y = Functions.RandomGaussian(0, YStddev);
-            double[] label = new double[2];
-            double funcPoint = Function(x);
-            if (y > funcPoint)
-            {
-                label[0] = 1;
-                label[1] = 0;
-            }
-            else
-            {
-                label[0] = 0;
-                label[1] = 1;
-            }
-
-            inputsTest.Add(new double[] { x, y });
-            labelsTest.Add(label);
-        }
-
-
     }
-    private void Normalize_Data(List<double[]> data)
+
+
+    private void FindMinMax()
     {
-        double[] mins = new double[inputsData[0].Length];
-        double[] maxs = new double[inputsData[0].Length];
-        for (int i = 0; i < mins.Length; i++)
+        for (int i = 0; i < minsInputs.Length; i++)
         {
-            mins[i] = double.MaxValue;
-            maxs[i] = double.MinValue;
+            minsInputs[i] = inputsData.Min(x => x[i]);
+            maxsInputs[i] = inputsData.Max(x => x[i]);
         }
 
-        //Find min and max
-        for (int i = 0; i < data.Count; i++)
+        for (int i = 0; i < minsLabels.Length; i++)
         {
-            for (int j = 0; j < data[i].Length; j++)
+            minsLabels[i] = labelsData.Min(x => x[i]);
+            maxsLabels[i] = labelsData.Max(x => x[i]);
+        }
+    }
+    private void Normalize_Inputs_and_Labels()
+    {
+        for (int i = 0; i < inputsData.Count; i++)
+        {
+            for (int j = 0; j < inputsData[i].Length; j++) // Number of outputs
             {
-                if (data[i][j] < mins[j])
-                    mins[j] = data[i][j];
-                else if (data[i][j] > maxs[j])
-                    maxs[j] = data[i][j];
+                // 0 to 1 normalization
+                inputsData[i][j] = (inputsData[i][j] - minsInputs[j]) / (maxsInputs[j] - minsInputs[j]);
             }
         }
 
-        //Normalize to (-1,1)
-        for (int i = 0; i < data.Count; i++)
+        for (int i = 0; i < labelsData.Count; i++)
         {
-            for (int j = 0; j < data[i].Length; j++) // Number of outputs
+            for (int j = 0; j < labelsData[i].Length; j++) // Number of outputs
             {
-                data[i][j] = 2 * (data[i][j] - mins[j]) / (maxs[j] - mins[j]) - 1;
+                // 0 to 1 normalization
+                labelsData[i][j] = (labelsData[i][j] - minsLabels[j]) / (maxsLabels[j] - minsLabels[j]);
             }
         }
 
     }
+
+
     private void TrainNetwork()
     {
         double data_acc = 0;
-        for (int i = 0; i < inputsData.Count; i++)
+        for (int i = 0; i < inputsData.Count/2; i++)
         {
             data_acc += net.BackPropagation(inputsData[i], labelsData[i]);
             if (i % 10 == 0) //minibatch
@@ -169,7 +164,7 @@ public class ClassificationDebugger : MonoBehaviour
 
         epoch++;
 
-        data_acc /= inputsData.Count;
+        data_acc /= (inputsData.Count/2);
         data_acc = (1 - data_acc) * 100;
         train_accuracy = data_acc.ToString("0.000") + "%";
     }
@@ -177,11 +172,11 @@ public class ClassificationDebugger : MonoBehaviour
     {
         double test_acc = 0;
         objectsToClassify.Clear();
-        for (int i = 0; i < inputsTest.Count; i++)
+        for (int i = labelsData.Count/2 + 1; i < inputsData.Count; i++)
         {
-            double[] inps = inputsTest[i];
+            double[] inps = inputsData[i];
             double[] outs = net.ForwardPropagation(inps);
-            double[] labels = labelsTest[i];
+            double[] labels = labelsData[i];
 
             double accuracy_on_sample = 0;
             for (int k = 0; k < outs.Length; k++)
@@ -193,8 +188,6 @@ public class ClassificationDebugger : MonoBehaviour
             accuracy_on_sample = (1 - accuracy_on_sample) * 100;
             test_acc += accuracy_on_sample;
 
-            //
-            // 2 inputs -> hidden -> 2 outputs (if first is higher is over, else is under)
             int pos = -1;
             if (outs[0] > outs[1])
                 pos = 1;
@@ -204,7 +197,7 @@ public class ClassificationDebugger : MonoBehaviour
             //add to objectsToClassify
             objectsToClassify.Add((inps[0], inps[1], pos));
         }
-        test_acc /= inputsTest.Count;
+        test_acc /= (inputsData.Count/2);
         test_accuracy = test_acc.ToString("0.000") + "%";
     }
     private void OnDrawGizmos()
@@ -215,13 +208,13 @@ public class ClassificationDebugger : MonoBehaviour
             {
                 //Blue Sphere
                 Gizmos.color = Color.blue;
-                Gizmos.DrawCube(new Vector3((float)obj.Item1, (float)obj.Item2, 0) * 100, Vector3.one *3);
+                Gizmos.DrawCube(new Vector3((float)obj.Item1, (float)obj.Item2, 0) * 100, Vector3.one * 1f);
             }
             else
             {
                 //Red Sphere
                 Gizmos.color = Color.red;
-                Gizmos.DrawSphere(new Vector3((float)obj.Item1, (float)obj.Item2, 0) * 100, 2);
+                Gizmos.DrawSphere(new Vector3((float)obj.Item1, (float)obj.Item2, 0) * 100, 0.66f);
             }
         }
     }

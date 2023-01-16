@@ -15,7 +15,7 @@ namespace SmartAgents
         [SerializeField] private int prevNeurons;
         [SerializeField] private int nextNeurons;
 
-        public WeightLayer(NeuronLayer firstLayer, NeuronLayer secondLayer, double stddev = 1, bool zeroes = false)
+        public WeightLayer(NeuronLayer firstLayer, NeuronLayer secondLayer, InitializationType initType, int netInputs = 1)
         {
             weights = new double[firstLayer.neurons.Length][];
             for (int i = 0; i < weights.Length; i++)
@@ -23,10 +23,21 @@ namespace SmartAgents
                 weights[i] = new double[secondLayer.neurons.Length];
                 for (int j = 0; j < weights[i].Length; j++)
                 {
-                    if (zeroes)
-                        weights[i][j] = 0;
-                    else
-                        weights[i][j] = Functions.RandomGaussian(0, stddev);
+                    switch(initType)
+                    {
+                        case InitializationType.Zero:
+                            weights[i][j] = 0;
+                            break;
+                        case InitializationType.NormalDistribution:
+                            weights[i][j] = Functions.RandomGaussian();
+                            break;
+                        case InitializationType.Xavier:
+                            weights[i][j] = Functions.RandomGaussian(0, 1/Math.Sqrt(1));
+                            break;
+                        case InitializationType.He:
+                            weights[i][j] = Functions.RandomGaussian(0, (double) 2.0 / netInputs);
+                            break;
+                    }
                 }
             }
 

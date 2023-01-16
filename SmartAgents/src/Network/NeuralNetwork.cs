@@ -10,29 +10,32 @@ using UnityEngine.Windows;
 using static System.Collections.Specialized.BitVector32;
 
 namespace SmartAgents {
-
-    [Serializable]
     public class NeuralNetwork: ScriptableObject
     {
         [SerializeField] public int[] format;
-        [SerializeField] public int[] outputShape;
         [SerializeField] public NeuronLayer[] neuronLayers;
         [SerializeField] public WeightLayer[] weightLayers;
         [SerializeField] public BiasLayer[] biasLayers;
 
+        
         [SerializeField] public ActivationType activationType = ActivationType.Tanh;
         [SerializeField] public ActivationType outputActivationType = ActivationType.Tanh;
         [SerializeField] public LossType lossType = LossType.MeanSquare;
 
-        private WeightLayer[] weightGradients;
+        public WeightLayer[] weightGradients;
         private WeightLayer[] weightMomentums;
         private BiasLayer[] biasGradients;    
         private BiasLayer[] biasMomentums;
 
         int backPropagationsCount = 0;
-        public NeuralNetwork(int inputs, int outputs,int hiddenUnits, int hiddenLayersNumber, ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, bool createAsset, string name)
+        public NeuralNetwork(int inputs, int outputs,int hiddenUnits, int hiddenLayersNumber, 
+                             ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, 
+                             InitializationType weightsInit, InitializationType biasesInit, bool createAsset, string name)
         {
             this.format = GetFormat(inputs, outputs, hiddenUnits, hiddenLayersNumber);
+            this.activationType = activationFunction;
+            this.outputActivationType = outputActivationFunction;
+            this.lossType = lossFunction;
 
             neuronLayers = new NeuronLayer[format.Length];
             biasLayers = new BiasLayer[format.Length];
@@ -41,12 +44,12 @@ namespace SmartAgents {
             for (int i = 0; i < neuronLayers.Length; i++)
             {
                 neuronLayers[i] = new NeuronLayer(format[i]);
-                biasLayers[i] = new BiasLayer(format[i]);
+                biasLayers[i] = new BiasLayer(format[i], weightsInit);
 
             }
             for (int i = 0; i < neuronLayers.Length - 1; i++)
             {
-                weightLayers[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], 1); 
+                weightLayers[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], biasesInit); 
             }
 
             if (createAsset)
@@ -81,7 +84,7 @@ namespace SmartAgents {
                 //Activate output neuron layer
                 else
                 {
-                    Functions.Activation.ActivateOutputLayer(neuronLayers[l], outputActivationType, outputShape);
+                    Functions.Activation.ActivateOutputLayer(neuronLayers[l], outputActivationType);
                 }
             }
 
@@ -106,13 +109,12 @@ namespace SmartAgents {
         }
         public void OptimizeParameters(float learningRate, float momentum, float regularization, bool descent)
         {
-            if(descent == true)
-                ApplyGradients(learningRate / backPropagationsCount, momentum, regularization, -1);
-            else //ascent
-                ApplyGradients(learningRate / backPropagationsCount, momentum, regularization, 1);
+            if(descent)
+                ApplyGradients(learningRate / backPropagationsCount, momentum, regularization, -1.0);
+            else
+                ApplyGradients(learningRate / backPropagationsCount, momentum, regularization, 1.0);
             backPropagationsCount = 0;
         }
-
 
         private void InitGradients_InitMomentums()
         {
@@ -123,26 +125,24 @@ namespace SmartAgents {
 
             for (int i = 0; i < neuronLayers.Length; i++)
             {
-                biasGradients[i] = new BiasLayer(format[i], true);
-                biasMomentums[i] = new BiasLayer(format[i], true);
+                biasGradients[i] = new BiasLayer(format[i], InitializationType.Zero);
+                biasMomentums[i] = new BiasLayer(format[i], InitializationType.Zero);
 
             }
             for (int i = 0; i < neuronLayers.Length - 1; i++)
             {
-                weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], 1, true);
-                weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], 1, true);
+                weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
+                weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
             }
 
 
         }
         private void UpdateGradients(WeightLayer weightGradient, BiasLayer biasGradient, NeuronLayer previousNeuronLayer, NeuronLayer nextNeuronLayer)
         {
-            //Related to Backpropagation
             lock(weightGradient)
             {
                 for (int i = 0; i < previousNeuronLayer.neurons.Length; i++)
-                {
-                   
+                {                
                     for (int j = 0; j < nextNeuronLayer.neurons.Length ; j++)
                     {
                         weightGradient.weights[i][j] += previousNeuronLayer.neurons[i].OutValue * nextNeuronLayer.neurons[j].CostValue;
@@ -159,7 +159,6 @@ namespace SmartAgents {
         }
         private void ApplyGradients(float modifiedLearnRate, float momentum, float regularization, double direction)
         {
-            //Related to UpdateParameters
             double weightDecay = 1 - regularization * modifiedLearnRate;
             for (int l = 0; l < weightLayers.Length; l++)
             {
@@ -173,7 +172,6 @@ namespace SmartAgents {
                         weightMomentums[l].weights[i][j] = veloc;
                         weightLayers[l].weights[i][j] = weight * weightDecay + veloc;
 
-                        //Reset the gradient
                         weightGradients[l].weights[i][j] = 0;
                     }
                 }
@@ -182,8 +180,7 @@ namespace SmartAgents {
             {
                 for (int j = 0; j < biasLayers[i].biases.Length; j++)
                 {
-                    double bias = biasLayers[i].biases[j];
-                    double veloc = bias * momentum + bias * modifiedLearnRate * direction;
+                    double veloc = biasMomentums[i].biases[j] * momentum + biasGradients[i].biases[j] * modifiedLearnRate * direction;
 
                     biasMomentums[i].biases[j] = veloc;
                     biasLayers[i].biases[j] += veloc;
@@ -210,14 +207,8 @@ namespace SmartAgents {
 
             return form;
         }
-        public int GetInputsNumber()
-        {
-            return format[0];
-        }
-        public int GetOutputsNumber()
-        {
-            return format[format.Length - 1];
-        }
+        public int GetInputsNumber() => format[0];
+        public int GetOutputsNumber() => format[format.Length - 1];
 
         #endregion
     }

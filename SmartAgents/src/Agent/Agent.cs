@@ -43,7 +43,6 @@ namespace SmartAgents
         private SensorBuffer sensorBuffer;
         private ActionBuffer actionBuffer;
         
-        // Input normalization
         double[] mins;
         double[] maxs;
 
@@ -60,12 +59,20 @@ namespace SmartAgents
             InitNetworks();
             InitMemory();
             InitBuffers();
-
             InitSensors(this.transform);
+
             if(OnEpisodeEnd == OnEpisodeEndType.ResetEnvironment)
                 InitInitialTransforms(this.transform.parent);
             else if(OnEpisodeEnd == OnEpisodeEndType.ResetAgent)
                 InitInitialTransforms(this.transform);
+
+            mins = new double[observationSize];
+            maxs = new double[observationSize];
+            for (int i = 0; i < observationSize; i++)
+            {
+                mins[i] = double.MaxValue;
+                maxs[i] = double.MinValue;
+            }
         }
         private void InitNetworks()
         {
@@ -82,7 +89,7 @@ namespace SmartAgents
                 else
                 {
                     actionSpace = ActionType.Discrete;
-                    DiscreteBranches = actorNetwork.outputShape;
+                    DiscreteBranches = actorNetwork.outputBranches;
                 }
             }
 
@@ -92,7 +99,7 @@ namespace SmartAgents
                         new ActorNetwork(observationSize, ContinuousSize, hp.hiddenUnits, hp.layersNumber, activation) :
                         new ActorNetwork(observationSize, DiscreteBranches, hp.hiddenUnits, hp.layersNumber, activation);
 
-            if (criticNetwork == null) criticNetwork = new NeuralNetwork(observationSize, 1, hp.hiddenUnits,hp.layersNumber, activation, ActivationType.Linear, LossType.MeanSquare, true, GetCriticName());
+            if (criticNetwork == null) criticNetwork = new NeuralNetwork(observationSize, 1, hp.hiddenUnits,hp.layersNumber, activation, ActivationType.Linear, LossType.MeanSquare, InitializationType.NormalDistribution, InitializationType.NormalDistribution,true, GetCriticName());
             
             string GetCriticName()
             {
@@ -336,7 +343,7 @@ namespace SmartAgents
                         actor_losses[l] = surrogate_losses[l] + hp.entropyRegularization * entropies[l];
                     }    
 
-                    actorNetwork.BackPropagation(mini_batch[t].state, actor_losses);
+                    actorNetwork.BackPropagation_LossCalculated(mini_batch[t].state, actor_losses);
                     criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
                 }
             }else
@@ -378,7 +385,7 @@ namespace SmartAgents
                         actor_losses[l] = surrogate_losses[l] + hp.entropyRegularization * entropies[l];
                     }
 
-                    actorNetwork.BackPropagation(mini_batch[t].state, actor_losses);
+                    actorNetwork.BackPropagation_LossCalculated(mini_batch[t].state, actor_losses);
                     criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
 
                     
@@ -395,34 +402,19 @@ namespace SmartAgents
         {
             double[] obs = sensorBuff.observations;
 
-            //Init
-            if (mins == null || maxs == null)
-            {
-                mins = new double[obs.Length];
-                maxs = new double[obs.Length];
-                for (int i = 0; i < obs.Length; i++)
-                {
-                    mins[i] = double.MaxValue;
-                    maxs[i] = double.MinValue;
-                }
-            }
-
-            //Find new min or max
+            //Update mins and maxs
             for (int i = 0; i < obs.Length; i++)
             {
                 if (obs[i] < mins[i])
                     mins[i] = obs[i];
-                if (obs[i] > maxs[i]) //if i place else i remain with NaN value on (max)
+                if (obs[i] > maxs[i])
                     maxs[i] = obs[i];
             }
 
-            //normalize the obs (-1,1)
+            //normalize the obs (0,1)
             for (int i = 0; i < obs.Length; i++)
             {
-                if (maxs[i] == mins[i])
-                    continue;
-
-                obs[i] = 2 * (obs[i] - mins[i]) / (maxs[i] - mins[i]) - 1;
+                obs[i] = obs[i] - mins[i] / (maxs[i] - mins[i]); // for extreme precaution you can avoid division by 0
             }
 
         }
@@ -466,7 +458,6 @@ namespace SmartAgents
             }
         }
 
-        // Used by the User
         public virtual void OnEpisodeBegin()
         {
 

@@ -10,20 +10,28 @@ namespace SmartAgents
     public class BiasLayer : ICloneable
     {
         [SerializeField] public double[] biases;
-        public BiasLayer(int noBiases, bool zeroes = false)
+        public BiasLayer(int noBiases, InitializationType initType)
         {
             biases = new double[noBiases];
             for (int i = 0; i < biases.Length; i++)
             {
-                if(zeroes)
-                    biases[i] = 0;
-                else
-                    biases[i] = Functions.RandomGaussian();
+                switch (initType)
+                {
+                    case InitializationType.Zero | InitializationType.Xavier:
+                        biases[i] = 0;
+                        break;
+                    case InitializationType.NormalDistribution:
+                        biases[i] = Functions.RandomGaussian();
+                        break;
+                    case InitializationType.He:
+                        biases[i] = Functions.RandomGaussian(0, 0.01);
+                        break;
+                }
             }
         }
         public object Clone()
         {
-            BiasLayer clone = new BiasLayer(biases.Length);
+            BiasLayer clone = new BiasLayer(biases.Length, InitializationType.Zero);
             clone.biases = new double[this.biases.Length];
             for (int i = 0; i < clone.biases.Length; i++)
             {

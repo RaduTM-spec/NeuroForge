@@ -9,13 +9,13 @@ namespace SmartAgents
 {
     public struct Functions
     {
-        public static double RandomGaussian(double mean = 0, double standardDeviation = 1)
+        public static double RandomGaussian(double mean = 0, double standardDeviation = 1.0)
         {         
             System.Random rng = new System.Random();
-            float x1 = (float)(1 - rng.NextDouble());
-            float x2 = (float)(1 - rng.NextDouble());
+            double x1 = 1 - rng.NextDouble();
+            double x2 = 1 - rng.NextDouble();
 
-            double y1 = Mathf.Sqrt(-2.0f * Mathf.Log(x1)) * Mathf.Cos(2.0f * (float)Math.PI * x2);
+            double y1 = Math.Sqrt(-2.0f * Math.Log(x1)) * Math.Cos(2.0f * Math.PI * x2);
             return y1 * standardDeviation + mean;          
         }
         public static void PrintArray(Array array)
@@ -40,7 +40,7 @@ namespace SmartAgents
                     neuron.OutValue = ActivateValue(neuron.InValue, activationFunction);
                 }
             }
-            public static void ActivateOutputLayer(NeuronLayer outNeurLayer, ActivationType outActivationFunction, int[] outputFormat)
+            public static void ActivateOutputLayer(NeuronLayer outNeurLayer, ActivationType outActivationFunction)
             {
                 if (outActivationFunction == ActivationType.SoftMax)
                 {
@@ -85,9 +85,9 @@ namespace SmartAgents
             }
 
             public static double BinaryStep(double value) => value < 0 ? 0 : 1;
-            public static double Sigmoid(double value) => 1 / (1 + Mathf.Exp((float)-value));
+            public static double Sigmoid(double value) => 1 / (1 + Math.Exp(-value));
             public static double Tanh(double value) => Math.Tanh(value);
-            public static double ReLU(double value) => Mathf.Max(0, (float) value);
+            public static double ReLU(double value) => Math.Max(0, value);
             public static double LeakyReLU(double value, double alpha = 0.2) => value > 0 ? value : value * alpha;
             public static double SiLU(double value) => value * Sigmoid(value);
             public static double SoftPlus(double value) => Math.Log(1 + Math.Exp(value));
@@ -105,6 +105,18 @@ namespace SmartAgents
                     values[i] /= exp_sum;
                 }
             }
+            public static int ArgMax(double[] values)
+            {
+                int index = -1;
+                double max = double.MinValue;
+                for (int i = 0; i < values.Length; i++)
+                    if (values[i] > max)
+                    {
+                        max = values[i];
+                        index = i;
+                    }
+                return index;
+            }
         }
         public struct Derivative
         {
@@ -116,11 +128,16 @@ namespace SmartAgents
                 }
                 
             }
-            public static void DeriveOutputLayer(NeuronLayer outNeurLayer, ActivationType outActivationFunc, int[] outputFormat)
+            public static void DeriveOutputLayer(NeuronLayer outNeurLayer, ActivationType outActivationFunc)
             {
                 if (outActivationFunc == ActivationType.SoftMax)
                 {
-                    //TODO
+                    double[] InValuesToDerive = outNeurLayer.neurons.Select(x => x.OutValue).ToArray();
+                    Derivative.DerivativeSoftMax(InValuesToDerive);
+                    for (int i = 0; i < InValuesToDerive.Length; i++)
+                    {
+                        outNeurLayer.neurons[i].CostValue = InValuesToDerive[i];
+                    }
                 }
                 else
                 {
@@ -130,7 +147,6 @@ namespace SmartAgents
                     }
                 }
             }
-
             static internal double DeriveValue(double value, ActivationType activationFunction)
             {
                 switch (activationFunction)
@@ -138,7 +154,7 @@ namespace SmartAgents
                     case ActivationType.Tanh:
                         return DerivativeTanh(value);
                     case ActivationType.BinaryStep:
-                        return DerivativeBinaryStep(value);
+                        return DerivativeBinaryStep();
                     case ActivationType.Sigmoid:
                         return DerivativeSigmoid(value);
                     case ActivationType.Relu:
@@ -156,10 +172,10 @@ namespace SmartAgents
 
             static public double DerivativeTanh(double  value) => 1f - Math.Pow(Math.Tanh(value), 2);
             static public double DerivativeSigmoid(double value) => Activation.Sigmoid(value) * (1 - Activation.Sigmoid(value));
-            static public double DerivativeBinaryStep(double value) => 0;
+            static public double DerivativeBinaryStep() => 0;
             static public double DerivativeReLU(double value) => value < 0 ? 0 : 1;
             static public double DerivativeLeakyReLU(double value, double alpha = 0.2f) => value < 0 ? alpha : 1;
-            static public double DerivativeSiLU(double value) => (1 + Mathf.Exp((float)-value) + value * Mathf.Exp((float)-value)) / Mathf.Pow((1 + Mathf.Exp((float)-value)), 2);
+            static public double DerivativeSiLU(double value) => (1 + Math.Exp(-value) + value * Math.Exp(-value)) / Math.Pow(1 + Math.Exp(-value), 2);
             static public double DerivativeSoftPlus(double value) => Activation.Sigmoid(value);
             static public void DerivativeSoftMax(double[] values)
             {
@@ -209,7 +225,6 @@ namespace SmartAgents
                 }
                 else
                 {
-                    //To get the derived of InValues we need to make a separate [] because softmax needs them all
                     double[] derivedInValuesBySoftMax = new double[expectedOuts.Length];
                     for (int i = 0; i < derivedInValuesBySoftMax.Length; i++)
                         derivedInValuesBySoftMax[i] = outNeurLayer.neurons[i].InValue;
