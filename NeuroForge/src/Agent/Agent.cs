@@ -14,8 +14,7 @@ namespace NeuroForge
         #region Visible Fields
         public BehaviorType behavior = BehaviorType.Inference;
 
-        [SerializeField] private ActorNetwork actorNetwork;
-        [SerializeField] private NeuralNetwork criticNetwork;
+        [SerializeField] private PPOModel model;
         [SerializeField] private ExperienceBuffer Memory;
 
         [Space]
@@ -57,7 +56,7 @@ namespace NeuroForge
             observationsNormalizer = new OnlineNormalizer(observationSize);
             advantagesNormalizer = new OnlineNormalizer(1);
 
-            InitNetworks();
+            InitNetwork();
             InitMemory();
             InitBuffers();
             InitSensors(this.transform);
@@ -67,41 +66,30 @@ namespace NeuroForge
             else if(OnEpisodeEnd == OnEpisodeEndType.ResetAgent)
                 InitInitialTransforms(this.transform);
         }
-        private void InitNetworks()
+        private void InitNetwork()
         {
-            if (actorNetwork)
+            if (model)
             {
-                observationSize = actorNetwork.GetObservationsNumber();
+                observationSize = model.actorNetwork.GetObservationsNumber();
                 
-
-                if (actorNetwork.actionSpace == ActionType.Continuous)
+                if (model.actorNetwork.actionSpace == ActionType.Continuous)
                 {
                     actionSpace = ActionType.Continuous;
-                    ContinuousSize = actorNetwork.GetActionsNumber();
+                    ContinuousSize = model.actorNetwork.GetActionsNumber();
                 }
                 else
                 {
                     actionSpace = ActionType.Discrete;
-                    DiscreteBranches = actorNetwork.outputBranches;
+                    DiscreteBranches = model.actorNetwork.outputBranches;
                 }
             }
 
-            ActivationType activation = hp.activationType;
-
-            if (actorNetwork == null) actorNetwork = actionSpace == ActionType.Continuous ?
-                        new ActorNetwork(observationSize, ContinuousSize, hp.hiddenUnits, hp.layersNumber, activation, hp.initializationType) :
-                        new ActorNetwork(observationSize, DiscreteBranches, hp.hiddenUnits, hp.layersNumber, activation, hp.initializationType);
-
-            if (criticNetwork == null) criticNetwork = new NeuralNetwork(observationSize, 1, hp.hiddenUnits, hp.layersNumber, activation, ActivationType.Linear, LossType.MeanSquare, hp.initializationType, true, GetCriticName());
-            
-            string GetCriticName()
+            if(!model)
             {
-                short id = 1;
-                while (AssetDatabase.LoadAssetAtPath<NeuralNetwork>("Assets/CriticNN#" + id + ".asset") != null)
-                    id++;
-                return "CriticNN#" + id;
+                model = actionSpace == ActionType.Continuous ?
+                        new PPOModel(observationSize, ContinuousSize, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType) :
+                        new PPOModel(observationSize, DiscreteBranches, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType);
             }
-            
         }
         private void InitMemory()
         {
@@ -114,7 +102,7 @@ namespace NeuroForge
         private void InitBuffers()
         {
             sensorBuffer = new SensorBuffer(observationSize);
-            actionBuffer = new ActionBuffer(actorNetwork.GetActionsNumber());
+            actionBuffer = new ActionBuffer(model.actorNetwork.GetActionsNumber());
         }
         private void InitSensors(Transform parent)
         {
@@ -180,11 +168,11 @@ namespace NeuroForge
 
             if(actionSpace == ActionType.Continuous)
             {
-                actionBuffer.continuousActions = actorNetwork.ContinuousForwardPropagation(sensorBuffer.observations).Item2;           
+                actionBuffer.continuousActions = model.actorNetwork.ContinuousForwardPropagation(sensorBuffer.observations).Item2;           
             }
             else
             {
-                actionBuffer.discreteActions = actorNetwork.DiscreteForwardPropagation(sensorBuffer.observations).Item2;
+                actionBuffer.discreteActions = model.actorNetwork.DiscreteForwardPropagation(sensorBuffer.observations).Item2;
             }
             OnActionReceived(actionBuffer);
 
@@ -203,7 +191,7 @@ namespace NeuroForge
                 List<Sample> miniBatch = Memory.records.GetRange(i, i + hp.batch_size);
                 List<double> returns = ret_and_adv.Item1.GetRange(i, i + hp.batch_size);
                 List<double> advantages = ret_and_adv.Item2.GetRange(i, i + hp.batch_size);
-                lock (actorNetwork) lock (criticNetwork)
+                lock (model.actorNetwork) lock (model.criticNetwork)
                 {
                     UpdateActorCritic(miniBatch, returns, advantages);
                 }
@@ -224,19 +212,19 @@ namespace NeuroForge
             CollectObservations(sensorBuffer);
             observationsNormalizer.Normalize(sensorBuffer.observations);
 
-            double value = criticNetwork.ForwardPropagation(sensorBuffer.observations)[0];
+            double value = model.criticNetwork.ForwardPropagation(sensorBuffer.observations)[0];
             double[] log_probs;
 
             if(actionSpace == ActionType.Continuous)
             {
-                (double[], float[]) outs_acts = actorNetwork.ContinuousForwardPropagation(sensorBuffer.observations);
-                log_probs = actorNetwork.GetContinuousLogProbs(outs_acts.Item1, outs_acts.Item2);
+                (double[], float[]) outs_acts = model.actorNetwork.ContinuousForwardPropagation(sensorBuffer.observations);
+                log_probs = model.actorNetwork.GetContinuousLogProbs(outs_acts.Item1, outs_acts.Item2);
                 actionBuffer.continuousActions = outs_acts.Item2;
                 Memory.Store(sensorBuffer.observations, outs_acts.Item1, stepReward, log_probs, value, episodeDone);
             }
             else
             {
-                (double[],int[]) dist_acts = actorNetwork.DiscreteForwardPropagation(sensorBuffer.observations);
+                (double[],int[]) dist_acts = model.actorNetwork.DiscreteForwardPropagation(sensorBuffer.observations);
                 log_probs = ActorNetwork.GetDiscreteLogProbs(dist_acts.Item1);
                 actionBuffer.discreteActions = dist_acts.Item2;
                 Memory.Store(sensorBuffer.observations, dist_acts.Item1, stepReward, log_probs, value, episodeDone);
@@ -249,38 +237,33 @@ namespace NeuroForge
         }
         private (List<double>, List<double>) GAE()
         {
-            List<Sample> iteration_data = Memory.records;
+            List<Sample> playback = Memory.records;
 
             //returns = discounted rewards
             List<double> returns = new List<double>();
             List<double> advantages = new List<double>();
 
+
             //Normalize rewards 
-            double minReward = iteration_data.Min(s => s.reward);
-            double maxReward = iteration_data.Max(s => s.reward);
-            for(int i = 0; i < iteration_data.Count; i++)
-            {
-                if (iteration_data[i].reward == 0)
-                    continue;
-                if (iteration_data[i].reward < 0)
-                    iteration_data[i].reward /= -minReward;
-                else
-                    iteration_data[i].reward /= maxReward;
-            }
+            double mean = playback.Average(t => t.reward);
+            double std = Math.Sqrt(playback.Sum(t => (t.reward - mean) * (t.reward - mean) / playback.Count)) ;
+            if (std == 0) std = +1e-8;
+            IEnumerable<double> normRewards = playback.Select(r => (r.reward - mean) / std);
+
 
             //Calculate returns and advantages
             double advantage = 0;
-            for (int i = iteration_data.Count - 1; i >= 0; i--)
+            for (int i = playback.Count - 1; i >= 0; i--)
             {
-                double value = criticNetwork.ForwardPropagation(iteration_data[i].state)[0];
-                double nextValue = i == iteration_data.Count-1? 
+                double value = model.criticNetwork.ForwardPropagation(playback[i].state)[0];
+                double nextValue = i == playback.Count-1? 
                                         0 : 
-                                        criticNetwork.ForwardPropagation(iteration_data[i + 1].state)[0];
+                                        model.criticNetwork.ForwardPropagation(playback[i + 1].state)[0];
 
 
-                double delta = iteration_data[i].done? 
-                               iteration_data[i].reward - value :
-                               iteration_data[i].reward + hp.discountFactor * nextValue - value;
+                double delta = playback[i].done?
+                               normRewards.ElementAt(i) - value :
+                               normRewards.ElementAt(i) + hp.discountFactor * nextValue - value;
 
                 advantage = advantage * hp.discountFactor * hp.gaeFactor + delta;
 
@@ -288,7 +271,6 @@ namespace NeuroForge
                 advantages.Add(advantagesNormalizer.Normalize(advantage));
                 returns.Add(advantage + value);
             }
-
 
             advantages.Reverse();           
             returns.Reverse();
@@ -301,16 +283,17 @@ namespace NeuroForge
             {
                 for (int t = 0; t < mini_batch.Count; t++)
                 {
-                    (double[], float[]) forwardPropagation = actorNetwork.ContinuousForwardPropagation(mini_batch[t].state);
+                    (double[], float[]) forwardPropagation = model.actorNetwork.ContinuousForwardPropagation(mini_batch[t].state);
 
                     double[] old_log_probs = mini_batch[t].log_probs;
-                    double[] new_log_probs = actorNetwork.GetContinuousLogProbs(forwardPropagation.Item1, forwardPropagation.Item2);
+                    double[] new_log_probs = model.actorNetwork.GetContinuousLogProbs(forwardPropagation.Item1, forwardPropagation.Item2);
 
                     double[] ratios = new double[new_log_probs.Length];
                     for (int r = 0; r < ratios.Length; r++)
                     {
                         ratios[r] = Math.Exp(new_log_probs[r] - old_log_probs[r]);
                     }
+                   
 
                     double[] surrogate_losses = new double[ratios.Length];
                     for (int r = 0; r < ratios.Length; r++)
@@ -337,24 +320,29 @@ namespace NeuroForge
                         actor_losses[l] = surrogate_losses[l] + hp.entropyRegularization * entropies[l];
                     }    
 
-                    actorNetwork.BackPropagation_LossCalculated(mini_batch[t].state, actor_losses);
-                    criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
+                    model.actorNetwork.BackPropagation_LossCalculated(mini_batch[t].state, actor_losses);
+                    model.criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
                 }
             }else
             if(actionSpace == ActionType.Discrete)
             {
                 for (int t = 0; t < mini_batch.Count; t++)
                 {
-                    double[] dist = actorNetwork.DiscreteForwardPropagation(mini_batch[t].state).Item1;
+                    double[] dist = model.actorNetwork.DiscreteForwardPropagation(mini_batch[t].state).Item1;
 
                     double[] old_log_probs = mini_batch[t].log_probs;
                     double[] new_log_probs = ActorNetwork.GetDiscreteLogProbs(dist);
 
+                    Functions.PrintArray(old_log_probs, "old");
+                    Functions.PrintArray(new_log_probs, "new");
+                   
                     double[] ratios = new double[new_log_probs.Length];
                     for (int r = 0; r < ratios.Length; r++)
                     {
                         ratios[r] = Math.Exp(new_log_probs[r] - old_log_probs[r]);
                     }
+
+                    Functions.PrintArray(ratios, "ratios");
 
                     double[] surrogate_losses = new double[ratios.Length];
                     for (int r = 0; r < ratios.Length; r++)
@@ -379,19 +367,28 @@ namespace NeuroForge
                         actor_losses[l] = surrogate_losses[l] + hp.entropyRegularization * entropies[l];
                     }
 
-                    actorNetwork.BackPropagation_LossCalculated(mini_batch[t].state, actor_losses);
-                    criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
+                    Functions.PrintArray(actor_losses, "losses");
 
+                    model.actorNetwork.BackPropagation_LossCalculated(mini_batch[t].state, actor_losses);
+                  
+                    model.criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
                     
                 }
             }
-
-            actorNetwork.OptimizeParameters(hp.actorLearnRate, hp.momentum, hp.regularization, false);
-            criticNetwork.OptimizeParameters(hp.criticLearnRate, hp.momentum, hp.regularization, true);
+            model.actorNetwork.OptimizeParameters(hp.actorLearnRate, hp.momentum, hp.regularization, false);
+            model.criticNetwork.OptimizeParameters(hp.criticLearnRate, hp.momentum, hp.regularization, true);
 
 
         }
-
+        private void PPODebugger(double[] data)
+        {
+            //Check log probs
+            foreach (var item in data)
+            {
+                if (item == double.NaN)
+                    UnityEngine.Debug.LogError("NaNFound");
+            }
+        }
 
         #endregion
 
@@ -448,6 +445,7 @@ namespace NeuroForge
             // Collect last data piece (including the terminal reward)
             Collect_Action_Store(true);
 
+            // Reset Transforms
             int transformsStart = 0;
             if (OnEpisodeEnd == OnEpisodeEndType.ResetEnvironment)
                 ResetToInitialTransforms(this.transform.parent, ref transformsStart);
@@ -455,24 +453,20 @@ namespace NeuroForge
                 ResetToInitialTransforms(this.transform, ref transformsStart);
 
             OnEpisodeBegin();
-            PrintEpsiodeStatistic();
+
+            // Print statistics
+            StringBuilder statistic = new StringBuilder();
+            statistic.Append("Episode: ");
+            statistic.Append(Episode);
+            statistic.Append(" | Steps: ");
+            statistic.Append(Step);
+            statistic.Append(" | Cumulated Reward: ");
+            statistic.Append(episodeReward);
+            UnityEngine.Debug.Log(statistic.ToString());
 
             Episode++;
             Step = 0;
-            episodeReward = 0;
-
-
-            void PrintEpsiodeStatistic()
-            {
-                StringBuilder statistic = new StringBuilder();
-                statistic.Append("Episode: ");
-                statistic.Append(Episode);
-                statistic.Append(" | Steps: ");
-                statistic.Append(Step);
-                statistic.Append(" | Cumulated Reward: ");
-                statistic.Append(episodeReward);
-                UnityEngine.Debug.Log(statistic.ToString());
-            }
+            episodeReward = 0;    
         }
 
         #endregion

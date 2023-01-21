@@ -10,6 +10,8 @@ using UnityEngine.Windows;
 using static System.Collections.Specialized.BitVector32;
 
 namespace NeuroForge {
+
+    [Serializable]
     public class NeuralNetwork: ScriptableObject
     {
         [SerializeField] public int[] format;

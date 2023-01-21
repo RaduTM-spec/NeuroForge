@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,9 +19,10 @@ namespace NeuroForge
             double y1 = Math.Sqrt(-2.0f * Math.Log(x1)) * Math.Cos(2.0f * Math.PI * x2);
             return y1 * standardDeviation + mean;          
         }
-        public static void PrintArray(Array array)
+        public static void PrintArray(Array array, string tag = null)
         {
             StringBuilder sb = new StringBuilder();
+            if(tag!=null) sb.Append(tag);
             sb.Append("[ ");
             foreach (var item in array)
             {
@@ -31,6 +33,22 @@ namespace NeuroForge
             sb.Append("]");
             Debug.Log(sb.ToString());
         }
+        public static void PrintList<T>(List<T> list, string tag = null)
+        {
+            StringBuilder sb = new StringBuilder();
+            if(tag!= null) sb.Append(tag);  
+            sb.Append("[ ");
+            foreach (var item in list)
+            {
+                sb.Append(item.ToString());
+                sb.Append(", ");
+            }
+            sb.Remove(sb.Length - 2, 1);
+            sb.Append("]");
+            Debug.Log(sb.ToString());
+        }
+
+
         public struct Activation
         {
             public static void ActivateLayer(NeuronLayer neuronLayer, ActivationType activationFunction)

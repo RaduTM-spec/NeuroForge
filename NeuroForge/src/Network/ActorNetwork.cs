@@ -11,6 +11,7 @@ using UnityEngine.Windows;
 
 namespace NeuroForge
 {
+    [Serializable]
     public class ActorNetwork : ScriptableObject
     {
         [SerializeField] public int[] format;
