@@ -18,7 +18,7 @@ namespace NeuroForge
         public PPOModel(int obsSize, int continuousSize, int hiddenUnits, int layersNum, ActivationType activation, InitializationType initialization)
         {
             actorNetwork = new ActorNetwork(obsSize, continuousSize, hiddenUnits, layersNum, activation, initialization);
-            criticNetwork = new NeuralNetwork(obsSize, 1, hiddenUnits, layersNum, activation, ActivationType.Linear, LossType.MeanSquare, initialization, true, GetCriticName());
+            criticNetwork = new NeuralNetwork(obsSize, 1, hiddenUnits, layersNum, activation, ActivationType.Tanh, LossType.MeanSquare, initialization, true, GetCriticName());
             observationsNormalizer = new OnlineNormalizer(obsSize);
             advantagesNormalizer = new OnlineNormalizer(1);
             CreateAsset();
@@ -26,7 +26,7 @@ namespace NeuroForge
         public PPOModel(int obsSize, int[] discreteSize, int hiddenUnits, int layersNum, ActivationType activation, InitializationType initialization)
         {
             actorNetwork = new ActorNetwork(obsSize, discreteSize, hiddenUnits, layersNum, activation, initialization);
-            criticNetwork = new NeuralNetwork(obsSize, 1, hiddenUnits, layersNum, activation, ActivationType.Linear, LossType.MeanSquare, initialization, true, GetCriticName());
+            criticNetwork = new NeuralNetwork(obsSize, 1, hiddenUnits, layersNum, activation, ActivationType.Tanh, LossType.MeanSquare, initialization, true, GetCriticName());
             observationsNormalizer = new OnlineNormalizer(obsSize);
             advantagesNormalizer = new OnlineNormalizer(1);
             CreateAsset();

@@ -24,7 +24,7 @@ namespace NeuroForge {
         [SerializeField] public ActivationType outputActivationType = ActivationType.Tanh;
         [SerializeField] public LossType lossType = LossType.MeanSquare;
 
-        public WeightLayer[] weightGradients;
+        private WeightLayer[] weightGradients;
         private WeightLayer[] weightMomentums;
         private BiasLayer[] biasGradients;    
         private BiasLayer[] biasMomentums;
@@ -95,9 +95,6 @@ namespace NeuroForge {
         }
         public double BackPropagation(double[] inputs, double[] labels)
         {
-            if (weightGradients == null || weightGradients.Length == 0)
-                InitGradients_InitMomentums();
-
             ForwardPropagation(inputs);
             double error = Functions.Cost.CalculateOutputLayerCost(neuronLayers[neuronLayers.Length-1], labels, outputActivationType, lossType);
 
@@ -117,8 +114,7 @@ namespace NeuroForge {
                 ApplyGradients(learningRate / backPropagationsCount, momentum, regularization, 1.0);
             backPropagationsCount = 0;
         }
-
-        private void InitGradients_InitMomentums()
+        public void ZeroGradients()
         {
             biasGradients = new BiasLayer[format.Length];
             biasMomentums = new BiasLayer[format.Length];
@@ -211,6 +207,24 @@ namespace NeuroForge {
         }
         public int GetInputsNumber() => format[0];
         public int GetOutputsNumber() => format[format.Length - 1];
+        public double GetMaxGradientValue()
+        {
+            double max = 0;
+            for (int i = 0; i < weightGradients.Length; i++)
+            {
+                for (int j = 0; j < weightGradients[i].weights.Length; j++)
+                {
+                    for (int k = 0; k < weightGradients[i].weights[j].Length; k++)
+                    {
+                        if (weightGradients[i].weights[j][k] > max)
+                        {
+                            max = weightGradients[i].weights[j][k];
+                        }
+                    }
+                }
+            }
+            return max;
+        }
 
         #endregion
     }

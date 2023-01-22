@@ -43,6 +43,16 @@ namespace NeuroForge
 
         }
         private WeightLayer() { }
+        public void Zero()
+        {
+            for (int i = 0; i < weights.Length; i++)
+            {
+                for (int j = 0; j < weights[i].Length; j++)
+                {
+                    weights[i][j] = 0;
+                }
+            }
+        }
         public object Clone()
         {
             WeightLayer clone = new WeightLayer();

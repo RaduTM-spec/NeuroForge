@@ -29,6 +29,13 @@ namespace NeuroForge
                 }
             }
         }
+        public void Zero()
+        {
+            for (int i = 0; i < biases.Length; i++)
+            {
+                biases[i] = 0;
+            }
+        }
         public object Clone()
         {
             BiasLayer clone = new BiasLayer(biases.Length, InitializationType.Zero);

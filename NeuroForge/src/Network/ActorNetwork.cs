@@ -31,11 +31,8 @@ namespace NeuroForge
         int backwardsCount = 0;
 
         #region Gradient Descent
-        public void BackPropagation_LossCalculated(double[] inputs, double[] losses)
+        public void BackPropagation(double[] inputs, double[] losses)
         {
-            if (weightGradients == null || weightGradients.Length == 0)
-                InitGradients_InitMomentums();
-
             NeuronLayer outLayer = neuronLayers[neuronLayers.Length - 1];
             if (actionSpace == ActionType.Continuous)
             {
@@ -46,8 +43,7 @@ namespace NeuroForge
                     else
                         outLayer.neurons[i].CostValue = losses[i] * Functions.Derivative.DerivativeSoftPlus(outLayer.neurons[i].InValue);  //sigma
                 }
-            }
-            else
+            } else
             if (actionSpace == ActionType.Discrete)
             {
                 double[] rawOuts = DiscreteForwardPropagation(inputs).Item1;
@@ -81,6 +77,42 @@ namespace NeuroForge
         {
             ApplyGradients(learningRate / backwardsCount, momentum, regularization, descent ? -1 : 1);
             backwardsCount = 0;
+        }
+        public void ZeroGradients()
+        {
+            if(weightGradients == null)
+            {
+                biasGradients = new BiasLayer[format.Length];
+                biasMomentums = new BiasLayer[format.Length];
+                weightGradients = new WeightLayer[format.Length - 1];
+                weightMomentums = new WeightLayer[format.Length - 1];
+
+                for (int i = 0; i < neuronLayers.Length; i++)
+                {
+                    biasGradients[i] = new BiasLayer(format[i], InitializationType.Zero);
+                    biasMomentums[i] = new BiasLayer(format[i], InitializationType.Zero);
+
+                }
+                for (int i = 0; i < neuronLayers.Length - 1; i++)
+                {
+                    weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
+                    weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < neuronLayers.Length; i++)
+                {
+                    biasLayers[i].Zero();
+                    biasMomentums[i].Zero();
+                }
+                for (int i = 0; i < neuronLayers.Length - 1; i++)
+                {
+                    weightGradients[i].Zero();
+                    weightMomentums[i].Zero();
+                }
+            }
+            
         }
         private void UpdateGradients(WeightLayer weightGradient, BiasLayer biasGradient, NeuronLayer previousNeuronLayer, NeuronLayer nextNeuronLayer)
         {
@@ -139,27 +171,7 @@ namespace NeuroForge
                 }
             }
         }
-        private void InitGradients_InitMomentums()
-        {
-            biasGradients = new BiasLayer[format.Length];
-            biasMomentums = new BiasLayer[format.Length];
-            weightGradients = new WeightLayer[format.Length - 1];
-            weightMomentums = new WeightLayer[format.Length - 1];
-
-            for (int i = 0; i < neuronLayers.Length; i++)
-            {
-                biasGradients[i] = new BiasLayer(format[i], InitializationType.Zero);
-                biasMomentums[i] = new BiasLayer(format[i], InitializationType.Zero);
-
-            }
-            for (int i = 0; i < neuronLayers.Length - 1; i++)
-            {
-                weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
-                weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
-            }
-
-
-        }
+       
 
         #endregion
 
@@ -247,8 +259,8 @@ namespace NeuroForge
             for (int i = 0; i < rawValues.Length; i += 2)
             {
                 double mean = rawValues[i];
-                double stddev = rawValues[i + 1] + 0.00000001;
-
+                double stddev = rawValues[i + 1];
+                if (stddev == 0) stddev = 1e-8;
                 double actionSample = Math.Clamp(Functions.RandomGaussian(mean, stddev), -1.0, 1.0);
 
                 continuousActions[i / 2] = (float)actionSample;
@@ -257,8 +269,19 @@ namespace NeuroForge
         }
         public double[] GetContinuousLogProbs(double[] rawContinuousOutputs, float[] continuousActions)
         {
-            Debug.LogError("NOT IMPLEMENTED");
-            return null;
+            double[] log_probs = new double[rawContinuousOutputs.Length];
+
+            for (int i = 0; i < continuousActions.Length; i++)
+            {
+                double x = continuousActions[i];
+                double mu = rawContinuousOutputs[i * 2];
+                double sigma = rawContinuousOutputs[i * 2 + 1];
+                if (sigma == 0) sigma = +1e-8;
+                double log_prob = -Math.Pow(x - mu, 2) / (2 * sigma * sigma) - Math.Log(2 * Math.PI * sigma * sigma);
+                log_probs[i * 2] = log_prob;
+                log_probs[i * 2 + 1] = log_prob;
+            }
+            return log_probs;
         }
 
         #endregion
@@ -380,6 +403,7 @@ namespace NeuroForge
             {
                 log_probs[i] = Math.Log(rawDiscreteOutputs[i]);
             }
+
             return log_probs;
         }
 
@@ -399,6 +423,24 @@ namespace NeuroForge
         }
         public int GetObservationsNumber() => format[0];
         public int GetActionsNumber() => actionSpace == ActionType.Continuous ? outputBranches[0] : outputBranches.Length;
+        public double GetMaxGradientValue()
+        {
+            double max = 0;
+            for (int i = 0; i < weightGradients.Length; i++)
+            {
+                for (int j = 0; j < weightGradients[i].weights.Length; j++)
+                {
+                    for (int k = 0; k < weightGradients[i].weights[j].Length; k++)
+                    {
+                        if (weightGradients[i].weights[j][k] > max)
+                        {
+                            max = weightGradients[i].weights[j][k];
+                        }
+                    }
+                }
+            }
+            return max;
+        }
 
         #endregion
     }
