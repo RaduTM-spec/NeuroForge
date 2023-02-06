@@ -142,6 +142,7 @@ namespace NeuroForge
         }
         private void CastRay3D(Vector3 castOrigin, float sphereCastRadius, Vector3 rayDirection, float distance, LayerMask layerMask)
         {
+            observations.Clear();
             RaycastHit hit;
             if (Physics.SphereCast(castOrigin, sphereCastRadius, rayDirection, out hit, distance, layerMask))
             {
@@ -186,6 +187,7 @@ namespace NeuroForge
         }
         private void CastRay2D(Vector3 castOrigin, float sphereCastRadius, Vector3 rayDirection, float distance, LayerMask layerMask)
         {
+            observations.Clear();
             RaycastHit2D hit = Physics2D.CircleCast(castOrigin, sphereCastRadius, rayDirection, distance, layerMask);
             if (hit == true)
             {

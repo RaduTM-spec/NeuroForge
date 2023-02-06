@@ -14,7 +14,7 @@ namespace NeuroForge
     public class PPOAgent : MonoBehaviour
     {
         // Displayed fields
-        public BehaviorType behavior = BehaviorType.Inference;
+        public BehaviourType behaviour = BehaviourType.Inference;
         [SerializeField] public PPONetwork model;
         [HideInInspector] public PPOMemory Memory;
 
@@ -29,7 +29,7 @@ namespace NeuroForge
 
         // Hidden fields
         [HideInInspector] public PPOHyperParameters hp;
-        private TrainingEnvironment personalEnvironment;
+        private TransformReseter personalEnvironment;
 
         private AgentSensor agentSensor;
         private SensorBuffer sensorBuffer;
@@ -60,11 +60,11 @@ namespace NeuroForge
             // Init environment
             if (onEpisodeEnd == OnEpisodeEndType.ResetNone) return;
             personalEnvironment = onEpisodeEnd == OnEpisodeEndType.ResetEnvironment?
-                                  personalEnvironment = new TrainingEnvironment(this.transform.parent) :
-                                  personalEnvironment = new TrainingEnvironment(this.transform);
+                                  personalEnvironment = new TransformReseter(this.transform.parent) :
+                                  personalEnvironment = new TransformReseter(this.transform);
 
             // Subscribe to trainer instance
-            if(behavior == BehaviorType.Inference)
+            if(behaviour == BehaviourType.Inference)
                 PPOTrainer.Subscribe(this);
         }
         private void InitNetwork()
@@ -113,24 +113,24 @@ namespace NeuroForge
         // Loop
         protected virtual void Update()
         {
-            switch (behavior)
+            switch (behaviour)
             {
-                case BehaviorType.Self:
+                case BehaviourType.Active:
                     SelfAction();
                     break;
-                case BehaviorType.Inference:
+                case BehaviourType.Inference:
                     InteractAction(false);
                     break;
-                case BehaviorType.Manual:
+                case BehaviourType.Manual:
                     ManualAction();
                     break;
             }
 
             episodeTimePassed += Time.deltaTime;
-            if (episodeTimePassed >= episodeMaxLength && behavior == BehaviorType.Inference)
+            if (episodeTimePassed >= episodeMaxLength && behaviour == BehaviourType.Inference)
                 EndEpisode();
             
-            if (behavior == BehaviorType.Inference && Memory.IsFull(hp.buffer_size))
+            if (behaviour == BehaviourType.Inference && Memory.IsFull(hp.buffer_size))
             {
                 PPOTrainer.Ready();
             }

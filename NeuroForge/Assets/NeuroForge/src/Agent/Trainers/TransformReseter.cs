@@ -6,12 +6,12 @@ using UnityEngine;
 
 namespace NeuroForge
 {
-    public class TrainingEnvironment : IResetable
+    public class TransformReseter : IResetable
     {
         private Transform parent;
         private List<Transform> initialTransforms;
 
-        public TrainingEnvironment(Transform parent)
+        public TransformReseter(Transform parent)
         {
             this.parent = parent;
             this.initialTransforms = new List<Transform>();

@@ -196,7 +196,7 @@ namespace NeuroForge
         {
             if (this.observations.Length - counter < observations.Length)
             {
-                Debug.LogError("SensorBuffer available space is " + (this.observations.Length - counter) + ". Float array observations is too large.");
+                Debug.LogError("SensorBuffer available space is " + (this.observations.Length - counter) + ". Float array observations size is " + observations.Length + ".");
                 return;
             }
             foreach (var item in observations)

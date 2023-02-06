@@ -12,7 +12,7 @@ namespace NeuroForge
     public class NEATAgent : MonoBehaviour
     {
         #region Fields
-        public BehaviorType behaviour = BehaviorType.Inference;
+        public BehaviourType behaviour = BehaviourType.Inference;
         [SerializeField] public NEATNetwork model;
 
         [Space]
@@ -23,7 +23,6 @@ namespace NeuroForge
 
         [Space]
         [Space, Min(10), Tooltip("seconds")] public int maxEpsiodeLength = 60;
-        [SerializeField] private OnEpisodeEndType OnEpisodeEnd = OnEpisodeEndType.ResetEnvironment;
 
         [HideInInspector] public NEATHyperParameters hp;
 
@@ -33,13 +32,14 @@ namespace NeuroForge
 
         private int speciesNumber;
         private float fitness;
-        private bool isDead = false;
 
         #endregion
 
         // Setup
         protected virtual void Awake()
         {
+            hp = GetComponent<NEATHyperParameters>();
+
             InitNetwork();
 
             // Init buffers
@@ -50,7 +50,7 @@ namespace NeuroForge
             agentSensor = new AgentSensor(this.transform);
 
             // Init trainer
-            if (behaviour == BehaviorType.Inference)
+            if (behaviour == BehaviourType.Inference)
                 NEATTrainer.Initialize(this);
         }
         private void InitNetwork()
@@ -97,14 +97,17 @@ namespace NeuroForge
         {
             switch (behaviour)
             {
-                case BehaviorType.Self:
+                case BehaviourType.Active:
                     ActiveAction();
                     break;
-                case BehaviorType.Inference:
-                    InferenceAction();
+                case BehaviourType.Inference:
+                    ActiveAction();
                     break;
-                case BehaviorType.Manual:
+                case BehaviourType.Manual:
                     ManualAction();
+                    break;
+                default:
+                    // Inactive
                     break;
             }
         }
@@ -129,11 +132,6 @@ namespace NeuroForge
                 actionBuffer.discreteActions = model.GetDiscreteActions(sensorBuffer.observations);
             }
             OnActionReceived(actionBuffer);
-
-        }
-        private void InferenceAction()
-        {
-
         }
         private void OnDrawGizmos()
         {
@@ -228,14 +226,14 @@ namespace NeuroForge
         }
         public void AddReward<T>(T reward) where T : struct
         {
-            if (isDead) return;
+            if (behaviour == BehaviourType.Inactive) return;
             this.fitness += Convert.ToSingle(reward);
         }
         public void EndEpisode()
         {
-            if(behaviour == BehaviorType.Inference)
+            if(behaviour == BehaviourType.Inference)
             {
-                isDead = true;
+                behaviour = BehaviourType.Inactive;
                 NEATTrainer.Ready();
             }
             
@@ -248,12 +246,10 @@ namespace NeuroForge
         public void SetSpecieNumber(int specieNumber) => speciesNumber = specieNumber;
         public void Ressurect()
         {
-            isDead = false;
+            behaviour = BehaviourType.Inference;
             fitness = 0;
         }
         public ActionType GetActionSpace() => actionSpace;
-        public OnEpisodeEndType GetOnEpisodeEndType() => OnEpisodeEnd;
-        public void SetOnEpisodeEndType(OnEpisodeEndType type) => OnEpisodeEnd = type;
     }
 
 

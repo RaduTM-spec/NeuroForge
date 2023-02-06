@@ -1,11 +1,11 @@
 namespace NeuroForge
 {
-    public enum BehaviorType
+    public enum BehaviourType
     { 
-        Self,
+        Active,
         Inference,
         Manual,
-
+        Inactive,
     }
 
 }

@@ -1,8 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using Unity.VisualScripting;
+using UnityEditor;
 using UnityEngine;
 
 namespace NeuroForge
@@ -15,15 +18,18 @@ namespace NeuroForge
     {
         private static NEATTrainer Instance;
 
-        [SerializeField] private List<NEATAgent> agents;
+        [SerializeField] private List<NEATAgent> population;
+        private Dictionary<int, List<NEATAgent>> species;
 
         private NEATNetwork mainModel;
         private NEATHyperParameters hp;
-        private TrainingEnvironment trainingEnvironment;
+        private TransformReseter trainingEnvironment;
 
-        private int agentsDead = 0;
-        private int episodeLength = 60;
-        private float episodeTimePassed = 0;
+        [SerializeField] private int agentsDead = 0;
+        [SerializeField] private int episodeLength = 60;
+        [SerializeField] private float episodeTimePassed = 0;
+
+        [SerializeField] private int GENERATION = 0;
 
 
         private InnovationCounter innovationCounter;
@@ -41,168 +47,321 @@ namespace NeuroForge
         }
         private void Update()
         {
-            if(Instance)
+            if (Instance)
                 Instance.episodeTimePassed += Time.deltaTime;
         }
         private void LateUpdate()
-        {   
-            if(Instance != null && (Instance.episodeTimePassed >= Instance.episodeLength || Instance.agentsDead == Instance.agents.Count))
+        {
+            if (Instance != null && (Instance.episodeTimePassed >= Instance.episodeLength || Instance.agentsDead == Instance.population.Count))
             {
                 // Update NEAT
+                Instance.NEAT_Algorithm();
 
 
-
+                EditorUtility.SetDirty(mainModel);
+                AssetDatabase.SaveAssetIfDirty(mainModel);
+                trainingEnvironment.Reset();
                 // Revive all agents
-                foreach (var agent in Instance.agents)
+                foreach (var agent in Instance.population)
                 {
                     agent.Ressurect();
                 }
+                Instance.agentsDead = 0;
+                Instance.episodeTimePassed = 0;
+                Debug.Log("<color=#2873eb>Generation: " + ++GENERATION + " | Max Fitness: " + population.Max(x => x.GetFitness()) + "</color>");
             }
         }
 
         public static void Initialize(NEATAgent agent)
         {
-            if(Instance == null)
-            {
-                GameObject go = new GameObject("PPOTrainer");
-                go.AddComponent<NEATTrainer>();
-                Instance.agents = new List<NEATAgent>();
-                Instance.mainModel = agent.model;
-                Instance.hp = agent.hp;
-                Instance.episodeLength = agent.maxEpsiodeLength;
-                Instance.innovationCounter = new InnovationCounter(agent.model.GetNewestWeightInnovation() + 1);
-                // Init environment
-                if (agent.GetOnEpisodeEndType() == OnEpisodeEndType.ResetNone) return;
-                Instance.trainingEnvironment = agent.GetOnEpisodeEndType() == OnEpisodeEndType.ResetEnvironment ?
-                                    Instance.trainingEnvironment = new TrainingEnvironment(agent.transform.parent) :
-                                    Instance.trainingEnvironment = new TrainingEnvironment(agent.transform);
-            }
+            if (Instance != null)
+                return;
+            
+            GameObject go = new GameObject("PPOTrainer");
+            go.AddComponent<NEATTrainer>();
 
-            Instance.agents.Add(agent);
+            Instance.population = new List<NEATAgent>() { agent };
+            Instance.species = new Dictionary<int, List<NEATAgent>>();
+            Instance.mainModel = agent.model;
+            Instance.hp = agent.hp;
+            Instance.episodeLength = agent.maxEpsiodeLength;
+            Instance.innovationCounter = new InnovationCounter(agent.model.GetHighestInnovation() + 1);
+
+            Instance.InitPopulation(agent.gameObject, agent.hp.populationSize - 1);
+
+            try
+            {
+                Instance.trainingEnvironment = new TransformReseter(agent.transform.parent);
+            }
+            catch { } // Is kept in try catch because on testing, agent is not initialized as a gameObject
+
         }
         public static void Ready()
         {
-            if(Instance)
-            Instance.agentsDead++;
+            if (Instance)
+                Instance.agentsDead++;                
+
+               
         }
 
-
-        public static NEATNetwork CrossOver(NEATNetwork parent1, NEATNetwork parent2)
+        private void InitPopulation(GameObject modelAgent, int size)
         {
+            for (int i = 0; i < size; i++)
+            {
+                GameObject newAgent = Instantiate(modelAgent, modelAgent.transform.position, modelAgent.transform.rotation, modelAgent.transform.parent);
+                NEATAgent script = newAgent.GetComponent<NEATAgent>();
+                script.SetSpecieNumber(1);
+                Instance.population.Add(script);
+                if (Instance.species.ContainsKey(1))
+                    Instance.species[1].Add(script);
+                else
+                    Instance.species.Add(1, new List<NEATAgent> { script });
+            }
+            foreach (var agent in population)
+            {
+                agent.model.Mutate();
+            }
+        }
+        private void NEAT_Algorithm()
+        {
+            //TODO
+        }
+
+        // to convert to private
+        public static NEATNetwork CrossOver(NEATNetwork parent1, NEATNetwork parent2, float p1_fitness, float p2_fitness)
+        {
+
+            // Notes: disjoint and excess are taken from the parent with highest fitness
+            // Notes: the new child (a.k.a. new topology) is mutated afterwards
+
             NEATNetwork child = new NEATNetwork(parent1.GetInputsNumber(), parent1.outputShape, parent1.actionSpace, false);
 
-            int lastInov = parent1.GetNewestWeightInnovation() > parent2.GetNewestWeightInnovation() ? 
-                           parent1.GetNewestWeightInnovation() : parent2.GetNewestWeightInnovation();
-
-            for (int gene = 0; gene < lastInov; gene++)
-            {
-                ConnectionGene parent1_gene;
-                if (parent1.connections.TryGetValue(gene, out parent1_gene)) {; }
-                ConnectionGene parent2_gene;
-                if (parent1.connections.TryGetValue(gene, out parent2_gene)) {; }
-
-                if (parent1_gene == null && parent2_gene == null) continue;
-                if (parent1_gene == null) AssignGene(parent2_gene);
-                else if (parent2_gene == null) AssignGene(parent1_gene);
-                else if (Random.value < .5f) AssignGene(parent1_gene);
-                else AssignGene(parent2_gene);
-
-                void AssignGene(ConnectionGene g)
-                {
-                    int node1 = g.inNeuron;
-                    int node2 = g.outNeuron;
-                    int inovation = g.innovation;
-
-                    NodeGene inNode = child.nodes[node1];
-                    NodeGene outNode = child.nodes[node2];
-
-                    // Also add the nodes in the child genome
-                    if(inNode == null)
-                    {
-                        NodeGene toAdd = new NodeGene(node1, NEATNodeType.hidden);
-                        child.nodes.Add(toAdd.innovation, toAdd);
-                        inNode = toAdd;
-                    }
-                    if(outNode == null)
-                    {
-                        NodeGene toAdd = new NodeGene(node2, NEATNodeType.hidden);
-                        child.nodes.Add(toAdd.innovation, toAdd);
-                        inNode = toAdd;
-                    }
-
-                    ConnectionGene crossedGene = new ConnectionGene(inNode, outNode, inovation);
-                    child.connections.Add(inovation, crossedGene);
-                }
 
 
-            }
+            /* int lastInov = parent1.GetNewestWeightInnovation() > parent2.GetNewestWeightInnovation() ? 
+                            parent1.GetNewestWeightInnovation() : parent2.GetNewestWeightInnovation();
+
+             for (int gene = 0; gene < lastInov; gene++)
+             {
+                 ConnectionGene parent1_gene;
+                 if (parent1.connections.TryGetValue(gene, out parent1_gene)) {; }
+                 ConnectionGene parent2_gene;
+                 if (parent1.connections.TryGetValue(gene, out parent2_gene)) {; }
+
+                 if (parent1_gene == null && parent2_gene == null) continue;
+                 if (parent1_gene == null) AssignGene(parent2_gene);
+                 else if (parent2_gene == null) AssignGene(parent1_gene);
+                 else if (Random.value < .5f) AssignGene(parent1_gene);
+                 else AssignGene(parent2_gene);
+
+                 void AssignGene(ConnectionGene g)
+                 {
+                     int node1 = g.inNeuron;
+                     int node2 = g.outNeuron;
+                     int inovation = g.innovation;
+
+                     NodeGene inNode = child.nodes[node1];
+                     NodeGene outNode = child.nodes[node2];
+
+                     // Also add the nodes in the child genome
+                     if(inNode == null)
+                     {
+                         NodeGene toAdd = new NodeGene(node1, NEATNodeType.hidden);
+                         child.nodes.Add(toAdd.innovation, toAdd);
+                         inNode = toAdd;
+                     }
+                     if(outNode == null)
+                     {
+                         NodeGene toAdd = new NodeGene(node2, NEATNodeType.hidden);
+                         child.nodes.Add(toAdd.innovation, toAdd);
+                         inNode = toAdd;
+                     }
+
+                     ConnectionGene crossedGene = new ConnectionGene(inNode, outNode, inovation);
+                     child.connections.Add(inovation, crossedGene);
+                 }
+
+
+             }*/
 
 
             return child;
-           
         }
-
-        public static float Distance(NEATNetwork parent1, NEATNetwork parent2)
+        public static bool AreCompatible(NEATNetwork parent1, NEATNetwork parent2)
         {
-            float c1 = Instance.hp.c1;
-            float c2 = Instance.hp.c2;
-            float c3 = Instance.hp.c3;
+            float N = Max_GenesNumber(parent1, parent2);
+            float E = Count_ExcessJoints(parent1, parent2);
+            float D = Count_Disjoints(parent1, parent2);
+            float W = Avg_WeightDifference(parent1, parent2);
 
-            float N = parent1.connections.Count > parent2.connections.Count ? parent1.connections.Count : parent2.connections.Count;
-            float E = 0;
-            float D = 0;
-            float W = 0;
-            int wCount = 0;
+            // Debug.Log("E = " + E + " | D = " + D + " | W = " + W + " | N = " + N);
+            float distance = (Instance.hp.c1 * E / N) +
+                             (Instance.hp.c2 * D / N) +
+                             (Instance.hp.c3 * W);
 
-            int lastInov = parent1.GetNewestWeightInnovation() > parent2.GetNewestWeightInnovation() ?
-                           parent1.GetNewestWeightInnovation() : parent2.GetNewestWeightInnovation();
+            return distance < Instance.hp.delta;
+        }
 
-            // Calculate D and W
-            for (int i = 0; i < lastInov; i++)
+        private static int Max_GenesNumber(NEATNetwork genome1, NEATNetwork genome2)
+        {
+            int gen1_count = genome1.connections.Count + genome1.nodes.Count;
+            int gen2_count = genome2.connections.Count + genome2.nodes.Count;
+            return Mathf.Max(gen1_count, gen2_count);
+        }
+        private static float Avg_WeightDifference(NEATNetwork genome1, NEATNetwork genome2)
+        {
+            float dif = 0f;
+            int matchesCount = 0;
+
+            foreach (var conn1 in genome1.connections)
             {
-                ConnectionGene parent1_gene;
-                if (parent1.connections.TryGetValue(i, out parent1_gene)) {; }
-                ConnectionGene parent2_gene;
-                if (parent1.connections.TryGetValue(i, out parent2_gene)) {; }
-
-                if (parent1_gene == null && parent2_gene == null) continue;
-                if (parent1_gene != null && parent2_gene != null)
+                foreach (var conn2 in genome2.connections)
                 {
-                    wCount++;
-                    W += Mathf.Abs(parent1_gene.weight - parent2_gene.weight);
+                    if (conn1.Key == conn2.Key)
+                    {
+                        dif = Mathf.Abs(conn1.Value.weight - conn2.Value.weight);
+                        matchesCount++;
+                    }
                 }
-                else D++;
             }
-            // Calculate E
-            for (int i = lastInov - 1; i >= 0; i--)
+
+            return matchesCount > 0 ? dif / matchesCount : 1_000_000;
+        }
+        private static int Count_ExcessJoints(NEATNetwork genome1, NEATNetwork genome2)
+        {
+            int excessJoints = 0;
+            int highestMatch = 0;
+
+            // Find highest match, excess joints are higher than this number
+            foreach (var node1 in genome1.nodes)
             {
-
-                ConnectionGene parent1_gene;
-                if (parent1.connections.TryGetValue(i, out parent1_gene)) { }
-                ConnectionGene parent2_gene;
-                if (parent1.connections.TryGetValue(i, out parent2_gene)) { }
-
-                if (parent1_gene != null && parent2_gene != null) break;
-                E++;
+                foreach (var node2 in genome2.nodes)
+                {
+                    if (node1.Key == node2.Key)
+                        highestMatch = Mathf.Max(highestMatch, node1.Key);
+                }
+            }
+            foreach (var conn1 in genome1.connections)
+            {
+                foreach (var conn2 in genome2.connections)
+                {
+                    if (conn1.Key == conn2.Key)
+                        highestMatch = Mathf.Max(highestMatch, conn1.Key);
+                }
             }
 
-            D -= E;
-            W /= wCount;
+            foreach (var node in genome1.nodes)
+            {
+                if (node.Key > highestMatch)
+                    excessJoints++;
+            }
+            foreach (var node in genome2.nodes)
+            {
+                if (node.Key > highestMatch)
+                    excessJoints++;
+            }
+            foreach (var conn in genome1.connections)
+            {
+                if (conn.Key > highestMatch)
+                    excessJoints++;
+            }
+            foreach (var conn in genome2.connections)
+            {
+                if (conn.Key > highestMatch)
+                    excessJoints++;
+            }
 
-            Debug.Log("E = " + E + " | D = " + D + " | W = " + W + " | N = " + N );
-            return (c1 * E / N) + (c2 * D / N) + (c3 * W);
+            return excessJoints;
+        }
+        private static int Count_Disjoints(NEATNetwork genome1, NEATNetwork genome2)
+        {
+            int disJoints = 0;
+            int highestMatch = 0;
+
+            // Calculate highest match, joints are less than this
+            foreach (var node1 in genome1.nodes)
+            {
+                foreach (var node2 in genome2.nodes)
+                {
+                    if (node1.Key == node2.Key)
+                        highestMatch = Mathf.Max(highestMatch, node1.Key);
+                }
+            }
+            foreach (var conn1 in genome1.connections)
+            {
+                foreach (var conn2 in genome2.connections)
+                {
+                    if (conn1.Key == conn2.Key)
+                        highestMatch = Mathf.Max(highestMatch, conn1.Key);
+                }
+            }
+
+            // now check for disjoints (need to be less than the highest match)
+            foreach (var node1 in genome1.nodes)
+            {
+                bool isMatch = false;
+                foreach (var node2 in genome2.nodes)
+                {
+                    if (node1.Key == node2.Key)
+                    {
+                        isMatch = true;
+                        break;
+                    }
+                }
+
+                if (!isMatch && node1.Key < highestMatch)
+                    disJoints++;
+            }
+            foreach (var node2 in genome2.nodes)
+            {
+                bool isMatch = false;
+                foreach (var node1 in genome1.nodes)
+                {
+                    if (node2.Key == node1.Key)
+                    {
+                        isMatch = true;
+                        break;
+                    }
+                }
+
+                if (!isMatch && node2.Key < highestMatch)
+                    disJoints++;
+            }
+            foreach (var conn1 in genome1.connections)
+            {
+                bool isMatch = false;
+                foreach (var conn2 in genome2.connections)
+                {
+                    if (conn1.Key == conn2.Key)
+                    {
+                        isMatch = true;
+                        break;
+                    }
+                }
+                if (!isMatch && conn1.Key < highestMatch)
+                    disJoints++;
+            }
+            foreach (var conn2 in genome2.connections)
+            {
+                bool isMatch = false;
+                foreach (var conn1 in genome1.connections)
+                {
+                    if (conn2.Key == conn1.Key)
+                    {
+                        isMatch = true;
+                        break;
+                    }
+                }
+                if (!isMatch && conn2.Key < highestMatch)
+                    disJoints++;
+            }
+
+            return disJoints;
         }
 
 
 
-
-
-
-
-
-
-
-        public static void Dispose() => Instance = null;
+        public static void Dispose() { Destroy(Instance.gameObject); Instance = null; }
         public static int GetInnovation() => Instance.innovationCounter.GetInnovation();
         public static void InitializeHyperParameters() => Instance.hp = new NEATHyperParameters();
     }

@@ -4,6 +4,10 @@ using UnityEngine;
 
 namespace NeuroForge
 {
+    /// <summary>
+    /// This class collects every sensor script that belongs to a gameObject (Agent) and 
+    /// collects their values each time CollectObservation() method is called.
+    /// </summary>
     internal class AgentSensor
     {
         List<object> sensors;

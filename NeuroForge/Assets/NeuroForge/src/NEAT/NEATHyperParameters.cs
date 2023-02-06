@@ -8,9 +8,10 @@ namespace NeuroForge
     [DisallowMultipleComponent, AddComponentMenu("NeuroForge/HyperParameters")]
     public class NEATHyperParameters : MonoBehaviour 
     {
-        [Min(10)]public int populationSize = 150;
+        [Min(10)]public int populationSize = 50;
 
-        [Header("Distance")]
+        [Header("Compatibility")]
+        public float delta = 3f;
         public float c1 = 1f;
         public float c2 = 1f;
         public float c3 = 0.4f;

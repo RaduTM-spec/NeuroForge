@@ -22,11 +22,13 @@ namespace NeuroForge
             this.innovation = innovation;
             this.inNeuron = inNeuron.innovation;
             this.outNeuron = outNeuron.innovation;
-
-            weight = Functions.RandomValue() < 0.5f ?
+            this.enabled = true;
+            weight = FunctionsF.RandomValue() < 0.5f ?
                      FunctionsF.RandomGaussian(0, 0.1f) :
                      FunctionsF.RandomGaussian(1, 0.1f);
             outNeuron.incomingConnections.Add(this.innovation);
         }
+
+        public bool IsSequencial() => inNeuron == outNeuron;
     }
 }

@@ -48,64 +48,79 @@ public class NEATUnitTests : MonoBehaviour
     public void AssertAll()
     {
         Assert(TestCreateNEATNET);
+        Assert(TestSequencials);
         Assert(TestAddConnection);
-        Assert(TestAssignRandomWeights);
+        Assert(TestMutateConnections);
         Assert(TestRemoveConnection);
         Assert(TestMergeConnections);
         Assert(TestAddNodeToConnection);
         Assert(TestMutateNode);
+        
         Assert(TestRandomMutations);
         Assert(TestDistance);
         Assert(TestCrossover);
-
-
     }
 
     bool TestCreateNEATNET()
     {
         NEATAgent agent = new NEATAgent();
-        agent.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
         agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
         return true;
         
     }
+    bool TestSequencials()
+    {
+        NEATAgent agent = new NEATAgent();
+        agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+        NEATTrainer.Initialize(agent);
+        for (int i = 0; i < 1; i++)
+        {
+            agent.model.AddConnection();
+            agent.model.AddNode();
+        }
+        for (int i = 0; i < 250; i++)
+        {
+            agent.model.AddConnection();
+        }
+
+        EditorUtility.SetDirty(agent.model);
+        AssetDatabase.SaveAssetIfDirty(agent.model);
+        NEATTrainer.Dispose();
+        agent.model.GetContinuousActions(new double[] { 1, 1 });
+
+        return true;
+    }
     bool TestAddConnection()
     {
-        
-        try
-        {
             NEATAgent agent = new NEATAgent();
-            agent.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
             agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 100; i++)
             {
                 agent.model.AddConnection();
             }
+        EditorUtility.SetDirty(agent.model);
+        AssetDatabase.SaveAssetIfDirty(agent.model);
             NEATTrainer.Dispose();
-        }
-        catch
-        {
-            return false;
-        }
-        
+            agent.model.GetContinuousActions(new double[] { 1, 1 });
 
         return true;
     }
-    bool TestAssignRandomWeights()
+    bool TestMutateConnections()
     {
         NEATAgent agent = new NEATAgent();
-        agent.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
         agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
         NEATTrainer.Initialize(agent);
         for (int i = 0; i < 30; i++)
         {
             agent.model.AddConnection();
         }
-        /*for (int i = 0; i < 30; i++)
+        for (int i = 0; i < 30; i++)
         {
-            agent.model.AssignRandomWeights();
-        }*/
+            agent.model.MutateConnections();
+        }
+        NEATTrainer.Dispose();
+        agent.model.GetContinuousActions(new double[] { 1, 1 });
 
         return true;
 
@@ -113,7 +128,6 @@ public class NEATUnitTests : MonoBehaviour
     bool TestRemoveConnection()
     {  
             NEATAgent agent = new NEATAgent();
-            agent.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
             agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 50; i++)
@@ -125,15 +139,13 @@ public class NEATUnitTests : MonoBehaviour
                 agent.model.RemoveConnection();
             }
             NEATTrainer.Dispose();
-       
+        agent.model.GetContinuousActions(new double[] { 1, 1 });
         return true;
     }
     bool TestMergeConnections()
     {
-        try
-        {
+        
             NEATAgent agent = new NEATAgent();
-            agent.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
             agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 50; i++)
@@ -144,21 +156,15 @@ public class NEATUnitTests : MonoBehaviour
             {
                 agent.model.MergeConnections();
             }
-            NEATTrainer.Dispose ();
+            NEATTrainer.Dispose();
             AssetDatabase.RemoveObjectFromAsset(agent.model);
-        }
-        catch
-        {
-            return false;
-        }
+        agent.model.GetContinuousActions(new double[] { 1, 1 });
         return true;
     }
     bool TestAddNodeToConnection()
     {
-        try
-        {
+       
             NEATAgent agent = new NEATAgent();
-            agent.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
             agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 50; i++)
@@ -167,23 +173,16 @@ public class NEATUnitTests : MonoBehaviour
             }
             for (int i = 0; i < 50; i++)
             {
-                agent.model.AddNodeToConnection();
+                agent.model.AddNode();
             }
             NEATTrainer.Dispose();
+        agent.model.GetContinuousActions(new double[] { 1, 1 });
 
-        }
-        catch
-        {
-            return false;
-        }
         return true;
     }
     bool TestMutateNode()
-    {
-        try
-        {
-            NEATAgent agent = new NEATAgent();
-            agent.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
+    {   
+            NEATAgent agent = new NEATAgent();  
             agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 30; i++)
@@ -192,80 +191,79 @@ public class NEATUnitTests : MonoBehaviour
             }
             for (int i = 0; i < 30; i++)
             {
-                agent.model.AddNodeToConnection();
+                agent.model.AddNode();
             }
             for (int i = 0; i < 100; i++)
             {
                 agent.model.MutateNode();
             }
             NEATTrainer.Dispose();
+        agent.model.GetContinuousActions(new double[] { 1, 1 });
 
-        }
-        catch
-        {
-            return false;
-        }
         return true;
     }
 
     bool TestRandomMutations()
     {
-       
-        for (int k = 0; k < 5; k++)
+      
+        for (int k = 0; k < 25; k++)
         {
             NEATAgent agent = new NEATAgent();
-            agent.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
             agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
             NEATTrainer.Initialize(agent);
 
-
-            for (int i = 0; i < 175; i++)
+            List<NEATNetwork.Mutation> mutations = new List<NEATNetwork.Mutation>();
+            mutations.Add(agent.model.AddConnection);
+            mutations.Add(agent.model.MutateNode); // -> here is problem
+            mutations.Add(agent.model.RemoveConnection);
+            mutations.Add(agent.model.MergeConnections);
+            mutations.Add(agent.model.AddNode);
+            mutations.Add(agent.model.MergeConnections);
+            
+            for (int i = 0; i < 200; i++)
             {
-                Debug.Log("Mutation: " + i + " | Conns: " + agent.model.connections.Count + " | Nodes: " + agent.model.nodes.Count);
-                agent.model.Mutate();
+                agent.model.ForceMutate(Functions.RandomIn(mutations));
             }
 
             NEATTrainer.Dispose();
         }
-        
-         
-        return true;
-         
-         
+
+        return true;      
     }
     bool TestDistance()
     {
-
-        NEATAgent agent = new NEATAgent();
-        agent.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
-        agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, true);
-        NEATTrainer.Initialize(agent);
-        for (int i = 0; i < 50; i++)
+        for (int k = 5; k < 25; k++)
         {
-            agent.model.Mutate();
+            NEATAgent agent = new NEATAgent();
+            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+            NEATTrainer.Initialize(agent);
+            //StringBuilder stringBuilder = new StringBuilder();
+            for (int i = 0; i < k; i++)
+            {
+                //stringBuilder.AppendLine("Mutation: " + i + " | Conns: " + agent.model.connections.Count + " | Nodes: " + agent.model.nodes.Count);
+
+                agent.model.Mutate();
+            }
+            NEATTrainer.Dispose();
+
+            NEATAgent agent2 = new NEATAgent();
+            agent2.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+            NEATTrainer.Initialize(agent2);
+            for (int i = 0; i < k; i++)
+            {
+                agent2.model.Mutate();
+            }
+
+            NEATTrainer.InitializeHyperParameters();
+            //Debug.Log("Distance: " + NEATTrainer.AreCompatible(agent.model, agent2.model));
+
         }
-        NEATTrainer.Dispose();
 
-
-        /*NEATAgent agent2 = new NEATAgent();
-        agent2.SetOnEpisodeEndType(OnEpisodeEndType.ResetNone);
-        agent2.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, true);
-*/
-
-
-        /* NEATTrainer.Initialize(agent2);
-         for (int i = 0; i < 50; i++)
-         {
-             agent2.model.Mutate();
-         }
-
-         NEATTrainer.InitializeHyperParameters();
-         Debug.Log("Distance: " + NEATTrainer.Distance(agent.model, agent2.model));
-         */
 
         return true;
 
-
+        // EditorUtility.SetDirty(models)
+        // SaveAssetIfDirty(models)
 
 
         // AssetDatabase.RemoveObjectFromAsset(agent.model);
@@ -275,5 +273,6 @@ public class NEATUnitTests : MonoBehaviour
     bool TestCrossover()
     {
         return true;
+        // disjoint 
     }
 }

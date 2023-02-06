@@ -6,6 +6,7 @@ using UnityEngine;
 using System.Threading.Tasks;
 using System.IO;
 using Unity.VisualScripting;
+using UnityEditor;
 
 namespace NeuroForge
 {
@@ -99,6 +100,7 @@ namespace NeuroForge
                 agent.Memory.Clear();
                 Instance.agentsReady--;
             }
+            // AssetDatabase.SaveAssets();      
         }
 
 
