@@ -8,7 +8,8 @@ namespace NeuroForge
     [DisallowMultipleComponent, AddComponentMenu("NeuroForge/HyperParameters")]
     public class NEATHyperParameters : MonoBehaviour 
     {
-        [Min(10)]public int populationSize = 50;
+        [Min(5)]public int populationSize = 50;
+        [Min(5), Tooltip("seconds")] public int maxEpsiodeLength = 60;
 
         [Header("Compatibility")]
         public float delta = 3f;

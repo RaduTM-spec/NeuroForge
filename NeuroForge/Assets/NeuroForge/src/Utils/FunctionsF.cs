@@ -72,7 +72,18 @@ namespace NeuroForge
                     values[i] /= exp_sum;
                 }
             }
-
+            public static int ArgMax(float[] values)
+            {
+                int index = -1;
+                float max = float.MinValue;
+                for (int i = 0; i < values.Length; i++)
+                    if (values[i] > max)
+                    {
+                        max = values[i];
+                        index = i;
+                    }
+                return index;
+            }
         }
     }
 

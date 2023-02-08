@@ -62,16 +62,23 @@ namespace NeuroForge
                 AssetDatabase.SaveAssetIfDirty(mainModel);
                 trainingEnvironment.Reset();
                 // Revive all agents
-                foreach (var agent in Instance.population)
-                {
-                    agent.Ressurect();
-                }
+                
                 Instance.agentsDead = 0;
                 Instance.episodeTimePassed = 0;
                 Debug.Log("<color=#2873eb>Generation: " + ++GENERATION + " | Max Fitness: " + population.Max(x => x.GetFitness()) + "</color>");
+
+                foreach (var agent in Instance.population)
+                {
+                    agent.Resurrect();
+                }
             }
         }
 
+        public static void Ready()
+        {
+            if (Instance)
+                Instance.agentsDead++;
+        }
         public static void Initialize(NEATAgent agent)
         {
             if (Instance != null)
@@ -84,47 +91,101 @@ namespace NeuroForge
             Instance.species = new Dictionary<int, List<NEATAgent>>();
             Instance.mainModel = agent.model;
             Instance.hp = agent.hp;
-            Instance.episodeLength = agent.maxEpsiodeLength;
+            Instance.episodeLength = agent.hp.maxEpsiodeLength;
             Instance.innovationCounter = new InnovationCounter(agent.model.GetHighestInnovation() + 1);
-
-            Instance.InitPopulation(agent.gameObject, agent.hp.populationSize - 1);
 
             try
             {
+                Instance.InitPopulation(agent.gameObject, agent.hp.populationSize - 1);
                 Instance.trainingEnvironment = new TransformReseter(agent.transform.parent);
             }
             catch { } // Is kept in try catch because on testing, agent is not initialized as a gameObject
 
         }
-        public static void Ready()
-        {
-            if (Instance)
-                Instance.agentsDead++;                
-
-               
-        }
-
         private void InitPopulation(GameObject modelAgent, int size)
         {
+            // init the agent gameobjects
             for (int i = 0; i < size; i++)
             {
                 GameObject newAgent = Instantiate(modelAgent, modelAgent.transform.position, modelAgent.transform.rotation, modelAgent.transform.parent);
-                NEATAgent script = newAgent.GetComponent<NEATAgent>();
-                script.SetSpecieNumber(1);
-                Instance.population.Add(script);
-                if (Instance.species.ContainsKey(1))
-                    Instance.species[1].Add(script);
-                else
-                    Instance.species.Add(1, new List<NEATAgent> { script });
+                NEATAgent newAgentScript = newAgent.GetComponent<NEATAgent>();
+                Instance.population.Add(newAgentScript);
             }
+
+            // assign them to the same specie 1
+            species.Add(1, new List<NEATAgent>());
+            foreach (var agent in population)
+            {
+                agent.SetSpecieNumber(1);
+                species[1].Add(agent);
+            }
+
+            // init the agent's networks
+            foreach (var agent in population)
+            {
+                agent.model = mainModel.Clone() as NEATNetwork;
+                agent.model.Mutate();
+            }     
+        }
+
+
+        private void NEAT_Algorithm()
+        {
+            List<int> genomesLength= new List<int>();
+            //TODO
             foreach (var agent in population)
             {
                 agent.model.Mutate();
+
+                int total = agent.model.nodes.Count + agent.model.connections.Count;
+                genomesLength.Add(total);
+
             }
+            Functions.Print(genomesLength);
+
+            mainModel.SetFrom(population[0].model);
+            
+            // Copy the best network inside mainModel and save it
+            EditorUtility.SetDirty(mainModel);
+            AssetDatabase.SaveAssetIfDirty(mainModel);
         }
-        private void NEAT_Algorithm()
+        private void OnDrawGizmos()
         {
-            //TODO
+            // Draw the mainModel
+            if (!mainModel) return;
+
+            List<NodeGene> inp_and_bias = mainModel.inputNodes_cache.ToList();
+            inp_and_bias.Add(mainModel.nodes[1]);
+            List<NodeGene> outp = mainModel.outputNodes_cache.ToList();
+            List<NodeGene> hids = mainModel.nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.hidden).ToList();
+
+            const float SIZE_SCALE = 1f;
+            const float X_SCALE = 10f;
+            const float Y_INC = 2f;
+
+            // Draw inputs on X = 0
+            float y_pos = 0;
+            foreach (var inp in inp_and_bias)
+            {
+                Gizmos.DrawCube(new Vector3(0 * X_SCALE, y_pos, 0), Vector3.one * SIZE_SCALE);
+                y_pos += Y_INC;
+            }
+
+            // Draw outputs on X = 1
+            y_pos= 0;
+            foreach (var inp in inp_and_bias)
+            {
+                Gizmos.DrawCube(new Vector3(1 * X_SCALE, y_pos, 0), Vector3.one * SIZE_SCALE);
+                y_pos += Y_INC;
+            }
+
+            // Draw hidden on X = .5
+            y_pos = 0;
+            foreach (var hid in hids)
+            {
+                Gizmos.DrawCube(new Vector3(0.5f * X_SCALE, y_pos, 0), Vector3.one * SIZE_SCALE);
+                y_pos += Y_INC;
+            }
         }
 
         // to convert to private

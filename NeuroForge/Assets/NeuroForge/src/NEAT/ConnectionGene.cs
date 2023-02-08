@@ -6,8 +6,9 @@ using UnityEngine;
 namespace NeuroForge
 {
     [Serializable]
-    public class ConnectionGene
+    public class ConnectionGene : ICloneable
     {
+        // Never use get; set on fields that are serializable
         [SerializeField] public int innovation;
 
         [SerializeField] public float weight;
@@ -16,19 +17,31 @@ namespace NeuroForge
         [SerializeField] public int inNeuron;
         [SerializeField] public int outNeuron;
 
-        
+
         public ConnectionGene(NodeGene inNeuron, NodeGene outNeuron, int innovation)
         {
             this.innovation = innovation;
             this.inNeuron = inNeuron.innovation;
             this.outNeuron = outNeuron.innovation;
             this.enabled = true;
-            weight = FunctionsF.RandomValue() < 0.5f ?
-                     FunctionsF.RandomGaussian(0, 0.1f) :
-                     FunctionsF.RandomGaussian(1, 0.1f);
+            this.weight = FunctionsF.RandomValue() < 0.5f ?
+                          FunctionsF.RandomGaussian(0, 0.1f) :
+                          FunctionsF.RandomGaussian(1, 0.1f);
             outNeuron.incomingConnections.Add(this.innovation);
         }
-
+        private ConnectionGene() { }
+        public object Clone()
+        {
+            ConnectionGene clone = new ConnectionGene();
+            
+            clone.innovation = this.innovation;
+            clone.weight = this.weight;
+            clone.enabled = this.enabled;
+            clone.inNeuron = this.inNeuron;
+            clone.outNeuron = this.outNeuron;
+        
+            return clone;
+        }
         public bool IsSequencial() => inNeuron == outNeuron;
     }
 }

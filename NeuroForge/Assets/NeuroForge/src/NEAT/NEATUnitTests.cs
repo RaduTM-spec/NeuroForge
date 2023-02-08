@@ -47,6 +47,7 @@ public class NEATUnitTests : MonoBehaviour
     //------------Tests----------------//
     public void AssertAll()
     {
+        Assert(TestOutputForDifferentMutations);
         Assert(TestCreateNEATNET);
         Assert(TestSequencials);
         Assert(TestAddConnection);
@@ -61,6 +62,25 @@ public class NEATUnitTests : MonoBehaviour
         Assert(TestCrossover);
     }
 
+    bool TestOutputForDifferentMutations()
+    {
+
+        NEATAgent agent = new NEATAgent();
+        agent.model = new NEATNetwork(8, new int[1] { 5 }, ActionType.Discrete, true);
+        NEATTrainer.Initialize(agent);
+        for (int i = 0; i < 200; i++)
+        {
+            agent.model.Mutate();
+            int[] outs = agent.model.GetDiscreteActions(new double[] { 1, 2, 3, 4, 5, 6, 7, 8 });
+            Functions.Print(outs);
+        }
+        EditorUtility.SetDirty(agent.model);
+        AssetDatabase.SaveAssetIfDirty(agent.model);
+        NEATTrainer.Dispose();
+        
+
+        return true;
+    }
     bool TestCreateNEATNET()
     {
         NEATAgent agent = new NEATAgent();
@@ -136,7 +156,7 @@ public class NEATUnitTests : MonoBehaviour
             }
             for (int i = 0; i < 50; i++)
             {
-                agent.model.RemoveConnection();
+                agent.model.RemoveRandomConnection();
             }
             NEATTrainer.Dispose();
         agent.model.GetContinuousActions(new double[] { 1, 1 });
@@ -195,13 +215,15 @@ public class NEATUnitTests : MonoBehaviour
             }
             for (int i = 0; i < 100; i++)
             {
-                agent.model.MutateNode();
+                agent.model.MutateRandomNode();
             }
             NEATTrainer.Dispose();
         agent.model.GetContinuousActions(new double[] { 1, 1 });
 
         return true;
     }
+
+
 
     bool TestRandomMutations()
     {
@@ -214,8 +236,8 @@ public class NEATUnitTests : MonoBehaviour
 
             List<NEATNetwork.Mutation> mutations = new List<NEATNetwork.Mutation>();
             mutations.Add(agent.model.AddConnection);
-            mutations.Add(agent.model.MutateNode); // -> here is problem
-            mutations.Add(agent.model.RemoveConnection);
+            mutations.Add(agent.model.MutateRandomNode); // -> here is problem
+            mutations.Add(agent.model.RemoveRandomConnection);
             mutations.Add(agent.model.MergeConnections);
             mutations.Add(agent.model.AddNode);
             mutations.Add(agent.model.MergeConnections);

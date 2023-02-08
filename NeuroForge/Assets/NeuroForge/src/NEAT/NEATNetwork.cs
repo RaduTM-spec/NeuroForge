@@ -1,10 +1,13 @@
+using Palmmedia.ReportGenerator.Core.Parser.Analysis;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
 using Unity.VisualScripting.Antlr3.Runtime;
+using Unity.VisualScripting.Antlr3.Runtime.Tree;
 using UnityEditor;
+using UnityEditor.Profiling;
 using UnityEngine;
 using UnityEngine.Networking.Types;
 using UnityEngine.Windows;
@@ -13,7 +16,7 @@ using static UnityEngine.UIElements.UxmlAttributeDescription;
 namespace NeuroForge
 {
     [Serializable]
-    public class NEATNetwork : ScriptableObject, ISerializationCallbackReceiver
+    public class NEATNetwork : ScriptableObject, ISerializationCallbackReceiver, ICloneable
     {
         [SerializeField] public ActionType actionSpace;
         [SerializeField] public int[] outputShape;
@@ -25,8 +28,9 @@ namespace NeuroForge
         [SerializeField] public List<NodeGene> outputNodes_cache;
 
         [SerializeField] List<NodeGene> serialized_nodes;
-        [SerializeField] List<int> seralized_connections_keys;
+        [SerializeField] List<int> serialized_connections_keys;
         [SerializeField] List<ConnectionGene> serialized_connections_values;
+        
         public NEATNetwork(int inputSize, int[] outputShape, ActionType actionSpace, bool createAsset)
         {
             this.actionSpace = actionSpace;
@@ -71,35 +75,81 @@ namespace NeuroForge
             if(createAsset)
                 CreateAsset();
         }
+        public void SetFrom(NEATNetwork copy)
+        {
+            this.actionSpace= copy.actionSpace;
+            this.outputShape = copy.outputShape.ToArray();
+            this.nodes = new Dictionary<int, NodeGene>();
+            foreach (var nod in copy.nodes)
+            {
+                this.nodes.Add(nod.Key, nod.Value.Clone() as NodeGene);
+            }
+            this.connections = new Dictionary<int, ConnectionGene>();
+            foreach (var con in copy.connections)
+            {
+                this.connections.Add(con.Key, con.Value.Clone() as ConnectionGene);
+            }
+            this.inputNodes_cache = copy.inputNodes_cache.Select(x => x.Clone() as NodeGene).ToList();
+            this.outputNodes_cache = copy.outputNodes_cache.Select(x => x.Clone() as NodeGene).ToList();
+        }
+        private NEATNetwork() { }
+        public object Clone()
+        {
+            NEATNetwork clone = new NEATNetwork();
+
+            clone.actionSpace = this.actionSpace;
+            clone.outputShape = this.outputShape.ToArray();
+            clone.nodes = new Dictionary<int, NodeGene>();
+            foreach (var nod in this.nodes)
+            {
+                clone.nodes.Add(nod.Key, nod.Value.Clone() as NodeGene);
+            }
+            clone.connections = new Dictionary<int, ConnectionGene>();
+            foreach (var conn in this.connections)
+            {
+                clone.connections.Add(conn.Key, conn.Value.Clone() as ConnectionGene);
+            }
+
+            clone.inputNodes_cache = this.inputNodes_cache.Select(x => x.Clone() as NodeGene).ToList();
+            clone.outputNodes_cache = this.outputNodes_cache.Select(x => x.Clone() as NodeGene).ToList();
+
+            return clone;
+        }
+
         public void OnBeforeSerialize()
         {
             serialized_nodes = new List<NodeGene>();
-            seralized_connections_keys = new List<int>();
+            serialized_connections_keys = new List<int>();
             serialized_connections_values= new List<ConnectionGene>();
 
             foreach (var node in nodes.Values)
             {
                 serialized_nodes.Add(node);
             }
-            foreach (KeyValuePair<int,ConnectionGene> keyConnection in connections)
+            foreach (KeyValuePair<int,ConnectionGene> conn in connections)
             {
-                seralized_connections_keys.Add(keyConnection.Key);
-                serialized_connections_values.Add(keyConnection.Value);
+                serialized_connections_keys.Add(conn.Key);
+                serialized_connections_values.Add(conn.Value);
             }
+
+            // Do not ever save asset dirty from here otherwise you get crash
         }
         public void OnAfterDeserialize()
         {
             connections = new Dictionary<int, ConnectionGene>();
-            for (int i = 0; i < seralized_connections_keys.Count; i++)
-            {
-                connections.Add(seralized_connections_keys[i], serialized_connections_values[i]);
-            }
 
             nodes = new Dictionary<int, NodeGene>();
             foreach (var node in serialized_nodes)
             {
                 nodes.Add(node.innovation, node);
             }
+
+            for (int i = 0; i < serialized_connections_keys.Count; i++)
+            {
+                connections.Add(serialized_connections_keys[i], serialized_connections_values[i]);
+            }
+
+            
         }
 
 
@@ -124,6 +174,12 @@ namespace NeuroForge
         }
         public float[] GetContinuousActions(double[] inputs)
         {
+            if (actionSpace != ActionType.Continuous)
+            {
+                Debug.LogError("Cannot get discrete actions from a discrete model");
+                throw new Exception("Cannot get discrete actions from a discrete model");
+            }
+
             float[] outs = ForwardPropagation(inputs);
 
             for (int i = 0; i < outs.Length; i++)
@@ -135,15 +191,24 @@ namespace NeuroForge
         }
         public int[] GetDiscreteActions(double[] inputs)
         {
+            if(actionSpace != ActionType.Discrete)
+            {
+                Debug.LogError("Cannot get continuous actions from a discrete model");
+                throw new Exception("Cannot get continuous actions from a discrete model");
+            }
+            int[] discreteActions = new int[outputShape.Length];
+            
             float[] outs = ForwardPropagation(inputs);
             FunctionsF.Activation.SoftMax(outs);
-            int[] discreteActions = new int[outputShape.Length];
+            List<float> activatedOutputs = outs.ToList();
 
+            int index = 0;
+            for (int i = 0; i < outputShape.Length; i++)
+            {
+                float[] branchValues = activatedOutputs.GetRange(index, outputShape[i]).ToArray();
+                discreteActions[i] = FunctionsF.Activation.ArgMax(branchValues);
+            }
             
-            
-            //return branched discrete actions
-
-
             return discreteActions;
         }
         private float[] ForwardPropagation(double[] inputs)
@@ -250,10 +315,10 @@ namespace NeuroForge
                     AddConnection();
                     break;
                 case < 0.25f:
-                    MutateNode();
+                    MutateRandomNode();
                     break;
                 case < 0.40f:
-                    RemoveConnection();
+                    RemoveRandomConnection();
                     break;
                 case < 0.60f:
                     MergeConnections();
@@ -356,7 +421,7 @@ namespace NeuroForge
             }
 
         } // good
-        public void RemoveConnection()
+        public void RemoveRandomConnection()
         {
             // 0.15 probability
             //Connection removal: if the structure of the network is not minimal, then a randomly chosen connection is deleted. The connections between inputs and outputs are
@@ -481,7 +546,7 @@ namespace NeuroForge
 
 
         } // good
-        public void MutateNode()
+        public void MutateRandomNode()
         {
             // 0.15 probability
             /*Mutating random node: the type of operation performed in a randomly chosen node
@@ -523,16 +588,63 @@ namespace NeuroForge
 
         } // not good
 
-
-        // Not from the upper paper
-        public void EnableDisableConnection()
+        void PurgeInvalids()
         {
-            ConnectionGene randomConnection = connections[Functions.RandomIn(connections.Keys)];
+            /*Some of the mutations may result in an invalid structure of the neural network,
+            i.e., there could be nodes not connected to anything or connections with a non - existing
+            destination.To fix the invalid nodes or connections the purging operation is used, which
+            removes them from the solution.*/
 
-            randomConnection.enabled = randomConnection.enabled == true ? false : true;
-        }
+            // Kill hidden neurons with 0 reference 
+            List<NodeGene> toRemoveNodes = new List<NodeGene>();
+            foreach (var node in nodes.Values)
+            {
+                if (node.type != NEATNodeType.hidden)
+                    continue;
+
+                // Check if has an in connection
+                if (node.incomingConnections.Count > 0)
+                    continue;
+
+                // Check if has an out connection
+                bool hasOutConn = false;
+                foreach (var connection in connections.Values)
+                {
+                    if(connection.inNeuron == node.innovation)
+                    {
+                        hasOutConn = true;
+                        break;
+                    }
+                }
+                if(!hasOutConn)
+                    toRemoveNodes.Add(node);
+            }
+            foreach (var node in toRemoveNodes)
+            {
+                nodes.Remove(node.innovation);
+            }
+            
+
+            // Kill connections with non-existing destinations
+            List<ConnectionGene> toRemoveConnections = new List<ConnectionGene>();
+            foreach (var connection in connections.Values)
+            {
+                if(!nodes.ContainsKey(connection.inNeuron))
+                {
+                    toRemoveConnections.Add(connection);
+                }
+                if(!nodes.ContainsKey(connection.outNeuron))
+                {
+                    nodes[connection.outNeuron].incomingConnections.Remove(connection.innovation);
+                    toRemoveConnections.Add(connection);
+                }
+            }
+            foreach (var connection in toRemoveConnections)
+            {
+               connections.Remove(connection.innovation);
+            }
+        } 
         
-
 
 
         // Other

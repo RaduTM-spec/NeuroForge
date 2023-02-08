@@ -17,7 +17,7 @@ public class NEATMoveRight : NEATAgent
     protected override void Update()
     {
         base.Update();
-        AddReward(transform.position.z);
+        AddReward(transform.position.z * Time.deltaTime);
     }
     public override void CollectObservations(SensorBuffer sensorBuffer)
     {

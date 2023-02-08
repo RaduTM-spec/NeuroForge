@@ -2982,9 +2982,9 @@ GameObject:
   - component: {fileID: 2005809422}
   - component: {fileID: 2005809421}
   - component: {fileID: 2005809426}
+  - component: {fileID: 2005809427}
   - component: {fileID: 2005809425}
   - component: {fileID: 2005809424}
-  - component: {fileID: 2005809427}
   m_Layer: 6
   m_Name: NEATAgent
   m_TagString: Untagged
@@ -3099,12 +3099,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   behaviour: 1
-  model: {fileID: 0}
+  model: {fileID: 11400000, guid: 1183a4bc36ff7d740aed8f9463728c1b, type: 2}
   observationSize: 8
   actionSpace: 1
   ContinuousSize: 0
   DiscreteBranches: 05000000
-  maxEpsiodeLength: 10
   hp: {fileID: 0}
   speed: 5
   target: {fileID: 0}
@@ -3148,7 +3147,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ca894bcd623b054c8da9c0030e9fd8e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  populationSize: 25
+  populationSize: 10
+  maxEpsiodeLength: 60
   delta: 3
   c1: 1
   c2: 1

@@ -68,7 +68,7 @@ namespace NeuroForge
                 list[j] = temp;
             }
         }
-        public static void Print(Array array, string tag = null)
+        public static void Print(IEnumerable array, string tag = null)
         {
             StringBuilder sb = new StringBuilder();
             if (tag != null) sb.Append(tag);
@@ -82,13 +82,14 @@ namespace NeuroForge
             sb.Append("]");
             Debug.Log(sb.ToString());
         }
-        public static string StringOf(Array array)
+        public static string StringOf(IEnumerable array)
         {
             StringBuilder sb = new StringBuilder();
             sb.Append("[ ");
-            for (int i = 0; i < array.Length; i++)
+            foreach (var item in array)
             {
-                sb.Append(array.GetValue(i) + ", ");
+                sb.Append(item.ToString());
+                sb.Append(", ");
             }
             sb.Remove(sb.Length - 2, 1);
             sb.Append("]");
