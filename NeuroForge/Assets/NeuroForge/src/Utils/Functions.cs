@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
@@ -103,7 +104,14 @@ namespace NeuroForge
             }
             return false;
         }
-        
+        public static void DebuggerLog(string text)
+        {
+            using (StreamWriter sw = new StreamWriter("C:\\Users\\X\\Desktop\\debug.txt", true))
+            {
+                sw.WriteLine(text);
+            }
+        }
+
         public readonly struct Activation
         {
             internal static double ActivateValue(double value, ActivationType activationFunction)

@@ -107,8 +107,10 @@ namespace NeuroForge
 
 
         }
+
         private void CastRays()
         {
+            observations.Clear();
             float oneAngle = rays == 1 ? 0 : (float)-fieldOfView / (rays - 1f);
 
             float begin = (float)-oneAngle * (rays - 1) / 2 + rotationOffset;
@@ -142,7 +144,6 @@ namespace NeuroForge
         }
         private void CastRay3D(Vector3 castOrigin, float sphereCastRadius, Vector3 rayDirection, float distance, LayerMask layerMask)
         {
-            observations.Clear();
             RaycastHit hit;
             if (Physics.SphereCast(castOrigin, sphereCastRadius, rayDirection, out hit, distance, layerMask))
             {
@@ -187,7 +188,6 @@ namespace NeuroForge
         }
         private void CastRay2D(Vector3 castOrigin, float sphereCastRadius, Vector3 rayDirection, float distance, LayerMask layerMask)
         {
-            observations.Clear();
             RaycastHit2D hit = Physics2D.CircleCast(castOrigin, sphereCastRadius, rayDirection, distance, layerMask);
             if (hit == true)
             {
@@ -230,8 +230,12 @@ namespace NeuroForge
                 }
             }
         }
+
         public int GetObservationSize() => observations.Count;
         public float[] GetObservations() => observations.ToArray();
+        public List<float> GetListedObservations() => observations;
+
+
         public enum World
         {
             World3d,
@@ -249,6 +253,8 @@ namespace NeuroForge
             All,
         }
     }
+
+
     [CustomEditor(typeof(RaySensor)), CanEditMultipleObjects]
     class ScriptlessRaySensor : Editor
     {

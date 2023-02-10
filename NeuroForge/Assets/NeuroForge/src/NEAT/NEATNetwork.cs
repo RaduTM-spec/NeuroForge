@@ -7,6 +7,7 @@ using Unity.VisualScripting;
 using Unity.VisualScripting.Antlr3.Runtime;
 using Unity.VisualScripting.Antlr3.Runtime.Tree;
 using UnityEditor;
+using UnityEditor.Experimental.GraphView;
 using UnityEditor.Profiling;
 using UnityEngine;
 using UnityEngine.Networking.Types;
@@ -24,8 +25,8 @@ namespace NeuroForge
                          public Dictionary<int, NodeGene> nodes;
                          public Dictionary<int, ConnectionGene> connections; 
         
-        [SerializeField] public List<NodeGene> inputNodes_cache;
-        [SerializeField] public List<NodeGene> outputNodes_cache;
+        [SerializeField] public List<int> inputNodes_cache;
+        [SerializeField] public List<int> outputNodes_cache;
 
         [SerializeField] List<NodeGene> serialized_nodes;
         [SerializeField] List<int> serialized_connections_keys;
@@ -42,19 +43,19 @@ namespace NeuroForge
             NodeGene bias = new NodeGene(innov++, NEATNodeType.bias);
             nodes.Add(bias.innovation, bias);
 
-            inputNodes_cache = new List<NodeGene>();
-            outputNodes_cache = new List<NodeGene>();
+            inputNodes_cache = new List<int>();
+            outputNodes_cache = new List<int>();
             for (int i = 0; i < inputSize; i++)
             {
                 NodeGene newInput = new NodeGene(innov++, NEATNodeType.input);
                 nodes.Add(newInput.innovation, newInput);
-                inputNodes_cache.Add(newInput);
+                inputNodes_cache.Add(newInput.innovation);
             }
             for (int i = 0; i < outputShape.Sum(); i++)
             {
                 NodeGene newOutput = new NodeGene(innov++, NEATNodeType.output);
                 nodes.Add(newOutput.innovation, newOutput);
-                outputNodes_cache.Add(newOutput);
+                outputNodes_cache.Add(newOutput.innovation);
             }
 
             
@@ -89,8 +90,8 @@ namespace NeuroForge
             {
                 this.connections.Add(con.Key, con.Value.Clone() as ConnectionGene);
             }
-            this.inputNodes_cache = copy.inputNodes_cache.Select(x => x.Clone() as NodeGene).ToList();
-            this.outputNodes_cache = copy.outputNodes_cache.Select(x => x.Clone() as NodeGene).ToList();
+            this.inputNodes_cache = copy.inputNodes_cache.Select(x => x).ToList();
+            this.outputNodes_cache = copy.outputNodes_cache.Select(x => x).ToList();
         }
         private NEATNetwork() { }
         public object Clone()
@@ -110,8 +111,8 @@ namespace NeuroForge
                 clone.connections.Add(conn.Key, conn.Value.Clone() as ConnectionGene);
             }
 
-            clone.inputNodes_cache = this.inputNodes_cache.Select(x => x.Clone() as NodeGene).ToList();
-            clone.outputNodes_cache = this.outputNodes_cache.Select(x => x.Clone() as NodeGene).ToList();
+            clone.inputNodes_cache = this.inputNodes_cache.Select(x => x).ToList();
+            clone.outputNodes_cache = this.outputNodes_cache.Select(x => x).ToList();
 
             return clone;
         }
@@ -176,11 +177,11 @@ namespace NeuroForge
         {
             if (actionSpace != ActionType.Continuous)
             {
-                Debug.LogError("Cannot get discrete actions from a discrete model");
-                throw new Exception("Cannot get discrete actions from a discrete model");
+                Debug.LogError("Cannot get continuous actions from a discrete model");
+                throw new Exception("Cannot get continuous actions from a discrete model");
             }
 
-            float[] outs = ForwardPropagation(inputs);
+            float[] outs = Forward(inputs);
 
             for (int i = 0; i < outs.Length; i++)
             {
@@ -193,12 +194,12 @@ namespace NeuroForge
         {
             if(actionSpace != ActionType.Discrete)
             {
-                Debug.LogError("Cannot get continuous actions from a discrete model");
-                throw new Exception("Cannot get continuous actions from a discrete model");
+                Debug.LogError("Cannot get discrete actions from a continuous model");
+                throw new Exception("Cannot get discrete actions from a continuous model");
             }
             int[] discreteActions = new int[outputShape.Length];
             
-            float[] outs = ForwardPropagation(inputs);
+            float[] outs = Forward(inputs);
             FunctionsF.Activation.SoftMax(outs);
             List<float> activatedOutputs = outs.ToList();
 
@@ -211,96 +212,108 @@ namespace NeuroForge
             
             return discreteActions;
         }
-        private float[] ForwardPropagation(double[] inputs)
+        private float[] Forward(double[] inputs)
         {
+            Debug.Log("Forward: ");
             // Insert inputs
-            for (int i = 0; i < inputs.Length; i++)
+            for (int i = 0; i < inputNodes_cache.Count; i++)
             {
-                inputNodes_cache[i].OutValue = (float)inputs[i];
+                nodes[inputNodes_cache[i]].OutValue = (float)inputs[i];
             }
 
-            // Propagate
-            int nodesActivated = inputNodes_cache.Count + 1; // input nodes & bias are already considered activated
-            Dictionary<int,bool> nodesStatus = new Dictionary<int,bool>(); // <node id, wasActivated>
-            foreach (var node in nodes)
+            // Deactivated all hidden and output
+            foreach (var node in nodes.Values)
             {
-                if (node.Value.type == NEATNodeType.input || node.Value.type == NEATNodeType.bias)
-                    nodesStatus.Add(node.Key, true); //input/bias nodes are already activated              
-                else
-                    nodesStatus.Add(node.Key, false);
+                if (node.type == NEATNodeType.hidden || node.type == NEATNodeType.output)
+                    node.Deactivate();
             }
 
-            int maxTries = 10_000;
-            while(nodesActivated < nodes.Count)
+            int tryX = 1_000;
+            while(tryX-- > 0)
             {
+                // Something wrong in here
                 foreach (var node in nodes)
                 {
-                    // if node has an output value than pass
-                    if (nodesStatus[node.Key] == true)
-                        continue;
+                    if (node.Value.IsActivated())
+                        goto NEXT_NODE;
 
-                    // else calculate incoming values
-                    float sum = 0;
-                    int dones = 0;
-                    List<ConnectionGene> sequencialCons = new List<ConnectionGene>();
-                    foreach (var ic in node.Value.incomingConnections)
+                    if(node.Value.incomingConnections.Count == 0)
                     {
-                        ConnectionGene incomingConn = connections[ic];
-                        if (incomingConn.IsSequencial())
-                        {
-                            sequencialCons.Add(incomingConn);
-                            dones++;
-                        }
-                        else if (nodesStatus[node.Key] == true || incomingConn.enabled)
-                        {
-                            dones++;
-                            sum += incomingConn.weight * nodes[incomingConn.inNeuron].OutValue;
-                        }
-                        else if (incomingConn.enabled == false)
-                            dones++;
-                        else
-                            break;
+                        node.Value.Activate();
+                        goto NEXT_NODE;
                     }
-                    // If not all incoming values where calculated then pass
-                    if (dones < node.Value.incomingConnections.Count)
-                        continue;
 
+                    List<ConnectionGene> incoming_connections = node.Value.incomingConnections.Select(x => connections[x]).ToList();
+                    Dictionary<ConnectionGene, NodeGene> incoming_nw_pairs = new Dictionary<ConnectionGene, NodeGene>();
+                    incoming_connections.ForEach(x =>
+                    {
+                        if(!x.IsSequencial())
+                           incoming_nw_pairs.Add(x, nodes[x.inNeuron]);
+                    });
 
+                    // Check if all incoming nodes are done
+                    foreach (var prev_node in incoming_nw_pairs.Values)
+                        if (!prev_node.IsActivated())
+                            goto NEXT_NODE;
+                    
+                    // -----------------NODE IS PREPARED TO BE ACTIVATED-----------------------//
+                    // propagate value from input nodes
+                    float sum = 0f;
+                    foreach (var nw_pair in incoming_nw_pairs)
+                    {
+                        if (nw_pair.Key.IsSequencial())
+                            continue;
+                        if (!nw_pair.Key.enabled)
+                            continue;
+
+                        sum += nw_pair.Value.OutValue * nw_pair.Key.weight;
+                    }
+                    node.Value.InValue = sum;
+                    node.Value.Activate();
+                    if (node.Value.type == NEATNodeType.output)
+                        Debug.Log("output activated | incoming cons: " + incoming_nw_pairs.Count());
+                    // treat sequencial weights
+                    sum = 0f;
+                    foreach (var inc_con in incoming_connections)
+                    {
+                        if (!inc_con.IsSequencial())
+                            continue;
+
+                        if (!inc_con.enabled)
+                            continue;
+
+                        sum += node.Value.OutValue * inc_con.weight;
+                    }
                     node.Value.InValue = sum;
                     node.Value.Activate();
 
-                    // Treat sequencial weights
-                    if (sequencialCons.Count > 0)
-                    {
-                        
-                        float sequencialInput = 0f;
-                        foreach (var seq in sequencialCons)
-                        {
-                            if (seq.enabled == false)
-                                continue;
-                            sequencialInput += seq.weight * node.Value.OutValue;
-                        }
-                        node.Value.InValue = sequencialInput;
-                        node.Value.Activate();
-                    }
-
-                    nodesStatus[node.Key] = true;
-                    nodesActivated++;
+                NEXT_NODE:
+                    continue;
                 }
 
-                if(maxTries-- == 0)
+                int nodes_inactivated = 0;
+                foreach (var node in nodes.Values)
                 {
-                    Debug.LogError("Fatal Error: Infinite loop in forward propagation");
-                    break;
+                    if(!node.IsActivated())
+                        nodes_inactivated++;
                 }
-            }
+                /*if (nodes.Select(x => x.Value).Where(x => !x.IsActivated()).Any() == false)
+                      break;*/
+               // Debug.Log(nodes_inactivated+ " | "+ tryX);
 
+                if (nodes_inactivated == 0)
+                    break;
+            }
+           
+            
             // Collect outputs
             float[] outputs = new float[GetOutputsNumber()];
-            for (int i = 0; i < outputs.Length; i++)
+            for (int i = 0; i < outputNodes_cache.Count; i++)
             {
-                outputs[i] = outputNodes_cache[i].OutValue;
+                outputs[i] = nodes[outputNodes_cache[i]].OutValue;
             }
+            Functions.Print(outputs);
+
             return outputs;
         }
 
@@ -396,7 +409,7 @@ namespace NeuroForge
             foreach (var connection in connections.Values)
             {
                 // Mutate weight
-                if (FunctionsF.RandomValue() > 1f / connections.Count)
+                if (FunctionsF.RandomValue() < 1f / connections.Count)
                 {
                     // complete new value
                     connection.weight = FunctionsF.RandomValue() < .5f ?
@@ -412,7 +425,7 @@ namespace NeuroForge
 
 
                 // Enable or disable
-                if (FunctionsF.RandomValue() > 1f / connections.Count)
+                if (FunctionsF.RandomValue() < 1f / connections.Count)
                 {
                     connection.enabled = connection.enabled == true ? false : true;
                 }
@@ -427,8 +440,8 @@ namespace NeuroForge
             //Connection removal: if the structure of the network is not minimal, then a randomly chosen connection is deleted. The connections between inputs and outputs are
             //never chosen.
 
-            IEnumerable<int> inNodes = inputNodes_cache.Select(x => x.innovation);
-            IEnumerable<int> outNodes = outputNodes_cache.Select(x => x.innovation);
+            IEnumerable<int> inNodes = nodes.Where(x => x.Value.type == NEATNodeType.input).Select(x => x.Key).ToList();
+            IEnumerable<int> outNodes = nodes.Where(x => x.Value.type == NEATNodeType.output).Select(x => x.Key).ToList();
 
             // Connections between inputs and outputs are never removed
             List<ConnectionGene> removeableConns = new List<ConnectionGene>();
@@ -466,40 +479,43 @@ namespace NeuroForge
             */
             if (connections.Count == 0) return;
 
-            foreach (var conn1 in connections.Values)
+            bool found = true;
+            while(found)
             {
-                foreach (var conn2 in connections.Values)
+                found = false;
+
+                List<ConnectionGene> cons = connections.Values.ToList();
+                foreach (var con1 in cons)
                 {
-                    if (conn1.Equals(conn2))
-                        continue;
-
-                    if(conn1.inNeuron == conn2.inNeuron && conn1.outNeuron == conn2.outNeuron)
+                    foreach (var con2 in cons)
                     {
-                        int newInnov = FunctionsF.RandomValue() < .5f? conn1.innovation : conn2.innovation;
-                        ConnectionGene mergedConnection = new ConnectionGene(nodes[conn1.inNeuron], nodes[conn1.outNeuron], newInnov);
-                        mergedConnection.weight = conn1.weight + conn2.weight;
+                        if (con1.innovation == con2.innovation)
+                            continue;
 
-                        connections.Remove(conn1.innovation);
-                        connections.Remove(conn2.innovation);
-                        foreach (var neuron in nodes.Values)
-                        {
-                            try
-                            {
-                                neuron.incomingConnections.Remove(conn1.innovation);
-                            }
-                            catch { }
-                            try
-                            {
-                                neuron.incomingConnections.Remove(conn2.innovation);
-                            }
-                            catch { }
-                        }
+                        if (con1.inNeuron != con2.inNeuron || con1.outNeuron != con2.outNeuron)
+                            continue;
 
-                        connections.Add(newInnov, mergedConnection);
-                        return; // Only one merge for now                  
+                        int newInov = FunctionsF.RandomValue() < .5f? con1.innovation: con2.innovation;
+                        ConnectionGene mergedCon = new ConnectionGene(nodes[con1.inNeuron], nodes[con1.outNeuron], newInov);
+                        mergedCon.weight = con1.weight + con2.weight;
+
+                        connections.Remove(con1.innovation);
+                        connections.Remove(con2.innovation);
+
+                        NodeGene outNeur = nodes[con1.outNeuron];
+                        outNeur.incomingConnections.Remove(con1.innovation);
+                        outNeur.incomingConnections.Remove(con2.innovation);
+                        outNeur.incomingConnections.Add(newInov);
+
+                        connections.Add(newInov, mergedCon);
+                        found = true;
+                        goto FIND_AGAIN;
                     }
                 }
+                FIND_AGAIN:            
+                continue;
             }
+            
 
 
         } // good

@@ -19,7 +19,7 @@ namespace NeuroForge
         private static NEATTrainer Instance;
 
         [SerializeField] private List<NEATAgent> population;
-        private Dictionary<int, List<NEATAgent>> species;
+        private List<Species> species;
 
         private NEATNetwork mainModel;
         private NEATHyperParameters hp;
@@ -88,7 +88,8 @@ namespace NeuroForge
             go.AddComponent<NEATTrainer>();
 
             Instance.population = new List<NEATAgent>() { agent };
-            Instance.species = new Dictionary<int, List<NEATAgent>>();
+            Instance.species = new List<Species>() { new Species(agent) };
+
             Instance.mainModel = agent.model;
             Instance.hp = agent.hp;
             Instance.episodeLength = agent.hp.maxEpsiodeLength;
@@ -112,11 +113,9 @@ namespace NeuroForge
                 Instance.population.Add(newAgentScript);
             }
 
-            // assign them to the same specie 1
-            species.Add(1, new List<NEATAgent>());
+            // Add population to the first species
             foreach (var agent in population)
             {
-                agent.SetSpecieNumber(1);
                 species[1].Add(agent);
             }
 
@@ -141,113 +140,20 @@ namespace NeuroForge
                 genomesLength.Add(total);
 
             }
-            Functions.Print(genomesLength);
 
-            mainModel.SetFrom(population[0].model);
-            
+            //Functions.Print(genomesLength);
+
+
+
             // Copy the best network inside mainModel and save it
+            mainModel.SetFrom(population[0].model);
             EditorUtility.SetDirty(mainModel);
             AssetDatabase.SaveAssetIfDirty(mainModel);
         }
-        private void OnDrawGizmos()
-        {
-            // Draw the mainModel
-            if (!mainModel) return;
-
-            List<NodeGene> inp_and_bias = mainModel.inputNodes_cache.ToList();
-            inp_and_bias.Add(mainModel.nodes[1]);
-            List<NodeGene> outp = mainModel.outputNodes_cache.ToList();
-            List<NodeGene> hids = mainModel.nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.hidden).ToList();
-
-            const float SIZE_SCALE = 1f;
-            const float X_SCALE = 10f;
-            const float Y_INC = 2f;
-
-            // Draw inputs on X = 0
-            float y_pos = 0;
-            foreach (var inp in inp_and_bias)
-            {
-                Gizmos.DrawCube(new Vector3(0 * X_SCALE, y_pos, 0), Vector3.one * SIZE_SCALE);
-                y_pos += Y_INC;
-            }
-
-            // Draw outputs on X = 1
-            y_pos= 0;
-            foreach (var inp in inp_and_bias)
-            {
-                Gizmos.DrawCube(new Vector3(1 * X_SCALE, y_pos, 0), Vector3.one * SIZE_SCALE);
-                y_pos += Y_INC;
-            }
-
-            // Draw hidden on X = .5
-            y_pos = 0;
-            foreach (var hid in hids)
-            {
-                Gizmos.DrawCube(new Vector3(0.5f * X_SCALE, y_pos, 0), Vector3.one * SIZE_SCALE);
-                y_pos += Y_INC;
-            }
-        }
+       
 
         // to convert to private
-        public static NEATNetwork CrossOver(NEATNetwork parent1, NEATNetwork parent2, float p1_fitness, float p2_fitness)
-        {
-
-            // Notes: disjoint and excess are taken from the parent with highest fitness
-            // Notes: the new child (a.k.a. new topology) is mutated afterwards
-
-            NEATNetwork child = new NEATNetwork(parent1.GetInputsNumber(), parent1.outputShape, parent1.actionSpace, false);
-
-
-
-            /* int lastInov = parent1.GetNewestWeightInnovation() > parent2.GetNewestWeightInnovation() ? 
-                            parent1.GetNewestWeightInnovation() : parent2.GetNewestWeightInnovation();
-
-             for (int gene = 0; gene < lastInov; gene++)
-             {
-                 ConnectionGene parent1_gene;
-                 if (parent1.connections.TryGetValue(gene, out parent1_gene)) {; }
-                 ConnectionGene parent2_gene;
-                 if (parent1.connections.TryGetValue(gene, out parent2_gene)) {; }
-
-                 if (parent1_gene == null && parent2_gene == null) continue;
-                 if (parent1_gene == null) AssignGene(parent2_gene);
-                 else if (parent2_gene == null) AssignGene(parent1_gene);
-                 else if (Random.value < .5f) AssignGene(parent1_gene);
-                 else AssignGene(parent2_gene);
-
-                 void AssignGene(ConnectionGene g)
-                 {
-                     int node1 = g.inNeuron;
-                     int node2 = g.outNeuron;
-                     int inovation = g.innovation;
-
-                     NodeGene inNode = child.nodes[node1];
-                     NodeGene outNode = child.nodes[node2];
-
-                     // Also add the nodes in the child genome
-                     if(inNode == null)
-                     {
-                         NodeGene toAdd = new NodeGene(node1, NEATNodeType.hidden);
-                         child.nodes.Add(toAdd.innovation, toAdd);
-                         inNode = toAdd;
-                     }
-                     if(outNode == null)
-                     {
-                         NodeGene toAdd = new NodeGene(node2, NEATNodeType.hidden);
-                         child.nodes.Add(toAdd.innovation, toAdd);
-                         inNode = toAdd;
-                     }
-
-                     ConnectionGene crossedGene = new ConnectionGene(inNode, outNode, inovation);
-                     child.connections.Add(inovation, crossedGene);
-                 }
-
-
-             }*/
-
-
-            return child;
-        }
+       
         public static bool AreCompatible(NEATNetwork parent1, NEATNetwork parent2)
         {
             float N = Max_GenesNumber(parent1, parent2);

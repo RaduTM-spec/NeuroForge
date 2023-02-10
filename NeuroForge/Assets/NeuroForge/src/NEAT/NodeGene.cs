@@ -18,6 +18,8 @@ namespace NeuroForge
         [SerializeField] public NEATNodeType type;
         [SerializeField] public List<int> incomingConnections;
 
+        [SerializeField] private bool activated;
+
         public NodeGene(int innov, NEATNodeType type)
         {
             this.innovation = innov;
@@ -27,6 +29,8 @@ namespace NeuroForge
             this.type = type;
             activationType = (ActivationTypeF)(int)(FunctionsF.RandomValue() * Enum.GetValues(typeof(ActivationTypeF)).Length);
             incomingConnections = new List<int>();
+
+            activated = true;
         }
         private NodeGene() { }
         public object Clone()
@@ -38,13 +42,16 @@ namespace NeuroForge
             clone.activationType = activationType;
             clone.type = type;
             clone.incomingConnections = this.incomingConnections.ToList();
+            clone.activated = activated;
             return clone;
         }
         public void Activate()
         {
             OutValue = FunctionsF.Activation.Activate(InValue, activationType);
+            activated = true;
         }
-
+        public void Deactivate() => activated = false;
+        public bool IsActivated() => activated;
     }
     public enum NEATNodeType
     {

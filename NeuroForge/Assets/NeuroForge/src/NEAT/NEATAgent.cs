@@ -27,7 +27,7 @@ namespace NeuroForge
         private SensorBuffer sensorBuffer;
         private ActionBuffer actionBuffer;
 
-        private int speciesNumber;
+        private Species species;
         private float fitness;
 
         #endregion
@@ -164,8 +164,8 @@ namespace NeuroForge
 
         // Other
         public float GetFitness() => fitness;
-        public int GetSpecieNumber() => speciesNumber;
-        public void SetSpecieNumber(int specieNumber) => speciesNumber = specieNumber;
+        public Species GetSpecies() => species;
+        public void SetSpecies(Species species) => this.species = species;
         public void Resurrect()
         {
             behaviour = BehaviourType.Inference;
