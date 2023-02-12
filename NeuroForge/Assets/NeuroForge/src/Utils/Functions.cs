@@ -38,7 +38,6 @@ namespace NeuroForge
             }
             
         }
-
         public static void Normalize(List<double> list)
         {
             // Calculate mean
@@ -104,12 +103,23 @@ namespace NeuroForge
             }
             return false;
         }
-        public static void DebuggerLog(string text)
+        public static void DebuggerLog(string text, bool newLine = true)
         {
             using (StreamWriter sw = new StreamWriter("C:\\Users\\X\\Desktop\\debug.txt", true))
             {
-                sw.WriteLine(text);
+                if (newLine)
+                    sw.WriteLine(text);
+                else
+                    sw.Write(text);
             }
+        }
+        public static string HexOf(Color color)
+        {
+            int r = Mathf.RoundToInt(color.r * 255.0f);
+            int g = Mathf.RoundToInt(color.g * 255.0f);
+            int b = Mathf.RoundToInt(color.b * 255.0f);
+
+            return string.Format("#{0:X2}{1:X2}{2:X2}", r, g, b);
         }
 
         public readonly struct Activation

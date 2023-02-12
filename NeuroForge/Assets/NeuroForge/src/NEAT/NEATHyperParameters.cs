@@ -9,6 +9,8 @@ namespace NeuroForge
     public class NEATHyperParameters : MonoBehaviour 
     {
         [Min(1)]public int populationSize = 50;
+        [Range(.2f, .8f)] public float survivalRate = .8f;
+        [Min(50)] public int generations = 500;
         [Min(5), Tooltip("seconds")] public int maxEpsiodeLength = 60;
 
         [Header("Compatibility")]
@@ -25,6 +27,10 @@ namespace NeuroForge
         [Range(0,1)] public float addNode = 0.10f;
         [Range(0,1)] public float mutateNode = 0.15f;
         [Range(0,1)] public float noMutation = 0.10f;
+
+        [Header("Structure")]
+        public int maxConnections = 150;
+        public int maxHiddenNodes = 30;
         
         
 

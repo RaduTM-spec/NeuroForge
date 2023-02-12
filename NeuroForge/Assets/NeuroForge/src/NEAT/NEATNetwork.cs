@@ -3,11 +3,13 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Unity.VisualScripting;
 using Unity.VisualScripting.Antlr3.Runtime;
 using Unity.VisualScripting.Antlr3.Runtime.Tree;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
+using UnityEditor.MemoryProfiler;
 using UnityEditor.Profiling;
 using UnityEngine;
 using UnityEngine.Networking.Types;
@@ -214,7 +216,6 @@ namespace NeuroForge
         }
         private float[] Forward(double[] inputs)
         {
-            Debug.Log("Forward: ");
             // Insert inputs
             for (int i = 0; i < inputNodes_cache.Count; i++)
             {
@@ -259,10 +260,14 @@ namespace NeuroForge
                     // -----------------NODE IS PREPARED TO BE ACTIVATED-----------------------//
                     // propagate value from input nodes
                     float sum = 0f;
+                    bool seq_found = false;
                     foreach (var nw_pair in incoming_nw_pairs)
                     {
                         if (nw_pair.Key.IsSequencial())
+                        {
                             continue;
+                            seq_found = true;
+                        }
                         if (!nw_pair.Key.enabled)
                             continue;
 
@@ -270,22 +275,25 @@ namespace NeuroForge
                     }
                     node.Value.InValue = sum;
                     node.Value.Activate();
-                    if (node.Value.type == NEATNodeType.output)
-                        Debug.Log("output activated | incoming cons: " + incoming_nw_pairs.Count());
+
                     // treat sequencial weights
-                    sum = 0f;
-                    foreach (var inc_con in incoming_connections)
+                    if(seq_found)
                     {
-                        if (!inc_con.IsSequencial())
-                            continue;
+                        sum = 0f;
+                        foreach (var inc_con in incoming_connections)
+                        {
+                            if (!inc_con.IsSequencial())
+                                continue;
 
-                        if (!inc_con.enabled)
-                            continue;
+                            if (!inc_con.enabled)
+                                continue;
 
-                        sum += node.Value.OutValue * inc_con.weight;
+                            seq_found = true;
+                            sum += node.Value.OutValue * inc_con.weight;
+                        }
+                        node.Value.InValue = sum;
+                        node.Value.Activate();
                     }
-                    node.Value.InValue = sum;
-                    node.Value.Activate();
 
                 NEXT_NODE:
                     continue;
@@ -299,8 +307,8 @@ namespace NeuroForge
                 }
                 /*if (nodes.Select(x => x.Value).Where(x => !x.IsActivated()).Any() == false)
                       break;*/
-               // Debug.Log(nodes_inactivated+ " | "+ tryX);
-
+                // Debug.Log(nodes_inactivated+ " | "+ tryX);
+                
                 if (nodes_inactivated == 0)
                     break;
             }
@@ -312,8 +320,6 @@ namespace NeuroForge
             {
                 outputs[i] = nodes[outputNodes_cache[i]].OutValue;
             }
-            Functions.Print(outputs);
-
             return outputs;
         }
 
@@ -328,7 +334,7 @@ namespace NeuroForge
                     AddConnection();
                     break;
                 case < 0.25f:
-                    MutateRandomNode();
+                    MutateNodes();
                     break;
                 case < 0.40f:
                     RemoveRandomConnection();
@@ -440,14 +446,11 @@ namespace NeuroForge
             //Connection removal: if the structure of the network is not minimal, then a randomly chosen connection is deleted. The connections between inputs and outputs are
             //never chosen.
 
-            IEnumerable<int> inNodes = nodes.Where(x => x.Value.type == NEATNodeType.input).Select(x => x.Key).ToList();
-            IEnumerable<int> outNodes = nodes.Where(x => x.Value.type == NEATNodeType.output).Select(x => x.Key).ToList();
-
             // Connections between inputs and outputs are never removed
             List<ConnectionGene> removeableConns = new List<ConnectionGene>();
             connections.Values.ToList().ForEach((x) =>
             {
-                if (!Functions.IsValueIn(x.inNeuron, inNodes) || !Functions.IsValueIn(x.outNeuron, outNodes))
+                if (!Functions.IsValueIn(x.inNeuron, inputNodes_cache) || !Functions.IsValueIn(x.outNeuron, outputNodes_cache))
                 {
                     removeableConns.Add(x);
                 }
@@ -460,14 +463,10 @@ namespace NeuroForge
             connections.Remove(toRemove.innovation);
             foreach (var node in nodes.Values)
             {
-                try
-                { node.incomingConnections.Remove(toRemove.innovation); }
-                catch { }      //               
+                if(Functions.IsValueIn(toRemove.innovation, node.incomingConnections))
+                    node.incomingConnections.Remove(toRemove.innovation);            
             }
                  
-            
-         
-
         } // good
         public void MergeConnections()
         {
@@ -503,9 +502,10 @@ namespace NeuroForge
                         connections.Remove(con2.innovation);
 
                         NodeGene outNeur = nodes[con1.outNeuron];
-                        outNeur.incomingConnections.Remove(con1.innovation);
-                        outNeur.incomingConnections.Remove(con2.innovation);
-                        outNeur.incomingConnections.Add(newInov);
+                        if (outNeur.incomingConnections.Remove(con1.innovation) == false)
+                            Debug.LogError("Problem here");
+                        if (outNeur.incomingConnections.Remove(con2.innovation) == false)
+                            Debug.LogError("Problem here2");
 
                         connections.Add(newInov, mergedCon);
                         found = true;
@@ -562,7 +562,7 @@ namespace NeuroForge
 
 
         } // good
-        public void MutateRandomNode()
+        public void MutateNodes()
         {
             // 0.15 probability
             /*Mutating random node: the type of operation performed in a randomly chosen node
@@ -571,107 +571,49 @@ namespace NeuroForge
 
             // Get Random Hidden Node
             IEnumerable<NodeGene> hiddens = nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.hidden);
-
             if (hiddens.Count() == 0) return;
 
-            NodeGene oldNode = Functions.RandomIn(hiddens);
-
-            // TEMPORARY modification
-            oldNode.activationType = (ActivationTypeF) (Enum.GetValues(typeof(ActivationTypeF)).Length * FunctionsF.RandomValue());
-
-
-
-            return;
-
-
-
-            NodeGene newNode = new NodeGene(NEATTrainer.GetInnovation(), NEATNodeType.hidden);
-            newNode.incomingConnections = oldNode.incomingConnections.ToList();
-
-            // Update the new innovations to all connections
-            foreach (var conn in connections.Values)
+            foreach (var node in hiddens)
             {
-                // Consider sequencial nodes
-
-                if (conn.inNeuron == oldNode.innovation)
-                    conn.inNeuron = newNode.innovation;
-
-                if (conn.outNeuron == oldNode.innovation)
-                    conn.outNeuron = newNode.innovation;
-            }
-
-            nodes.Remove(oldNode.innovation);
-
-        } // not good
-
-        void PurgeInvalids()
-        {
-            /*Some of the mutations may result in an invalid structure of the neural network,
-            i.e., there could be nodes not connected to anything or connections with a non - existing
-            destination.To fix the invalid nodes or connections the purging operation is used, which
-            removes them from the solution.*/
-
-            // Kill hidden neurons with 0 reference 
-            List<NodeGene> toRemoveNodes = new List<NodeGene>();
-            foreach (var node in nodes.Values)
-            {
-                if (node.type != NEATNodeType.hidden)
-                    continue;
-
-                // Check if has an in connection
-                if (node.incomingConnections.Count > 0)
-                    continue;
-
-                // Check if has an out connection
-                bool hasOutConn = false;
-                foreach (var connection in connections.Values)
+                if (FunctionsF.RandomValue() < 2f / nodes.Count)
                 {
-                    if(connection.inNeuron == node.innovation)
-                    {
-                        hasOutConn = true;
-                        break;
-                    }
-                }
-                if(!hasOutConn)
-                    toRemoveNodes.Add(node);
-            }
-            foreach (var node in toRemoveNodes)
-            {
-                nodes.Remove(node.innovation);
-            }
-            
-
-            // Kill connections with non-existing destinations
-            List<ConnectionGene> toRemoveConnections = new List<ConnectionGene>();
-            foreach (var connection in connections.Values)
-            {
-                if(!nodes.ContainsKey(connection.inNeuron))
-                {
-                    toRemoveConnections.Add(connection);
-                }
-                if(!nodes.ContainsKey(connection.outNeuron))
-                {
-                    nodes[connection.outNeuron].incomingConnections.Remove(connection.innovation);
-                    toRemoveConnections.Add(connection);
+                    node.activationType = (ActivationTypeF)(Enum.GetValues(typeof(ActivationTypeF)).Length * FunctionsF.RandomValue());
                 }
             }
-            foreach (var connection in toRemoveConnections)
-            {
-               connections.Remove(connection.innovation);
-            }
-        } 
-        
+        } // not like in paper
+
+
 
 
         // Other
+        public override string ToString()
+        {
+            StringBuilder nodesSB = new StringBuilder("nodes->");
+            StringBuilder connectionsSB = new StringBuilder("\nconnections->");
+            foreach (var node in nodes)
+            {
+                nodesSB.Append(node.Value.ToString());
+            }
+            foreach (var item in connections)
+            {
+                connectionsSB.Append(item.Value.ToString());
+            }
+            nodesSB.Append(connectionsSB.ToString());
+            return nodesSB.ToString();
+
+        }
         public int GetHighestInnovation()
         {
+
             int max_nodes_inov = nodes.Keys.Max();
             int max_conec_inov = connections.Count > 0 ? connections.Keys.Max() : -1;
+
+           
             return Math.Max(max_conec_inov, max_nodes_inov);
         }
         public int GetInputsNumber() => inputNodes_cache.Count;
         public int GetOutputsNumber() => outputNodes_cache.Count;
+        public int GetGenomeLength() => nodes.Count + connections.Count;
 
     }
 }

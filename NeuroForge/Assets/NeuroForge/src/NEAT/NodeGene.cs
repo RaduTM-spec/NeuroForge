@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Unity.VisualScripting;
 using UnityEngine;
 
@@ -52,6 +53,22 @@ namespace NeuroForge
         }
         public void Deactivate() => activated = false;
         public bool IsActivated() => activated;
+        public override string ToString()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("[ ");
+            sb.Append(innovation);
+            sb.Append(", ");
+            sb.Append(" in: ");
+            foreach (var item in incomingConnections)
+            {
+                sb.Append(item);
+                sb.Append(", ");
+            }
+            sb.Remove(sb.Length- 2, 1);
+            sb.Append(']');
+            return sb.ToString();
+        }
     }
     public enum NEATNodeType
     {

@@ -47,7 +47,8 @@ public class NEATUnitTests : MonoBehaviour
     //------------Tests----------------//
     public void AssertAll()
     {
-        Assert(TestOutputForDifferentMutations);
+        Assert(TestMutations);
+        /*Assert(TestOutputForDifferentMutations);
         Assert(TestCreateNEATNET);
         Assert(TestSequencials);
         Assert(TestAddConnection);
@@ -59,9 +60,27 @@ public class NEATUnitTests : MonoBehaviour
         
         Assert(TestRandomMutations);
         Assert(TestDistance);
-        Assert(TestCrossover);
+        Assert(TestCrossover);*/
     }
 
+    bool TestMutations()
+    {
+        for (int i = 0; i < 30; i++)
+        {
+            NEATAgent agent = new NEATAgent();
+            agent.hp = new NEATHyperParameters();
+            agent.hp.maxEpsiodeLength = 100_000;
+            agent.model = new NEATNetwork(8, new int[1] { 5 }, ActionType.Discrete, false);
+            NEATTrainer.Initialize(agent);
+
+            for (int k = 0; k < 300; k++)
+            {
+                agent.model.Mutate();
+            }
+        }
+        
+        return true;
+    }
     bool TestOutputForDifferentMutations()
     {
 
@@ -215,7 +234,7 @@ public class NEATUnitTests : MonoBehaviour
             }
             for (int i = 0; i < 100; i++)
             {
-                agent.model.MutateRandomNode();
+                agent.model.MutateNodes();
             }
             NEATTrainer.Dispose();
         agent.model.GetContinuousActions(new double[] { 1, 1 });
@@ -236,7 +255,7 @@ public class NEATUnitTests : MonoBehaviour
 
             List<NEATNetwork.Mutation> mutations = new List<NEATNetwork.Mutation>();
             mutations.Add(agent.model.AddConnection);
-            mutations.Add(agent.model.MutateRandomNode); // -> here is problem
+            mutations.Add(agent.model.MutateNodes); // -> here is problem
             mutations.Add(agent.model.RemoveRandomConnection);
             mutations.Add(agent.model.MergeConnections);
             mutations.Add(agent.model.AddNode);

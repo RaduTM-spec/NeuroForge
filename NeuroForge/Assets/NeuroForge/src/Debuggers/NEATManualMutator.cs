@@ -50,7 +50,7 @@ public class NEATManualMutator : MonoBehaviour
         }
         else if(Input.GetKeyDown(KeyCode.Alpha2))
         {
-            mainModel.ForceMutate(mainModel.MutateRandomNode);
+            mainModel.ForceMutate(mainModel.MutateNodes);
             mainModel.GetDiscreteActions(inputs);
         }
         else if(Input.GetKeyDown(KeyCode.Alpha3))
@@ -88,32 +88,48 @@ public class NEATManualMutator : MonoBehaviour
         const float Y_INC = 2f;
 
         Gizmos.color = Color.grey;
-        Dictionary<int, Vector3> nodesPositions = new Dictionary<int, Vector3>();
+        Dictionary<NodeGene, Vector3> nodesPositions = new Dictionary<NodeGene, Vector3>();
+
         // Compute inputs positions
-        float y_pos = 0;
+        float y_pos = -Y_INC;
         foreach (var inp in in_b)
         {
-            nodesPositions.Add(inp.innovation, new Vector3(0, y_pos, 0));
-            y_pos += Y_INC;
+            nodesPositions.Add(inp, new Vector3(0, y_pos, 0));
+            y_pos += Y_INC;       
         }
         // Compute hidden positions
         y_pos = 0;
         foreach (var hid in hids)
         {
-            nodesPositions.Add(hid.innovation, new Vector3(.5f * X_SCALE, y_pos, 0));
+            nodesPositions.Add(hid, new Vector3(.5f * X_SCALE, y_pos, 0));
             y_pos += Y_INC;
         }
         // Compute outputs positions
         y_pos = 0;
         foreach (var inp in outp)
         {
-            nodesPositions.Add(inp.innovation, new Vector3(1f * X_SCALE, y_pos, 0));
+            nodesPositions.Add(inp, new Vector3(1f * X_SCALE, y_pos, 0));
             y_pos += Y_INC;
         }
 
         //Draw nodes
         foreach (var node in nodesPositions)
         {
+            switch(node.Key.type)
+            {
+                case NEATNodeType.input:
+                    Gizmos.color = Color.magenta;
+                    break;
+                case NEATNodeType.hidden:
+                    Gizmos.color = Color.yellow;
+                    break;
+                case NEATNodeType.output:
+                    Gizmos.color = Color.red;
+                    break;
+                case NEATNodeType.bias:
+                    Gizmos.color = Color.green;
+                    break;
+            }
             Gizmos.DrawCube(new Vector3(node.Value.x, node.Value.y, node.Value.z), Vector3.one * SIZE_SCALE);
         }
 
@@ -125,8 +141,8 @@ public class NEATManualMutator : MonoBehaviour
                                 new Color(-connection.Value.weight, 0, 0) :
                                 new Color(0, 0, connection.Value.weight);
             Gizmos.color = connection.Value.enabled == false ? Color.white : Gizmos.color;
-            Vector3 firstPoint = nodesPositions[connection.Value.inNeuron];
-            Vector3 secondPoint = nodesPositions[connection.Value.outNeuron];
+            Vector3 firstPoint = nodesPositions.Where(x => x.Key.innovation == connection.Value.inNeuron).Select(x => x.Value).FirstOrDefault();
+            Vector3 secondPoint = nodesPositions.Where(x => x.Key.innovation == connection.Value.outNeuron).Select(x => x.Value).FirstOrDefault();
             if (!firstPoint.Equals(secondPoint))
                 Gizmos.DrawRay(firstPoint, secondPoint - firstPoint);
             else

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 
 namespace NeuroForge
@@ -43,5 +44,17 @@ namespace NeuroForge
             return clone;
         }
         public bool IsSequencial() => inNeuron == outNeuron;
+        public override string ToString()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("[ ");
+            sb.Append(innovation);
+            sb.Append(", in: ");
+            sb.Append(inNeuron);
+            sb.Append(", out: ");
+            sb.Append(outNeuron);
+            sb.Append(" ]");
+            return sb.ToString();
+        }
     }
 }

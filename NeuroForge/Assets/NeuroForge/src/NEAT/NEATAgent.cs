@@ -28,7 +28,7 @@ namespace NeuroForge
         private ActionBuffer actionBuffer;
 
         private Species species;
-        private float fitness;
+        private float fitness = 0;
 
         #endregion
 

@@ -1,9 +1,11 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
@@ -18,19 +20,20 @@ namespace NeuroForge
     {
         private static NEATTrainer Instance;
 
-        [SerializeField] private List<NEATAgent> population;
-        private List<Species> species;
+        [SerializeField] private HashSet<NEATAgent> population;
+        private HashSet<Species> species;
 
         private NEATNetwork mainModel;
         private NEATHyperParameters hp;
         private TransformReseter trainingEnvironment;
 
         [SerializeField] private int agentsDead = 0;
+        [SerializeField] private int generationLimit = 500;
         [SerializeField] private int episodeLength = 60;
         [SerializeField] private float episodeTimePassed = 0;
 
         [SerializeField] private int GENERATION = 0;
-
+        [SerializeField] private bool SESSION_END = false;
 
         private InnovationCounter innovationCounter;
 
@@ -52,24 +55,38 @@ namespace NeuroForge
         }
         private void LateUpdate()
         {
-            if (Instance != null && (Instance.episodeTimePassed >= Instance.episodeLength || Instance.agentsDead == Instance.population.Count))
+            if (!SESSION_END && Instance != null && (Instance.episodeTimePassed >= Instance.episodeLength || Instance.agentsDead == Instance.population.Count))
             {
                 // Update NEAT
-                Instance.NEAT_Algorithm();
+                Instance.Evolution();
 
+                // Reset Environment
+                Instance.trainingEnvironment.Reset();
 
-                EditorUtility.SetDirty(mainModel);
-                AssetDatabase.SaveAssetIfDirty(mainModel);
-                trainingEnvironment.Reset();
-                // Revive all agents
-                
+                // Reset Episode Stats
                 Instance.agentsDead = 0;
                 Instance.episodeTimePassed = 0;
-                Debug.Log("<color=#2873eb>Generation: " + ++GENERATION + " | Max Fitness: " + population.Max(x => x.GetFitness()) + "</color>");
 
+                // Print Episode Statistic
+                Debug.Log(GetEpisodeStatistic());
+
+                // Resurrect agents
                 foreach (var agent in Instance.population)
-                {
                     agent.Resurrect();
+                
+
+                // Check for stop
+                if(GENERATION == generationLimit)
+                {
+                    SESSION_END = true;
+                    species = null;
+                    foreach (var ag in population)
+                    {
+                        ag.behaviour = BehaviourType.Inactive;
+                    }
+                    Debug.Log("<color=green> Training session ended! </color>");
+                    EditorApplication.isPlaying = false;
+                   
                 }
             }
         }
@@ -84,24 +101,23 @@ namespace NeuroForge
             if (Instance != null)
                 return;
             
-            GameObject go = new GameObject("PPOTrainer");
+            GameObject go = new GameObject("NEATTrainer");
             go.AddComponent<NEATTrainer>();
 
-            Instance.population = new List<NEATAgent>() { agent };
-            Instance.species = new List<Species>() { new Species(agent) };
+            Instance.population = new HashSet<NEATAgent>() { agent };
+            Instance.species = new HashSet<Species>();
 
             Instance.mainModel = agent.model;
             Instance.hp = agent.hp;
+            Instance.generationLimit = agent.hp.generations;
             Instance.episodeLength = agent.hp.maxEpsiodeLength;
             Instance.innovationCounter = new InnovationCounter(agent.model.GetHighestInnovation() + 1);
 
-            try
-            {
-                Instance.InitPopulation(agent.gameObject, agent.hp.populationSize - 1);
-                Instance.trainingEnvironment = new TransformReseter(agent.transform.parent);
-            }
-            catch { } // Is kept in try catch because on testing, agent is not initialized as a gameObject
-
+            
+            Instance.InitPopulation(agent.gameObject, agent.hp.populationSize - 1);
+            Instance.trainingEnvironment = new TransformReseter(agent.transform.parent); // is ok placed here, to get reference of all other agents
+            Instance.Evolution();
+          
         }
         private void InitPopulation(GameObject modelAgent, int size)
         {
@@ -113,47 +129,134 @@ namespace NeuroForge
                 Instance.population.Add(newAgentScript);
             }
 
-            // Add population to the first species
-            foreach (var agent in population)
-            {
-                species[1].Add(agent);
-            }
-
             // init the agent's networks
             foreach (var agent in population)
             {
                 agent.model = mainModel.Clone() as NEATNetwork;
-                agent.model.Mutate();
+                int how_many_mutations = mainModel.inputNodes_cache.Count + mainModel.outputNodes_cache.Count;
+                for (int i = 0; i < how_many_mutations; i++)
+                    agent.model.Mutate();
             }     
         }
 
-
-        private void NEAT_Algorithm()
+        private void Evolution()
         {
-            List<int> genomesLength= new List<int>();
-            //TODO
+           GenerateSpecies();
+           Kill();
+           RemoveExtinctSpecies();
+           Reproduce();
+           Mutate();
+
+           mainModel.SetFrom(GetBestModel());
+           EditorUtility.SetDirty(mainModel);
+           AssetDatabase.SaveAssetIfDirty(mainModel);
+        }
+        void GenerateSpecies()
+        {
+            foreach (var spec in species)
+            {
+                spec.Reset();
+            }
+
+            foreach (var agent in population)
+            {
+                // If he is a representative of a species
+                if (agent.GetSpecies() != null)
+                    continue;
+
+                // Else introduce him in a species
+                bool joined_species = false;
+                foreach (var specie in species)
+                {
+                    if(specie.TryAdd(agent))
+                    {
+                        joined_species = true;
+                        break;
+                    }
+                }
+                
+                // If didn't joined any species, create a new species
+                if(!joined_species)
+                {
+                    species.Add(new Species(agent));
+                }
+            }
+
+            foreach (var spec in species)
+            {
+                spec.CalculateScore();
+            }
+
+           
+        }
+        void Kill()
+        {
+            foreach (var spec in species)
+            {
+                spec.Kill(1 - Instance.hp.survivalRate);
+            }
+        }
+        void RemoveExtinctSpecies()
+        {
+            List<Species> removed = new List<Species>();
+            for (int i = 0; i < species.Count; i++)
+            {
+                Species spec = species.ElementAt(i);
+                if (spec.GetSize() < 2)
+                {
+                    spec.GoExtinct();
+                    removed.Add(spec);
+                }
+            }
+            foreach (var toRem in removed)
+            {
+                species.Remove(toRem);
+            }
+            
+        }
+        void Reproduce()
+        {         
+            foreach (var agent in population)
+            {
+                if(agent.GetSpecies() == null)
+                {
+                    Species spec = GetRandomSpecies();// Species with good overall fitness have more chances to reproduce
+                    agent.model = spec.Breed();
+                    spec.ForceAdd(agent);
+                }
+            }
+        }
+        void Mutate()
+        {
             foreach (var agent in population)
             {
                 agent.model.Mutate();
-
-                int total = agent.model.nodes.Count + agent.model.connections.Count;
-                genomesLength.Add(total);
-
+            }
+        }
+        //used for testing
+        void TestAll()
+        {
+            double[] inputs = new double[population.ElementAt(0).model.inputNodes_cache.Count];
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                inputs[i] = Functions.RandomValue();
             }
 
-            //Functions.Print(genomesLength);
-
-
-
-            // Copy the best network inside mainModel and save it
-            mainModel.SetFrom(population[0].model);
-            EditorUtility.SetDirty(mainModel);
-            AssetDatabase.SaveAssetIfDirty(mainModel);
+            foreach (var agent in population)
+            {                    
+                try
+                {
+                    agent.model.GetDiscreteActions(inputs);
+                }
+                catch
+                {
+                    Functions.DebuggerLog(agent.model.ToString());
+                    Debug.LogError("err");
+                  
+                }       
+            }
         }
-       
 
-        // to convert to private
-       
         public static bool AreCompatible(NEATNetwork parent1, NEATNetwork parent2)
         {
             float N = Max_GenesNumber(parent1, parent2);
@@ -161,21 +264,20 @@ namespace NeuroForge
             float D = Count_Disjoints(parent1, parent2);
             float W = Avg_WeightDifference(parent1, parent2);
 
-            // Debug.Log("E = " + E + " | D = " + D + " | W = " + W + " | N = " + N);
             float distance = (Instance.hp.c1 * E / N) +
                              (Instance.hp.c2 * D / N) +
                              (Instance.hp.c3 * W);
+           // Functions.DebuggerLog("Distance: " + distance + " |N=" + N + " |E=" + E + " |D=" + D + " |W=" + W);
 
             return distance < Instance.hp.delta;
         }
-
-        private static int Max_GenesNumber(NEATNetwork genome1, NEATNetwork genome2)
+        static int Max_GenesNumber(NEATNetwork genome1, NEATNetwork genome2)
         {
             int gen1_count = genome1.connections.Count + genome1.nodes.Count;
             int gen2_count = genome2.connections.Count + genome2.nodes.Count;
             return Mathf.Max(gen1_count, gen2_count);
         }
-        private static float Avg_WeightDifference(NEATNetwork genome1, NEATNetwork genome2)
+        static float Avg_WeightDifference(NEATNetwork genome1, NEATNetwork genome2)
         {
             float dif = 0f;
             int matchesCount = 0;
@@ -186,15 +288,15 @@ namespace NeuroForge
                 {
                     if (conn1.Key == conn2.Key)
                     {
-                        dif = Mathf.Abs(conn1.Value.weight - conn2.Value.weight);
+                        dif += Mathf.Abs(conn1.Value.weight - conn2.Value.weight);
                         matchesCount++;
                     }
                 }
             }
 
-            return matchesCount > 0 ? dif / matchesCount : 1_000_000;
+            return dif;
         }
-        private static int Count_ExcessJoints(NEATNetwork genome1, NEATNetwork genome2)
+        static int Count_ExcessJoints(NEATNetwork genome1, NEATNetwork genome2)
         {
             int excessJoints = 0;
             int highestMatch = 0;
@@ -240,7 +342,7 @@ namespace NeuroForge
 
             return excessJoints;
         }
-        private static int Count_Disjoints(NEATNetwork genome1, NEATNetwork genome2)
+        static int Count_Disjoints(NEATNetwork genome1, NEATNetwork genome2)
         {
             int disJoints = 0;
             int highestMatch = 0;
@@ -327,6 +429,58 @@ namespace NeuroForge
         }
 
 
+        private string GetEpisodeStatistic()
+        {
+            StringBuilder text = new StringBuilder();
+            text.Append("<color=#2873eb><b>Generation: ");
+            text.Append(++GENERATION);
+            text.Append("</b></color>\n");
+            int index = 1;
+            foreach (var spec in species)
+            {
+                Color color = new Color(FunctionsF.RandomValue(), FunctionsF.RandomValue(), FunctionsF.RandomValue());
+                text.Append("<color=");
+                text.Append(Functions.HexOf(color));
+                text.Append(">Specie ");
+                text.Append(index);
+                text.Append(" | Score ");
+                text.Append(spec.GetScore());
+                text.Append("</color>\n");
+                foreach (var ag in spec.GetAgents())
+                {
+                    text.AppendLine("Genome: " + ag.model.GetGenomeLength() + " | Fit: " + ag.GetFitness());
+                }
+            }
+            return text.ToString();
+        }
+        private Species GetRandomSpecies()
+        {
+            float min = species.Select(x => x.GetScore()).Min();
+            float max = species.Select(x => x.GetScore()).Max();
+            float total = max - min;
+            float cummulated = min;
+            float try_reach = min + FunctionsF.RandomValue() * total;
+
+            foreach (var spec in species)
+            {
+                cummulated += spec.GetScore();
+                if (cummulated >= try_reach)
+                    return spec;
+
+            }
+            return Functions.RandomIn(species);
+        }
+        private NEATNetwork GetBestModel()
+        {
+            List<NEATAgent> best_foreach_species = species.Select(x => x.GetBestAgent()).ToList();
+            NEATAgent best = null;
+            foreach (var some in best_foreach_species)
+            {
+                if (best == null || some.GetFitness() > best.GetFitness())
+                    best = some;
+            }
+            return best.model;
+        }
 
         public static void Dispose() { Destroy(Instance.gameObject); Instance = null; }
         public static int GetInnovation() => Instance.innovationCounter.GetInnovation();
