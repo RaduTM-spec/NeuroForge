@@ -69,8 +69,8 @@ public class NEATUnitTests : MonoBehaviour
         {
             NEATAgent agent = new NEATAgent();
             agent.hp = new NEATHyperParameters();
-            agent.hp.maxEpsiodeLength = 100_000;
-            agent.model = new NEATNetwork(8, new int[1] { 5 }, ActionType.Discrete, false);
+            agent.hp.episodeLength = 100_000;
+            agent.model = new NEATNetwork(8, new int[1] { 5 }, ActionType.Discrete, true, false);
             NEATTrainer.Initialize(agent);
 
             for (int k = 0; k < 300; k++)
@@ -85,7 +85,7 @@ public class NEATUnitTests : MonoBehaviour
     {
 
         NEATAgent agent = new NEATAgent();
-        agent.model = new NEATNetwork(8, new int[1] { 5 }, ActionType.Discrete, true);
+        agent.model = new NEATNetwork(8, new int[1] { 5 }, ActionType.Discrete, false, true);
         NEATTrainer.Initialize(agent);
         for (int i = 0; i < 200; i++)
         {
@@ -103,14 +103,14 @@ public class NEATUnitTests : MonoBehaviour
     bool TestCreateNEATNET()
     {
         NEATAgent agent = new NEATAgent();
-        agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+        agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false,false);
         return true;
         
     }
     bool TestSequencials()
     {
         NEATAgent agent = new NEATAgent();
-        agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+        agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false, false);
         NEATTrainer.Initialize(agent);
         for (int i = 0; i < 1; i++)
         {
@@ -132,7 +132,7 @@ public class NEATUnitTests : MonoBehaviour
     bool TestAddConnection()
     {
             NEATAgent agent = new NEATAgent();
-            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 100; i++)
             {
@@ -148,7 +148,7 @@ public class NEATUnitTests : MonoBehaviour
     bool TestMutateConnections()
     {
         NEATAgent agent = new NEATAgent();
-        agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+        agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false, false);
         NEATTrainer.Initialize(agent);
         for (int i = 0; i < 30; i++)
         {
@@ -167,7 +167,7 @@ public class NEATUnitTests : MonoBehaviour
     bool TestRemoveConnection()
     {  
             NEATAgent agent = new NEATAgent();
-            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 50; i++)
             {
@@ -185,7 +185,7 @@ public class NEATUnitTests : MonoBehaviour
     {
         
             NEATAgent agent = new NEATAgent();
-            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 50; i++)
             {
@@ -204,7 +204,7 @@ public class NEATUnitTests : MonoBehaviour
     {
        
             NEATAgent agent = new NEATAgent();
-            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 50; i++)
             {
@@ -222,7 +222,7 @@ public class NEATUnitTests : MonoBehaviour
     bool TestMutateNode()
     {   
             NEATAgent agent = new NEATAgent();  
-            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false, false);
             NEATTrainer.Initialize(agent);
             for (int i = 0; i < 30; i++)
             {
@@ -234,7 +234,7 @@ public class NEATUnitTests : MonoBehaviour
             }
             for (int i = 0; i < 100; i++)
             {
-                agent.model.MutateNodes();
+                agent.model.MutateNode();
             }
             NEATTrainer.Dispose();
         agent.model.GetContinuousActions(new double[] { 1, 1 });
@@ -244,39 +244,13 @@ public class NEATUnitTests : MonoBehaviour
 
 
 
-    bool TestRandomMutations()
-    {
-      
-        for (int k = 0; k < 25; k++)
-        {
-            NEATAgent agent = new NEATAgent();
-            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
-            NEATTrainer.Initialize(agent);
-
-            List<NEATNetwork.Mutation> mutations = new List<NEATNetwork.Mutation>();
-            mutations.Add(agent.model.AddConnection);
-            mutations.Add(agent.model.MutateNodes); // -> here is problem
-            mutations.Add(agent.model.RemoveRandomConnection);
-            mutations.Add(agent.model.MergeConnections);
-            mutations.Add(agent.model.AddNode);
-            mutations.Add(agent.model.MergeConnections);
-            
-            for (int i = 0; i < 200; i++)
-            {
-                agent.model.ForceMutate(Functions.RandomIn(mutations));
-            }
-
-            NEATTrainer.Dispose();
-        }
-
-        return true;      
-    }
+ 
     bool TestDistance()
     {
         for (int k = 5; k < 25; k++)
         {
             NEATAgent agent = new NEATAgent();
-            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+            agent.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false, false);
             NEATTrainer.Initialize(agent);
             //StringBuilder stringBuilder = new StringBuilder();
             for (int i = 0; i < k; i++)
@@ -288,7 +262,7 @@ public class NEATUnitTests : MonoBehaviour
             NEATTrainer.Dispose();
 
             NEATAgent agent2 = new NEATAgent();
-            agent2.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false);
+            agent2.model = new NEATNetwork(2, new int[1] { 2 }, ActionType.Continuous, false, false);
             NEATTrainer.Initialize(agent2);
             for (int i = 0; i < k; i++)
             {

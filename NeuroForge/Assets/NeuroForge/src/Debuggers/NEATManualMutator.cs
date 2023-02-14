@@ -21,7 +21,7 @@ public class NEATManualMutator : MonoBehaviour
     {
         if (mainModel == null)
         {
-            mainModel = new NEATNetwork(2, new int[] { 2 }, ActionType.Discrete, true);
+            mainModel = new NEATNetwork(2, new int[] { 2 }, ActionType.Discrete, false, true) ;
         }
     }
 
@@ -30,7 +30,7 @@ public class NEATManualMutator : MonoBehaviour
     {
         NEATAgent agent = new NEATAgent();
         agent.hp = new NEATHyperParameters();
-        agent.hp.maxEpsiodeLength = 100_000;
+        agent.hp.episodeLength = 100_000;
         agent.model = this.mainModel;
         NEATTrainer.Initialize(agent);
     }
@@ -44,33 +44,33 @@ public class NEATManualMutator : MonoBehaviour
         }
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
-            mainModel.ForceMutate(mainModel.AddConnection);
+            mainModel.AddConnection();
        
             mainModel.GetDiscreteActions(inputs);
         }
         else if(Input.GetKeyDown(KeyCode.Alpha2))
         {
-            mainModel.ForceMutate(mainModel.MutateNodes);
+            mainModel.MutateNode();
             mainModel.GetDiscreteActions(inputs);
         }
         else if(Input.GetKeyDown(KeyCode.Alpha3))
         {
-            mainModel.ForceMutate(mainModel.RemoveRandomConnection);
+            mainModel.RemoveRandomConnection();
             mainModel.GetDiscreteActions(inputs);
         }
         else if(Input.GetKeyDown(KeyCode.Alpha4))
         {
-            mainModel.ForceMutate(mainModel.MergeConnections);
+            mainModel.MergeConnections();
             mainModel.GetDiscreteActions(inputs);
         }
         else if(Input.GetKeyDown(KeyCode.Alpha5))
         {
-            mainModel.ForceMutate(mainModel.AddNode);
+            mainModel.AddNode();
             mainModel.GetDiscreteActions(inputs);
         }
         else if(Input.GetKeyDown(KeyCode.Alpha6))
         {
-            mainModel.ForceMutate(mainModel.MutateConnections);
+            mainModel.MutateConnections();
             mainModel.GetDiscreteActions(inputs);
         }
     }

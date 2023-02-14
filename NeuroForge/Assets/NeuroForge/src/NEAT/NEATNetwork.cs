@@ -34,7 +34,7 @@ namespace NeuroForge
         [SerializeField] List<int> serialized_connections_keys;
         [SerializeField] List<ConnectionGene> serialized_connections_values;
         
-        public NEATNetwork(int inputSize, int[] outputShape, ActionType actionSpace, bool createAsset)
+        public NEATNetwork(int inputSize, int[] outputShape, ActionType actionSpace, bool fullyConnected, bool createAsset)
         {
             this.actionSpace = actionSpace;
             this.outputShape = outputShape;
@@ -60,20 +60,23 @@ namespace NeuroForge
                 outputNodes_cache.Add(newOutput.innovation);
             }
 
-            
-
-            // Zero conns
+           
             connections = new Dictionary<int, ConnectionGene>();
             
-           /* foreach (var inp in inputNodes_cache)
+            if(fullyConnected)
             {
-                foreach(var outp in outputNodes_cache)
+                foreach (var inp in inputNodes_cache)
                 {
-                    ConnectionGene newConn = new ConnectionGene(inp, outp, innov++);
-                    connections.Add(newConn.innovation, newConn);
+                    foreach (var outp in outputNodes_cache)
+                    {
+                        ConnectionGene newConn = new ConnectionGene(nodes[inp], nodes[outp], innov++);
+                        connections.Add(newConn.innovation, newConn);
 
+                    }
                 }
-            }*/
+                
+            }
+        
 
             if(createAsset)
                 CreateAsset();
@@ -265,8 +268,8 @@ namespace NeuroForge
                     {
                         if (nw_pair.Key.IsSequencial())
                         {
-                            continue;
                             seq_found = true;
+                            continue;                          
                         }
                         if (!nw_pair.Key.enabled)
                             continue;
@@ -326,36 +329,36 @@ namespace NeuroForge
 
         // Based on Difference-Based Mutation Operation for Neuroevolution of Augmented Topoligies
         public delegate void Mutation();
+        Dictionary<Mutation, float> mutations;
         public void Mutate()
         {
-            switch(UnityEngine.Random.value)
+            if(mutations == null)
             {
-                case < 0.10f:
-                    AddConnection();
-                    break;
-                case < 0.25f:
-                    MutateNodes();
-                    break;
-                case < 0.40f:
-                    RemoveRandomConnection();
-                    break;
-                case < 0.60f:
-                    MergeConnections();
-                    break;
-                case < 0.70f:
-                    AddNode();
-                    break;
-                case < 0.90f:
-                    MutateConnections();
-                    break;
-                default:
-                    //No mutation
-                    break;                  
+                mutations = new Dictionary<Mutation, float>();
+                mutations.Add(AddConnection, NEATTrainer.GetHP().addConnection);
+                mutations.Add(MutateNode, NEATTrainer.GetHP().mutateNode);
+                mutations.Add(RemoveRandomConnection, NEATTrainer.GetHP().removeConnection);
+                mutations.Add(MergeConnections, NEATTrainer.GetHP().mergeConnections);
+                mutations.Add(AddNode, NEATTrainer.GetHP().addNode);
+                mutations.Add(MutateConnections, NEATTrainer.GetHP().mutateConnections);
+                mutations.Add(NoMutation, NEATTrainer.GetHP().noMutation);
+
+                // mutations mustn't necesarrily be sorted in ascending order based on the probabilities
             }
-        }
-        public void ForceMutate(Mutation mutation)
-        {
-            mutation();
+
+            float random = FunctionsF.RandomValue();
+            float cumulated_probability = 0.0f;
+            foreach (var mut in mutations)
+            {
+                cumulated_probability += mut.Value;
+                if (cumulated_probability > random)
+                {
+                    mut.Key();
+                    return;
+                }
+                
+            }
+           
         }
 
         public void AddConnection()
@@ -368,6 +371,7 @@ namespace NeuroForge
                 normal distributed random number with a mean equal to 0 and standard deviation set
                 to 0.1 (normrand(0, 0.1)). Otherwise, the weight it set close to 1, i.e., normrand(1, 0.1).
                 A new innovation number is assigned to the connection*/
+            if (connections.Count >= NEATTrainer.GetHP().maxConnections) return;
 
             List<NodeGene> input_bias_hidden = new List<NodeGene>();
             List<NodeGene> hidden_output = new List<NodeGene>();
@@ -400,7 +404,7 @@ namespace NeuroForge
 
             connections.Add(newConnection.innovation, newConnection);
 
-        } // good
+        } 
         public void MutateConnections()
         {
             // 0.2 probability
@@ -412,15 +416,20 @@ namespace NeuroForge
             //is either activated or deactivated.
             if (connections.Count == 0) return;
 
+            // On short
+            // 1/C chance to complete new value
             foreach (var connection in connections.Values)
             {
                 // Mutate weight
                 if (FunctionsF.RandomValue() < 1f / connections.Count)
                 {
+                    connection.weight = FunctionsF.RandomGaussian();
                     // complete new value
-                    connection.weight = FunctionsF.RandomValue() < .5f ?
+
+                    // Paper alternative (is changed because i want weights to be also strong negative
+                   /* connection.weight = FunctionsF.RandomValue() < .5f ?
                                         FunctionsF.RandomGaussian(0, 0.1f) :
-                                        FunctionsF.RandomGaussian(1, 0.1f);
+                                        FunctionsF.RandomGaussian(1, 0.1f);*/
                 }
                 else
                 {
@@ -439,7 +448,7 @@ namespace NeuroForge
 
             }
 
-        } // good
+        } 
         public void RemoveRandomConnection()
         {
             // 0.15 probability
@@ -467,7 +476,7 @@ namespace NeuroForge
                     node.incomingConnections.Remove(toRemove.innovation);            
             }
                  
-        } // good
+        } 
         public void MergeConnections()
         {
             // 0.2 probabillity
@@ -518,7 +527,7 @@ namespace NeuroForge
             
 
 
-        } // good
+        } 
         public void AddNode()
         {
             // 0.1 probability
@@ -528,7 +537,9 @@ namespace NeuroForge
                 number and operation, one of the weights is set to 1, while the other keeps the previous
                 value. The connections receive new innovation numbers.
             */
+            // Max hidden allowed = inputs + outputs
             if (connections.Count == 0) return;
+            if (nodes.Count >= NEATTrainer.GetHP().maxNodes) return;
 
             ConnectionGene oldConnection = connections[Functions.RandomIn(connections.Keys)];
             connections.Remove(oldConnection.innovation);
@@ -561,27 +572,23 @@ namespace NeuroForge
 
 
 
-        } // good
-        public void MutateNodes()
+        } 
+        public void MutateNode()
         {
             // 0.15 probability
             /*Mutating random node: the type of operation performed in a randomly chosen node
                 is changed to another one, and the new innovation number is assigned to the node.
                 Only hidden nodes are mutating.*/
+            // In my implementation, the innovation remains the same, only the activation is changed
 
             // Get Random Hidden Node
             IEnumerable<NodeGene> hiddens = nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.hidden);
             if (hiddens.Count() == 0) return;
 
-            foreach (var node in hiddens)
-            {
-                if (FunctionsF.RandomValue() < 2f / nodes.Count)
-                {
-                    node.activationType = (ActivationTypeF)(Enum.GetValues(typeof(ActivationTypeF)).Length * FunctionsF.RandomValue());
-                }
-            }
-        } // not like in paper
-
+            NodeGene toMutate = Functions.RandomIn(hiddens);
+            toMutate.activationType = (ActivationTypeF)(Enum.GetValues(typeof(ActivationTypeF)).Length * FunctionsF.RandomValue());
+        }
+        public void NoMutation() { }
 
 
 

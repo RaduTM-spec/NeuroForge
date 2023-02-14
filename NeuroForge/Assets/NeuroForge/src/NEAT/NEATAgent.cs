@@ -14,10 +14,11 @@ namespace NeuroForge
         #region Fields
         public BehaviourType behaviour = BehaviourType.Inference;
         [SerializeField] public NEATNetwork model;
+        [SerializeField] private bool fullyConnected = false;
 
         [Space]
         [Min(1), SerializeField] private int observationSize = 2;
-        [SerializeField] private ActionType actionSpace = ActionType.Continuous;
+        [Min(1), SerializeField] private ActionType actionSpace = ActionType.Discrete;
         [Min(1), SerializeField] private int ContinuousSize;
         [Min(1), SerializeField] private int[] DiscreteBranches;
 
@@ -29,7 +30,6 @@ namespace NeuroForge
 
         private Species species;
         private float fitness = 0;
-
         #endregion
 
         // Setup
@@ -85,7 +85,7 @@ namespace NeuroForge
                 outputShape = DiscreteBranches;
             }
 
-            model = new NEATNetwork(observationSize, outputShape, actionSpace, true);
+            model = new NEATNetwork(observationSize, outputShape, actionSpace, fullyConnected, true);
         }
 
 
@@ -166,11 +166,8 @@ namespace NeuroForge
         public float GetFitness() => fitness;
         public Species GetSpecies() => species;
         public void SetSpecies(Species species) => this.species = species;
-        public void Resurrect()
-        {
-            behaviour = BehaviourType.Inference;
-            fitness = 0f;
-        }
+        public void Resurrect() => behaviour = BehaviourType.Inference;
+        public void ResetFitness() => fitness = 0f;
         public ActionType GetActionSpace() => actionSpace;
     }
 
@@ -198,20 +195,31 @@ namespace NeuroForge
     class ScriptlessNEATAgent : Editor
     {
         public override void OnInspectorGUI()
+        {
+            SerializedProperty actType = serializedObject.FindProperty("actionSpace");
+            List<string> what_not_to_draw = new List<string>();
+            what_not_to_draw.Add("m_Script");
+
+            if (actType.enumValueIndex == (int)ActionType.Continuous)
             {
-                SerializedProperty actType = serializedObject.FindProperty("actionSpace");
-                if (actType.enumValueIndex == (int)ActionType.Continuous)
-                {
-                    DrawPropertiesExcluding(serializedObject, new string[] { "m_Script", "DiscreteBranches" });
-
-                }
-                else
-                {
-                    DrawPropertiesExcluding(serializedObject, new string[] { "m_Script", "ContinuousSize" });
-                }
-
-                serializedObject.ApplyModifiedProperties();
+                what_not_to_draw.Add("DiscreteBranches");
+                
             }
+            else
+            {
+                what_not_to_draw.Add("ContinuousSize");
+            }
+         
+            var script = target as NEATAgent;
+            if (script.model != null)
+            {
+                what_not_to_draw.Add("fullyConnected");
+            }
+
+            DrawPropertiesExcluding(serializedObject, what_not_to_draw.ToArray());
+
+            serializedObject.ApplyModifiedProperties();
+        }
     }
     #endregion
 }

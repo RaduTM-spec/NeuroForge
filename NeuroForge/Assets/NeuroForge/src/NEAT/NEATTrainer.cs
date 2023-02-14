@@ -14,7 +14,8 @@ namespace NeuroForge
 {
     /// <summary>
     /// The environment is public foreach agent, they are overlayed
-    /// TODOs: change const values from network mutation to acces TRAINER hyper parameters (or mayb let mutate on their own ........don t really do the change honstly_)
+    /// TODOs: check why ends up having 51 members in 2 species instead of a total of 50 (one is added i don t know from where
+    /// Decide between protecting a species (and having a maximum number of species) by no killing if too small, or use GoExtinct
     /// </summary>
     public sealed class NEATTrainer : MonoBehaviour
     {
@@ -28,8 +29,6 @@ namespace NeuroForge
         private TransformReseter trainingEnvironment;
 
         [SerializeField] private int agentsDead = 0;
-        [SerializeField] private int generationLimit = 500;
-        [SerializeField] private int episodeLength = 60;
         [SerializeField] private float episodeTimePassed = 0;
 
         [SerializeField] private int GENERATION = 0;
@@ -55,7 +54,7 @@ namespace NeuroForge
         }
         private void LateUpdate()
         {
-            if (!SESSION_END && Instance != null && (Instance.episodeTimePassed >= Instance.episodeLength || Instance.agentsDead == Instance.population.Count))
+            if (!SESSION_END && Instance != null && (Instance.episodeTimePassed >= Instance.hp.episodeLength || Instance.agentsDead == Instance.population.Count))
             {
                 // Update NEAT
                 Instance.Evolution();
@@ -72,11 +71,13 @@ namespace NeuroForge
 
                 // Resurrect agents
                 foreach (var agent in Instance.population)
+                {
                     agent.Resurrect();
-                
+                    agent.ResetFitness();
+                }
 
                 // Check for stop
-                if(GENERATION == generationLimit)
+                if(GENERATION == hp.generations)
                 {
                     SESSION_END = true;
                     species = null;
@@ -90,7 +91,84 @@ namespace NeuroForge
                 }
             }
         }
+        private void OnDrawGizmos()
+        {
+            // Draw the mainModel
+            if (!mainModel) return;
 
+            List<NodeGene> in_b = mainModel.nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.input || x.type == NEATNodeType.bias).ToList();
+            List<NodeGene> outp = mainModel.nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.output).ToList();
+            List<NodeGene> hids = mainModel.nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.hidden).ToList();
+
+            const float SIZE_SCALE = 1f;
+            const float X_SCALE = 10f;
+            const float Y_INC = 2f;
+
+            Gizmos.color = Color.grey;
+            Dictionary<NodeGene, Vector3> nodesPositions = new Dictionary<NodeGene, Vector3>();
+
+            // Compute inputs positions
+            float y_pos = -Y_INC;
+            foreach (var inp in in_b)
+            {
+                nodesPositions.Add(inp, new Vector3(0, y_pos, 0));
+                y_pos += Y_INC;
+            }
+            // Compute hidden positions
+            y_pos = 0;
+            foreach (var hid in hids)
+            {
+                nodesPositions.Add(hid, new Vector3(.5f * X_SCALE, y_pos, 0));
+                y_pos += Y_INC;
+            }
+            // Compute outputs positions
+            y_pos = 0;
+            foreach (var inp in outp)
+            {
+                nodesPositions.Add(inp, new Vector3(1f * X_SCALE, y_pos, 0));
+                y_pos += Y_INC;
+            }
+
+            //Draw nodes
+            foreach (var node in nodesPositions)
+            {
+                switch (node.Key.type)
+                {
+                    case NEATNodeType.input:
+                        Gizmos.color = Color.magenta;
+                        break;
+                    case NEATNodeType.hidden:
+                        Gizmos.color = Color.yellow;
+                        break;
+                    case NEATNodeType.output:
+                        Gizmos.color = Color.red;
+                        break;
+                    case NEATNodeType.bias:
+                        Gizmos.color = Color.green;
+                        break;
+                }
+                Gizmos.DrawCube(new Vector3(node.Value.x, node.Value.y, node.Value.z), Vector3.one * SIZE_SCALE);
+            }
+
+            //Draw connections
+            Gizmos.color = Color.white;
+            foreach (var connection in mainModel.connections)
+            {
+                Gizmos.color = connection.Value.weight < 0 ?
+                                    new Color(-connection.Value.weight, 0, 0) :
+                                    new Color(0, 0, connection.Value.weight);
+                Gizmos.color = connection.Value.enabled == false ? Color.white : Gizmos.color;
+                Vector3 firstPoint = nodesPositions.Where(x => x.Key.innovation == connection.Value.inNeuron).Select(x => x.Value).FirstOrDefault();
+                Vector3 secondPoint = nodesPositions.Where(x => x.Key.innovation == connection.Value.outNeuron).Select(x => x.Value).FirstOrDefault();
+                if (!firstPoint.Equals(secondPoint))
+                    Gizmos.DrawRay(firstPoint, secondPoint - firstPoint);
+                else
+                    Gizmos.DrawWireSphere(firstPoint, SIZE_SCALE);
+
+            }
+        }
+
+        // Trainer
         public static void Ready()
         {
             if (Instance)
@@ -109,8 +187,8 @@ namespace NeuroForge
 
             Instance.mainModel = agent.model;
             Instance.hp = agent.hp;
-            Instance.generationLimit = agent.hp.generations;
-            Instance.episodeLength = agent.hp.maxEpsiodeLength;
+            Instance.hp.generations = agent.hp.generations;
+            Instance.hp.episodeLength = agent.hp.episodeLength;
             Instance.innovationCounter = new InnovationCounter(agent.model.GetHighestInnovation() + 1);
 
             
@@ -133,29 +211,28 @@ namespace NeuroForge
             foreach (var agent in population)
             {
                 agent.model = mainModel.Clone() as NEATNetwork;
-                int how_many_mutations = mainModel.inputNodes_cache.Count + mainModel.outputNodes_cache.Count;
-                for (int i = 0; i < how_many_mutations; i++)
-                    agent.model.Mutate();
+                agent.model.Mutate();
             }     
         }
 
+
+        // NEAT
         private void Evolution()
         {
-           GenerateSpecies();
-           Kill();
-           RemoveExtinctSpecies();
+           Speciate();
+           MassKill();
+           RemoveEndangeredSpecies();
            Reproduce();
-           Mutate();
 
            mainModel.SetFrom(GetBestModel());
            EditorUtility.SetDirty(mainModel);
            AssetDatabase.SaveAssetIfDirty(mainModel);
         }
-        void GenerateSpecies()
+        void Speciate()
         {
             foreach (var spec in species)
             {
-                spec.Reset();
+                spec.ClearClients();
             }
 
             foreach (var agent in population)
@@ -166,9 +243,9 @@ namespace NeuroForge
 
                 // Else introduce him in a species
                 bool joined_species = false;
-                foreach (var specie in species)
+                foreach (var spc in species)
                 {
-                    if(specie.TryAdd(agent))
+                    if(spc.TryAdd(agent))
                     {
                         joined_species = true;
                         break;
@@ -189,26 +266,26 @@ namespace NeuroForge
 
            
         }
-        void Kill()
+        void MassKill()
         {
             foreach (var spec in species)
             {
                 spec.Kill(1 - Instance.hp.survivalRate);
             }
         }
-        void RemoveExtinctSpecies()
+        void RemoveEndangeredSpecies()
         {
-            List<Species> removed = new List<Species>();
+            List<Species> toRemoveSpecies = new List<Species>();
             for (int i = 0; i < species.Count; i++)
             {
                 Species spec = species.ElementAt(i);
-                if (spec.GetSize() < 2)
+                if(spec.IsEndangered())
                 {
                     spec.GoExtinct();
-                    removed.Add(spec);
+                    toRemoveSpecies.Add(spec);
                 }
             }
-            foreach (var toRem in removed)
+            foreach (var toRem in toRemoveSpecies)
             {
                 species.Remove(toRem);
             }
@@ -222,18 +299,11 @@ namespace NeuroForge
                 {
                     Species spec = GetRandomSpecies();// Species with good overall fitness have more chances to reproduce
                     agent.model = spec.Breed();
+                    agent.model.Mutate();
                     spec.ForceAdd(agent);
                 }
             }
         }
-        void Mutate()
-        {
-            foreach (var agent in population)
-            {
-                agent.model.Mutate();
-            }
-        }
-        //used for testing
         void TestAll()
         {
             double[] inputs = new double[population.ElementAt(0).model.inputNodes_cache.Count];
@@ -257,6 +327,7 @@ namespace NeuroForge
             }
         }
 
+        // Distance
         public static bool AreCompatible(NEATNetwork parent1, NEATNetwork parent2)
         {
             float N = Max_GenesNumber(parent1, parent2);
@@ -267,7 +338,7 @@ namespace NeuroForge
             float distance = (Instance.hp.c1 * E / N) +
                              (Instance.hp.c2 * D / N) +
                              (Instance.hp.c3 * W);
-           // Functions.DebuggerLog("Distance: " + distance + " |N=" + N + " |E=" + E + " |D=" + D + " |W=" + W);
+            //Functions.DebuggerLog("Distance: " + distance + " |N=" + N + " |E=" + E + " |D=" + D + " |W=" + W);
 
             return distance < Instance.hp.delta;
         }
@@ -428,12 +499,14 @@ namespace NeuroForge
             return disJoints;
         }
 
-
         private string GetEpisodeStatistic()
         {
             StringBuilder text = new StringBuilder();
             text.Append("<color=#2873eb><b>Generation: ");
             text.Append(++GENERATION);
+            text.Append(" (");
+            text.Append(species.Count);
+            text.Append(" species)");
             text.Append("</b></color>\n");
             int index = 1;
             foreach (var spec in species)
@@ -441,15 +514,14 @@ namespace NeuroForge
                 Color color = new Color(FunctionsF.RandomValue(), FunctionsF.RandomValue(), FunctionsF.RandomValue());
                 text.Append("<color=");
                 text.Append(Functions.HexOf(color));
-                text.Append(">Specie ");
+                text.Append(">\t    Species: ");
                 text.Append(index);
-                text.Append(" | Score ");
+                text.Append(" | Members: ");
+                text.Append(spec.GetClients().Count);
+                text.Append(" | Score: ");
                 text.Append(spec.GetScore());
                 text.Append("</color>\n");
-                foreach (var ag in spec.GetAgents())
-                {
-                    text.AppendLine("Genome: " + ag.model.GetGenomeLength() + " | Fit: " + ag.GetFitness());
-                }
+                index++;
             }
             return text.ToString();
         }
@@ -464,11 +536,12 @@ namespace NeuroForge
             foreach (var spec in species)
             {
                 cummulated += spec.GetScore();
-                if (cummulated >= try_reach)
+                if (cummulated > try_reach)
                     return spec;
 
             }
-            return Functions.RandomIn(species);
+            // because there might be negative scores, this alg breaks and choose random
+            return Functions.RandomIn(species); 
         }
         private NEATNetwork GetBestModel()
         {
@@ -485,6 +558,7 @@ namespace NeuroForge
         public static void Dispose() { Destroy(Instance.gameObject); Instance = null; }
         public static int GetInnovation() => Instance.innovationCounter.GetInnovation();
         public static void InitializeHyperParameters() => Instance.hp = new NEATHyperParameters();
+        public static NEATHyperParameters GetHP() => Instance.hp;
     }
 }
 

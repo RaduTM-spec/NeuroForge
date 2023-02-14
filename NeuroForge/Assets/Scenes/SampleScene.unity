@@ -3010,9 +3010,9 @@ GameObject:
   - component: {fileID: 2005809422}
   - component: {fileID: 2005809421}
   - component: {fileID: 2005809426}
-  - component: {fileID: 2005809427}
-  - component: {fileID: 2005809425}
   - component: {fileID: 2005809424}
+  - component: {fileID: 2005809428}
+  - component: {fileID: 2005809427}
   m_Layer: 6
   m_Name: NEATAgent
   m_TagString: Untagged
@@ -3028,7 +3028,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2005809418}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.18, z: 2.6100025}
+  m_LocalPosition: {x: 0, y: 1.13, z: 2.26}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3114,27 +3114,6 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
---- !u!114 &2005809425
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2005809418}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9d908a49190228d4a867123c6a47c0f3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  behaviour: 1
-  model: {fileID: 11400000, guid: b827b1c7d071284429bc1153624ef049, type: 2}
-  observationSize: 8
-  actionSpace: 1
-  ContinuousSize: 0
-  DiscreteBranches: 05000000
-  hp: {fileID: 0}
-  speed: 5
-  target: {fileID: 0}
 --- !u!114 &2005809426
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3150,9 +3129,9 @@ MonoBehaviour:
   world: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 63
   info: 0
-  rays: 8
+  rays: 10
   fieldOfView: 120
   rotationOffset: 0
   distance: 100
@@ -3172,26 +3151,48 @@ MonoBehaviour:
   m_GameObject: {fileID: 2005809418}
   m_Enabled: 1
   m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d908a49190228d4a867123c6a47c0f3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  behaviour: 1
+  model: {fileID: 11400000, guid: c681457b075b98c4a860cc7b40461d91, type: 2}
+  fullyConnected: 0
+  observationSize: 10
+  actionSpace: 1
+  ContinuousSize: 0
+  DiscreteBranches: 04000000
+  hp: {fileID: 0}
+  speed: 5
+  target: {fileID: 0}
+--- !u!114 &2005809428
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2005809418}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7ca894bcd623b054c8da9c0030e9fd8e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  populationSize: 20
-  survivalRate: 0.8
+  populationSize: 50
+  survivalRate: 0.504
   generations: 500
-  maxEpsiodeLength: 10
+  episodeLength: 8
   delta: 3
   c1: 1
   c2: 1
   c3: 0.4
-  addConnection: 0.1
-  removeConnection: 0.15
-  mergeConnections: 0.2
-  mutateConnections: 0.2
-  addNode: 0.1
-  mutateNode: 0.15
+  addConnection: 0.07
+  removeConnection: 0.03
+  mergeConnections: 0.03
+  mutateConnections: 0.7
+  addNode: 0.02
+  mutateNode: 0.05
   noMutation: 0.1
   maxConnections: 150
-  maxHiddenNodes: 30
+  maxNodes: 30
 --- !u!1 &2055724338
 GameObject:
   m_ObjectHideFlags: 0

@@ -28,7 +28,11 @@ namespace NeuroForge
             OutValue = type == NEATNodeType.bias ? 1 : 0;
 
             this.type = type;
-            activationType = (ActivationTypeF)(int)(FunctionsF.RandomValue() * Enum.GetValues(typeof(ActivationTypeF)).Length);
+
+            activationType = type == NEATNodeType.hidden? 
+                            (ActivationTypeF)(int)(FunctionsF.RandomValue() * Enum.GetValues(typeof(ActivationTypeF)).Length) :     
+                            ActivationTypeF.Linear;
+
             incomingConnections = new List<int>();
 
             activated = true;

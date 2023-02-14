@@ -16,6 +16,10 @@ namespace NeuroForge
             float y1 = (float)(Math.Sqrt(-2 * Math.Log(x1)) * Math.Cos(2 * Math.PI * x2));
             return y1 * standardDeviation + mean;
         }
+        /// <summary>
+        /// Returns a value in range [0.0, 1.0] (inclusive)
+        /// </summary>
+        /// <returns></returns>
         public static float RandomValue() => UnityEngine.Random.value;
         public readonly struct Activation
         {       

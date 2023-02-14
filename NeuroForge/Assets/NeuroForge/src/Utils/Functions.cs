@@ -57,16 +57,20 @@ namespace NeuroForge
                 list[i] = (list[i] - mean) / (std + 1e-8);
             }
         }
-        public static void Shuffle<T>(List<T> list)
+        public static void Shuffle<T>(List<T> list, int iterations = 1)
         {
             var random = new System.Random();
-            for (int i = 0; i < list.Count; i++)
+            for(int iter = 0; iter < iterations; iter++)
             {
-                int j = random.Next(0, list.Count - 1);
-                T temp = list[i];
-                list[i] = list[j];
-                list[j] = temp;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    int j = random.Next(0, list.Count - 1);
+                    T temp = list[i];
+                    list[i] = list[j];
+                    list[j] = temp;
+                }
             }
+           
         }
         public static void Print(IEnumerable array, string tag = null)
         {

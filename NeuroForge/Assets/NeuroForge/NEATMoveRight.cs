@@ -54,12 +54,12 @@ public class NEATMoveRight : NEATAgent
     {
         if (collision.collider.name == "Target")
         {
-            AddReward(+1);
+            AddReward(+10f);
             EndEpisode();
         }
         else if (collision.collider.CompareTag("Wall"))
         {
-            AddReward(-100);
+            AddReward(-5f);
             EndEpisode();
         }
 

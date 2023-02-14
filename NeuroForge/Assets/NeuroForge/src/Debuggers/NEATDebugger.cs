@@ -9,7 +9,7 @@ public class NEATDebugger : MonoBehaviour
     private void Start()
     {
         if (model == null)
-            model = new NEATNetwork(2, new int[2], ActionType.Continuous, true);
+            model = new NEATNetwork(2, new int[2], ActionType.Continuous, false, true);
         Functions.Print(model.GetContinuousActions(new double[] { 1, 1 }));
         StartCoroutine(Mutation());
     }

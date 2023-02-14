@@ -25,9 +25,7 @@ namespace NeuroForge
             this.inNeuron = inNeuron.innovation;
             this.outNeuron = outNeuron.innovation;
             this.enabled = true;
-            this.weight = FunctionsF.RandomValue() < 0.5f ?
-                          FunctionsF.RandomGaussian(0, 0.1f) :
-                          FunctionsF.RandomGaussian(1, 0.1f);
+            this.weight = FunctionsF.RandomGaussian();
             outNeuron.incomingConnections.Add(this.innovation);
         }
         private ConnectionGene() { }
