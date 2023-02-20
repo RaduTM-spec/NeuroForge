@@ -58,7 +58,6 @@ namespace NeuroForge
             agentSensor = new AgentSensor(this.transform);
 
             // Init environment
-            if (onEpisodeEnd == OnEpisodeEndType.ResetNone) return;
             personalEnvironment = onEpisodeEnd == OnEpisodeEndType.ResetEnvironment?
                                   personalEnvironment = new TransformReseter(this.transform.parent) :
                                   personalEnvironment = new TransformReseter(this.transform);

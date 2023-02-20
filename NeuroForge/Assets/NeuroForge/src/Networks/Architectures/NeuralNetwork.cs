@@ -133,7 +133,6 @@ namespace NeuroForge {
             {
                 for (int j = 0; j < biasLayers[i].biases.Length; j++)
                 {
-                    double bias = biasLayers[i].biases[j];
                     double veloc = biasMomentums[i].biases[j] * momentum - biasGradients[i].biases[j] * learningRate;
 
                     biasMomentums[i].biases[j] = veloc;

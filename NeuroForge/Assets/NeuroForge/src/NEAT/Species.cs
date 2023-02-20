@@ -11,15 +11,34 @@ namespace NeuroForge
     {
         private List<NEATAgent> clients = new List<NEATAgent>();
         private NEATAgent representative;
-        private float score = 0;
-        public Species(NEATAgent representative)
+        private float avgFitness = 0;
+        public Species(NEATAgent repr)
         {
-            this.representative = representative;
-            this.clients.Add(representative);
+            repr.SetSpecies(this);
+            this.representative = repr;         
+            this.clients.Add(repr);
         }        
 
-        public void CalculateScore() => score = clients.Select(x => x.GetFitness()).Average();
-        
+        public void CalculateAvgFitness() => avgFitness = clients.Select(x => x.GetFitness()).Average();
+
+        public void ClearClients()
+        {
+            // Clear everything but representative
+
+            representative = Functions.RandomIn(clients);
+
+            foreach (var cl in clients)
+            {
+                cl.SetSpecies(null);
+            }
+            clients.Clear();
+
+            representative.SetSpecies(this);
+            clients.Add(representative);
+
+            avgFitness = 0;
+
+        }
         public bool TryAdd(NEATAgent agent)
         {
             if(NEATTrainer.AreCompatible(agent.model, representative.model))
@@ -34,25 +53,9 @@ namespace NeuroForge
         {
             clients.Add(agent);
             agent.SetSpecies(this);
-        }
-        public void ClearClients()
-        {
-            foreach (var cl in clients)
-            {
-                    cl.SetSpecies(null);
-            }
-            clients.Clear();
-
-            // Keep the representative
-            representative.SetSpecies(this);
-            clients.Add(representative);
-            
-            score = 0;
-            
-        }
+        }      
         public void Kill(float percentage01)
         {
-            if (clients.Count < 3) return;
             clients.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
             for (int i = 0; i < clients.Count * percentage01; i++) 
             {
@@ -60,11 +63,19 @@ namespace NeuroForge
                 clients[0].model = null;
                 clients.RemoveAt(0);
             }
-            // It is possible to kill the representative in this process, so choose the best client as representative
+            // It is possible to kill the representative in this process, so choose another one
             if (clients.Count > 0 && !Functions.IsValueIn(representative, clients))
                 representative = clients.Last();
         }
-        
+        public void GoExtinct()
+        {
+            foreach (var ag in clients)
+            {
+                ag.SetSpecies(null);
+            }
+
+            representative = null;
+        }
         public NEATNetwork Breed()
         {
             // Select two random parents based on their fitness
@@ -72,39 +83,22 @@ namespace NeuroForge
             NEATAgent parent1 = null;
             NEATAgent parent2 = null;
 
+            List<float> probs = clients.Select(x => x.GetFitness()).ToList();
 
-            float total_fit = clients.Sum(x => x.GetFitness());
-            float cumulated = 0f;
-
-            float target = FunctionsF.RandomValue() * total_fit;
-            foreach (var item in clients)
-            {
-                cumulated += item.GetFitness();
-                if(cumulated >= target)
-                {
-                    parent1 = item;
-                    break;
-                }
-            }
-            target = FunctionsF.RandomValue() * total_fit;
-            cumulated = 0f;
-            foreach (var item in clients)
-            {
-                cumulated += item.GetFitness();
-                if (cumulated >= target)
-                {
-                    parent2 = item;
-                    break;
-                }
-            }
+            parent1 = Functions.RandomIn(clients, probs);
+            parent2 = Functions.RandomIn(clients, probs);
 
             return CrossOver(parent1.model, parent2.model, parent1.GetFitness(), parent2.GetFitness());
         }
+        
+
         private static NEATNetwork CrossOver(NEATNetwork parent1, NEATNetwork parent2, float p1_fitness, float p2_fitness)
         {
+            p1_fitness = Mathf.Exp(p1_fitness);
+            p2_fitness = Mathf.Exp(p2_fitness);
             float sum = p1_fitness + p2_fitness;
-            p1_fitness = p1_fitness / sum;
-            p2_fitness = p2_fitness / sum;
+            p1_fitness /= sum;
+            p2_fitness /= sum;
 
             // Notes: matching genes are taken randomly weighted (by fitness) from the parent with highest fitness
             // Notes: the new child (a.k.a. new topology) is mutated afterwards
@@ -184,15 +178,7 @@ namespace NeuroForge
 
             return child;
         }
-        public void GoExtinct()
-        {
-            foreach (var ag in clients)
-            {
-                ag.SetSpecies(null);
-            }
-
-            representative = null;
-        }
+        
 
         public bool IsEndangered() => clients.Count < 2;
         public NEATAgent GetBestAgent()
@@ -205,7 +191,7 @@ namespace NeuroForge
             }
             return best_ag;
         }
-        public float GetScore() => score;
+        public float GetFitness() => avgFitness;
         public List<NEATAgent> GetClients() => clients;
     }
 }

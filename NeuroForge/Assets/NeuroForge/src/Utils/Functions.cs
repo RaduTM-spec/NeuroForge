@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using UnityEngine;
 
@@ -37,6 +38,22 @@ namespace NeuroForge
                 return values.First();
             }
             
+        }
+        public static T RandomIn<T>(IEnumerable<T> values, List<float> probabilities)
+        {           
+            for (int i = 0; i < probabilities.Count; i++)
+            {
+                probabilities[i] = MathF.Exp(probabilities[i]);
+            }
+            float sum = probabilities.Sum();
+            float random = FunctionsF.RandomValue() * sum;
+            int index = 0;
+            while (random > probabilities[index])
+            {
+                random -= probabilities[index];
+                index++;
+            }
+            return values.ElementAt(index);   
         }
         public static void Normalize(List<double> list)
         {
@@ -86,9 +103,10 @@ namespace NeuroForge
             sb.Append("]");
             Debug.Log(sb.ToString());
         }
-        public static string StringOf(IEnumerable array)
+        public static string StringOf(IEnumerable array, string tag = null)
         {
             StringBuilder sb = new StringBuilder();
+            if (tag != null) sb.Append(tag);
             sb.Append("[ ");
             foreach (var item in array)
             {
@@ -107,7 +125,7 @@ namespace NeuroForge
             }
             return false;
         }
-        public static void DebuggerLog(string text, bool newLine = true)
+        public static void DebugInFile(string text, bool newLine = true)
         {
             using (StreamWriter sw = new StreamWriter("C:\\Users\\X\\Desktop\\debug.txt", true))
             {
@@ -124,6 +142,14 @@ namespace NeuroForge
             int b = Mathf.RoundToInt(color.b * 255.0f);
 
             return string.Format("#{0:X2}{1:X2}{2:X2}", r, g, b);
+        }
+        public static bool HasNaN(IEnumerable<double> array)
+        {
+            foreach (var item in array)
+            {
+                if (double.IsNaN(item)) return true;
+            }
+            return false;
         }
 
         public readonly struct Activation

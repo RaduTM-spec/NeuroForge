@@ -14,7 +14,7 @@ namespace NeuroForge
         [Min(50)] public int generations = 500;
         [Min(5), Tooltip("seconds")] public int episodeLength = 60;
 
-        [Header("Compatibility")]
+        [Header("Speciation")]
         public float delta = 3f;
         public float c1 = 1f;
         public float c2 = 1f;
@@ -29,7 +29,7 @@ namespace NeuroForge
         [Range(0,1)] public float mutateNode = 0.05f;
         [Range(0,1)] public float noMutation = 0.10f;
 
-        [Header("Structure")]
+        [Header("Genome")]
         [Min(30)] public int maxConnections = 150;
         [Min(5)] public int maxNodes = 30;
     }

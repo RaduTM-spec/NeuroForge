@@ -9,6 +9,7 @@ using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.Windows;
 using static NeuroForge.Functions;
+using static TMPro.SpriteAssetUtilities.TexturePacker_JsonArray;
 
 namespace NeuroForge
 {
@@ -29,17 +30,18 @@ namespace NeuroForge
         private BiasLayer[] biasGradients;
         private BiasLayer[] biasMomentums;
 
+
         int backwardsCount = 0;
 
         #region Gradient Descent
         public void BackPropagation(double[] inputs, double[] losses)
         {
+            // losses = Derivative of the loss function values
             if (weightGradients == null || weightGradients.Length < 1)
                 InitGradients();
 
             NeuronLayer outLayer = neuronLayers[neuronLayers.Length - 1];
 
-            // Calculate output layer cost
             if (actionSpace == ActionType.Continuous)
             {
                 ContinuousForwardPropagation(inputs);
@@ -58,14 +60,14 @@ namespace NeuroForge
                 int rawIndex = 0;
                 for (int i = 0; i < outputBranches.Length; i++)
                 {
-                    double[] rawBranchToDerive = new double[outputBranches[i]];
-                    Array.Copy(rawOuts, rawIndex, rawBranchToDerive, 0, outputBranches[i]);
+                    double[] rawBranchDerived = new double[outputBranches[i]];
+                    Array.Copy(rawOuts, rawIndex, rawBranchDerived, 0, outputBranches[i]);
 
-                    Derivative.SoftMax(rawBranchToDerive);
+                    Derivative.SoftMax(rawBranchDerived);
 
                     for (int j = rawIndex; j < rawIndex + outputBranches[i]; j++)
                     {
-                        outLayer.neurons[j].CostValue = losses[j] * rawBranchToDerive[j - rawIndex];
+                        outLayer.neurons[j].CostValue = losses[j] * rawBranchDerived[j - rawIndex];
                     }
 
                     rawIndex += outputBranches[i];
@@ -109,7 +111,6 @@ namespace NeuroForge
             {
                 for (int j = 0; j < biasLayers[i].biases.Length; j++)
                 {
-                    double bias = biasLayers[i].biases[j];
                     double veloc = biasMomentums[i].biases[j] * momentum - biasGradients[i].biases[j] * learningRate;
 
                     biasMomentums[i].biases[j] = veloc;
@@ -424,7 +425,7 @@ namespace NeuroForge
 
             for (int i = 0; i < rawDiscreteOutputs.Length; i++)
             {
-                log_probs[i] = Math.Log(rawDiscreteOutputs[i] + 1e-10);
+                log_probs[i] = Math.Log(rawDiscreteOutputs[i] + 1e-8);
             }
 
             return log_probs;

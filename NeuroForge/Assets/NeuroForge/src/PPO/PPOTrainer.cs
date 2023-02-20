@@ -35,8 +35,7 @@ namespace NeuroForge
         {
             if (Instance.agentsReady == Instance.agents.Count)
             {
-                Debug.Log("Learn");
-                Train();
+                Instance.Train();
             }
         }
 
@@ -61,56 +60,57 @@ namespace NeuroForge
         }
         private void Train()
         {
+            TrainingData trainData = new TrainingData();
+
+            // Calculate GAE for each agent playback
             foreach (var agent in Instance.agents)
             {
-                List<PPOSample> playback = agent.Memory.records;
-                var pair = GAE(playback, Instance.hp.discountFactor);
-                List<double> advantages = pair.Item1;
-                List<double> returns = pair.Item2;
-                
+                List<double> advantages;
+                List<double> returns;
+                GAE(agent.Memory.records, out advantages, out returns);
 
-                using (StreamWriter sw = new StreamWriter("C:\\Users\\X\\Desktop\\debug.txt", true))
+                trainData.playback.AddRange(agent.Memory.records);
+                trainData.advantages.AddRange(advantages);
+                trainData.returns.AddRange(returns);
+            }
+           
+            // Train for K epochs
+            for (int k = 0; k < Instance.hp.epochs; k++)
+            {
+                // Suffle the training data
+                ShuffleTrainingData(trainData);
+
+                // Create mini-batches
+                int no_mini_batches = (Instance.hp.buffer_size * agents.Count) / Instance.hp.batch_size;
+                for (int mb = 0; mb < no_mini_batches; mb++)
                 {
-                    sw.WriteLine("\n\n\n--------------> Memory: " + hp.buffer_size + " <----------------");
-                    for (int i = 0; i < advantages.Count; i++)
-                    {
-                        sw.Write("[ reward: " + playback[i].reward.ToString("00.00") + " ]");
-                        sw.Write("[ value: " + playback[i].value.ToString("00.00") + " ]");
-                        sw.Write("[ done: " + playback[i].done + " ]");
-                        sw.Write("[ return: " + returns[i].ToString("00.00" + " ]"));
-                        sw.Write("[ advantage: " + advantages[i].ToString("00.00") + " ]\n");
-                    }
-                }
+                    int posInBuffer = mb * Instance.hp.batch_size;
 
-                for (int i = 0; i < Instance.hp.buffer_size / Instance.hp.batch_size; i++)
-                {
-                    int posInBuffer = i * Instance.hp.batch_size;
-
-                    List<PPOSample> miniBatch = new List<PPOSample>(playback.GetRange(posInBuffer, Instance.hp.batch_size));
-                    List<double> miniBatch_advantages = new List<double>(advantages.GetRange(posInBuffer, Instance.hp.batch_size));
-                    List<double> miniBatch_returns = new List<double>(returns.GetRange(posInBuffer, Instance.hp.batch_size));
+                    var miniBatch_playback = new List<PPOSample>(trainData.playback.GetRange(posInBuffer, Instance.hp.batch_size));
+                    var miniBatch_advantages = new List<double>(trainData.advantages.GetRange(posInBuffer, Instance.hp.batch_size));
+                    var miniBatch_returns = new List<double>(trainData.returns.GetRange(posInBuffer, Instance.hp.batch_size));
 
                     if (Instance.actionSpace == ActionType.Continuous)
-                        UpdateContinuousModel(miniBatch, miniBatch_advantages, miniBatch_returns);
+                        UpdateContinuousModel(miniBatch_playback, miniBatch_advantages, miniBatch_returns);
                     else
-                        UpdateDiscreteModel(miniBatch, miniBatch_advantages, miniBatch_returns);
+                        UpdateDiscreteModel(miniBatch_playback, miniBatch_advantages, miniBatch_returns);
                 }
                 
-
-                agent.Memory.Clear();
-                Instance.agentsReady--;
             }
-            // AssetDatabase.SaveAssets();      
+
+            // Clear memories
+            agents.ForEach(x => x.Memory.Clear());
+            Instance.agentsReady = 0;
         }
 
 
-        void UpdateDiscreteModel(List<PPOSample> mini_batch, List<double> mb_advantages, List<double> mb_returns)
+        void UpdateDiscreteModel(List<PPOSample> mb_playback, List<double> mb_advantages, List<double> mb_returns)
         {
-            for (int t = 0; t < mini_batch.Count; t++)
+            for (int t = 0; t < mb_playback.Count; t++)
             {
-                double[] distributions = Instance.model.actorNetwork.DiscreteForwardPropagation(mini_batch[t].state).Item1;
+                double[] distributions = Instance.model.actorNetwork.DiscreteForwardPropagation(mb_playback[t].state).Item1;
 
-                double[] old_log_probs = mini_batch[t].log_probs;
+                double[] old_log_probs = mb_playback[t].log_probs;
                 double[] new_log_probs = PPOActorNetwork.GetDiscreteLogProbs(distributions);
 
                 // Calculate ratios
@@ -135,13 +135,13 @@ namespace NeuroForge
                 // Add entropy
                 for (int i = 0; i < clipped_surrogate_objective.Length; i++)
                 {
-                    double entropy = -distributions[i] * new_log_probs[i]; // phi log phi
+                    double entropy = -distributions[i] * new_log_probs[i]; // phi log phi (phi = aforementioned parameterization or output)
                     clipped_surrogate_objective[i] -= entropy * Instance.hp.entropyRegularization;
                 }
 
                 // Update policy with SGD
-                Instance.model.actorNetwork.BackPropagation(mini_batch[t].state, clipped_surrogate_objective);
-                Instance.model.criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
+                Instance.model.actorNetwork.BackPropagation(mb_playback[t].state, clipped_surrogate_objective);
+                Instance.model.criticNetwork.BackPropagation(mb_playback[t].state, new double[] { mb_returns[t] });
 
                 Instance.model.actorNetwork.OptimizeParameters(Instance.hp.actorLearnRate, Instance.hp.momentum, Instance.hp.regularization);
                 Instance.model.criticNetwork.OptimizeParameters(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
@@ -163,7 +163,7 @@ namespace NeuroForge
                 {
                     ratios[r] = Math.Exp(new_log_probs[r] - old_log_probs[r]);
                 }
-
+                
                 // Calculate surroagate loss
                 double[] clipped_surrogate_objective = new double[ratios.Length];
                 for (int r = 0; r < ratios.Length; r++)
@@ -193,7 +193,6 @@ namespace NeuroForge
                     clipped_surrogate_objective[i] -= entropies[i] * Instance.hp.entropyRegularization;
                 }
 
-
                 // Update policy SGD 
                 Instance.model.actorNetwork.BackPropagation(mini_batch[t].state, clipped_surrogate_objective);
                 Instance.model.criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
@@ -202,59 +201,67 @@ namespace NeuroForge
                 Instance.model.criticNetwork.OptimizeParameters(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
             }
         }
-        (List<double>, List<double>) DeprecatedGAE(List<PPOSample> playback, float gamma, float lambda)
-        {
-            List<double> advantages = new List<double>();
-            List<double> returns = new List<double>();
 
-            double runningAdvantage = 0;
+        void GAE(List<PPOSample> playback, out List<double> advantages, out List<double> returns)
+        {
+            double gamma = Instance.hp.discountFactor;
+            double lambda = Instance.hp.gaeFactor;
+
+            returns = new List<double>();
+            advantages = new List<double>();
+
+            double Vt = 0;
+            double At = 0;
             double nextValue = 0;
 
             for (int i = playback.Count - 1; i >= 0; i--)
             {
-                double mask = playback[i].done ? 0 : 1;
-                double delta = playback[i].reward + nextValue * gamma * mask - playback[i].value;
+                int mask = playback[i].done ? 0 : 1;
 
-                runningAdvantage = delta + runningAdvantage * gamma * lambda; // * mask?
-                nextValue = playback[i].done ? 0 : playback[i].value;
+                double delta = playback[i].reward +
+                               gamma * nextValue * mask - 
+                               playback[i].value;
 
-                advantages.Insert(0, runningAdvantage);
-                returns.Insert(0, runningAdvantage + playback[i].value);
+                At = delta + gamma * lambda * mask * At;
+                Vt = At + playback[i].value;
+                                
+                advantages.Insert(0, At);
+                returns.Insert(0, Vt);
+
+                nextValue = playback[i].value;
             }
-
-            if (Instance.hp.normalizeAdvantages)
-                Functions.Normalize(advantages);
-
-            return (advantages,returns);
         }
-        (List<double>, List<double>) GAE(List<PPOSample> playback, float gamma)
+        void ShuffleTrainingData(TrainingData data)
         {
-            List<double> advantages = new List<double>();
-            List<double> returns = new List<double>();
-
-            for (int i = 0; i < playback.Count; i++)
+            var rand = new System.Random();
+            for (int i = 0; i < data.playback.Count; i++)
             {
-                double discountedReturn = 0;
-                double discount = 1;
-                for (int j = i; j < playback.Count; j++)
-                {
-                    discountedReturn += playback[j].reward * discount;
-                    discount *= gamma;
-                }
-                returns.Add(discountedReturn);
-                advantages.Add(discountedReturn - playback[i].value);
+                int j = rand.Next(0, data.playback.Count - 1);
+                
+                // interchange playback memories
+                PPOSample temp = data.playback[i];
+                data.playback[i] = data.playback[j];
+                data.playback[j] = temp;
+
+                // interchange advantage values
+                double temp2 = data.advantages[i];
+                data.advantages[i] = data.advantages[j];
+                data.advantages[j] = temp2;
+
+                // interchange return values
+                double temp3 = data.returns[i];
+                data.returns[i] = data.returns[j];
+                data.returns[j] = temp3;
             }
+        }     
 
-            if (Instance.hp.normalizeAdvantages)
-                Functions.Normalize(advantages);
-
-            return (advantages, returns);
-        }
+    }
 
 
-        void ShuffleTrainingData(List<PPOSample> playback, List<double> advantages, List<double> returns)
-        {
-            // Not necesarry for now
-        }
+    public class TrainingData
+    {
+        public List<PPOSample> playback = new List<PPOSample>();
+        public List<double> advantages = new List<double>();
+        public List<double> returns = new List<double>();
     }
 }

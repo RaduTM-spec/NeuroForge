@@ -14,8 +14,7 @@ namespace NeuroForge
 {
     /// <summary>
     /// The environment is public foreach agent, they are overlayed
-    /// TODOs: check why ends up having 51 members in 2 species instead of a total of 50 (one is added i don t know from where
-    /// Decide between protecting a species (and having a maximum number of species) by no killing if too small, or use GoExtinct
+    /// TODO: species with 2 members need to grow then check for extinct ...
     /// </summary>
     public sealed class NEATTrainer : MonoBehaviour
     {
@@ -230,11 +229,13 @@ namespace NeuroForge
         }
         void Speciate()
         {
+            // Clear species
             foreach (var spec in species)
             {
                 spec.ClearClients();
             }
 
+            // Set species
             foreach (var agent in population)
             {
                 // If he is a representative of a species
@@ -259,12 +260,11 @@ namespace NeuroForge
                 }
             }
 
+            // Calculate score
             foreach (var spec in species)
             {
-                spec.CalculateScore();
-            }
-
-           
+                spec.CalculateAvgFitness();
+            }        
         }
         void MassKill()
         {
@@ -298,34 +298,12 @@ namespace NeuroForge
                 if(agent.GetSpecies() == null)
                 {
                     Species spec = GetRandomSpecies();// Species with good overall fitness have more chances to reproduce
-                    agent.model = spec.Breed();
-                    agent.model.Mutate();
+                    agent.model = spec.Breed(); // is mutated there already
                     spec.ForceAdd(agent);
                 }
             }
         }
-        void TestAll()
-        {
-            double[] inputs = new double[population.ElementAt(0).model.inputNodes_cache.Count];
-            for (int i = 0; i < inputs.Length; i++)
-            {
-                inputs[i] = Functions.RandomValue();
-            }
 
-            foreach (var agent in population)
-            {                    
-                try
-                {
-                    agent.model.GetDiscreteActions(inputs);
-                }
-                catch
-                {
-                    Functions.DebuggerLog(agent.model.ToString());
-                    Debug.LogError("err");
-                  
-                }       
-            }
-        }
 
         // Distance
         public static bool AreCompatible(NEATNetwork parent1, NEATNetwork parent2)
@@ -518,8 +496,8 @@ namespace NeuroForge
                 text.Append(index);
                 text.Append(" | Members: ");
                 text.Append(spec.GetClients().Count);
-                text.Append(" | Score: ");
-                text.Append(spec.GetScore());
+                text.Append(" | Fitness: ");
+                text.Append(spec.GetFitness());
                 text.Append("</color>\n");
                 index++;
             }
@@ -527,21 +505,11 @@ namespace NeuroForge
         }
         private Species GetRandomSpecies()
         {
-            float min = species.Select(x => x.GetScore()).Min();
-            float max = species.Select(x => x.GetScore()).Max();
-            float total = max - min;
-            float cummulated = min;
-            float try_reach = min + FunctionsF.RandomValue() * total;
-
-            foreach (var spec in species)
-            {
-                cummulated += spec.GetScore();
-                if (cummulated > try_reach)
-                    return spec;
-
-            }
-            // because there might be negative scores, this alg breaks and choose random
-            return Functions.RandomIn(species); 
+            if (species.Count == 1) return species.First();
+  
+            List<float> probs = species.Select(x => x.GetFitness()).ToList();
+            Species randomSpecies = Functions.RandomIn(species, probs);
+            return randomSpecies;
         }
         private NEATNetwork GetBestModel()
         {
