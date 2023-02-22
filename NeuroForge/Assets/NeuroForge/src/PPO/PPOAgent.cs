@@ -220,6 +220,13 @@ namespace NeuroForge
 
         }
         public void AddReward<T>(T reward) where T : struct
+        {         
+            if (behaviour == BehaviourType.Inactive) return;
+            
+            this.reward = Convert.ToDouble(reward);
+            this.cumulativeReward += this.reward;
+        }
+        public void ForceAddReward<T>(T reward) where T : struct
         {
             this.reward = Convert.ToDouble(reward);
             this.cumulativeReward += this.reward;

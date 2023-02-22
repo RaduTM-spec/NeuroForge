@@ -29,7 +29,7 @@ namespace NeuroForge
         private ActionBuffer actionBuffer;
 
         private Species species;
-        private float fitness = 0;
+        [SerializeField] private float fitness = 0;
         #endregion
 
         // Setup
@@ -151,6 +151,10 @@ namespace NeuroForge
             if (behaviour == BehaviourType.Inactive) return;          
             this.fitness += Convert.ToSingle(reward);
         }
+        public void ForceAddReward<T>(T reward) where T : struct
+        {
+            this.fitness += Convert.ToSingle(reward);
+        }
         public void EndEpisode()
         {
             if(behaviour == BehaviourType.Inference)
@@ -160,6 +164,7 @@ namespace NeuroForge
             }
             
         }
+       
 
 
         // Other

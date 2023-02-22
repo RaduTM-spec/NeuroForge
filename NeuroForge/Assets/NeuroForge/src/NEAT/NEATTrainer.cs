@@ -12,10 +12,6 @@ using UnityEngine;
 
 namespace NeuroForge
 {
-    /// <summary>
-    /// The environment is public foreach agent, they are overlayed
-    /// TODO: species with 2 members need to grow then check for extinct ...
-    /// </summary>
     public sealed class NEATTrainer : MonoBehaviour
     {
         private static NEATTrainer Instance;
@@ -95,7 +91,7 @@ namespace NeuroForge
             // Draw the mainModel
             if (!mainModel) return;
 
-            List<NodeGene> in_b = mainModel.nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.input || x.type == NEATNodeType.bias).ToList();
+            List<NodeGene> inputs_bias = mainModel.nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.input || x.type == NEATNodeType.bias).ToList();
             List<NodeGene> outp = mainModel.nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.output).ToList();
             List<NodeGene> hids = mainModel.nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.hidden).ToList();
 
@@ -106,25 +102,25 @@ namespace NeuroForge
             Gizmos.color = Color.grey;
             Dictionary<NodeGene, Vector3> nodesPositions = new Dictionary<NodeGene, Vector3>();
 
-            // Compute inputs positions
+            // Draw inputs
             float y_pos = -Y_INC;
-            foreach (var inp in in_b)
+            foreach (var inp in inputs_bias)
             {
-                nodesPositions.Add(inp, new Vector3(0, y_pos, 0));
+                nodesPositions.Add(inp, new Vector3(inp.layer * X_SCALE, y_pos, 0));
                 y_pos += Y_INC;
             }
-            // Compute hidden positions
+            // Draw hidden
             y_pos = 0;
-            foreach (var hid in hids)
+            foreach (var hidden in hids)
             {
-                nodesPositions.Add(hid, new Vector3(.5f * X_SCALE, y_pos, 0));
+                nodesPositions.Add(hidden, new Vector3(hidden.layer * X_SCALE, y_pos, 0));
                 y_pos += Y_INC;
             }
-            // Compute outputs positions
+            // Draw outs
             y_pos = 0;
             foreach (var inp in outp)
             {
-                nodesPositions.Add(inp, new Vector3(1f * X_SCALE, y_pos, 0));
+                nodesPositions.Add(inp, new Vector3(inp.layer * X_SCALE, y_pos, 0));
                 y_pos += Y_INC;
             }
 
@@ -134,16 +130,16 @@ namespace NeuroForge
                 switch (node.Key.type)
                 {
                     case NEATNodeType.input:
-                        Gizmos.color = Color.magenta;
+                        Gizmos.color = Color.yellow;
                         break;
                     case NEATNodeType.hidden:
-                        Gizmos.color = Color.yellow;
+                        Gizmos.color = Color.green;
                         break;
                     case NEATNodeType.output:
                         Gizmos.color = Color.red;
                         break;
                     case NEATNodeType.bias:
-                        Gizmos.color = Color.green;
+                        Gizmos.color = Color.blue;
                         break;
                 }
                 Gizmos.DrawCube(new Vector3(node.Value.x, node.Value.y, node.Value.z), Vector3.one * SIZE_SCALE);
@@ -157,8 +153,11 @@ namespace NeuroForge
                                     new Color(-connection.Value.weight, 0, 0) :
                                     new Color(0, 0, connection.Value.weight);
                 Gizmos.color = connection.Value.enabled == false ? Color.white : Gizmos.color;
-                Vector3 firstPoint = nodesPositions.Where(x => x.Key.innovation == connection.Value.inNeuron).Select(x => x.Value).FirstOrDefault();
-                Vector3 secondPoint = nodesPositions.Where(x => x.Key.innovation == connection.Value.outNeuron).Select(x => x.Value).FirstOrDefault();
+
+                Vector3 left_right_offset = new Vector3(.5f * SIZE_SCALE, 0, 0);
+                Vector3 firstPoint = nodesPositions.Where(x => x.Key.innovation == connection.Value.inNeuron).Select(x => x.Value).FirstOrDefault() + left_right_offset;
+                Vector3 secondPoint = nodesPositions.Where(x => x.Key.innovation == connection.Value.outNeuron).Select(x => x.Value).FirstOrDefault() - left_right_offset;
+               
                 if (!firstPoint.Equals(secondPoint))
                     Gizmos.DrawRay(firstPoint, secondPoint - firstPoint);
                 else
@@ -218,14 +217,14 @@ namespace NeuroForge
         // NEAT
         private void Evolution()
         {
-           Speciate();
-           MassKill();
-           RemoveEndangeredSpecies();
-           Reproduce();
+            Speciate();
+            MassKill();
+            Reproduce();
+            SpeciesExtinction();
 
-           mainModel.SetFrom(GetBestModel());
-           EditorUtility.SetDirty(mainModel);
-           AssetDatabase.SaveAssetIfDirty(mainModel);
+            mainModel.SetFrom(GetBestModel());
+            EditorUtility.SetDirty(mainModel);
+            AssetDatabase.SaveAssetIfDirty(mainModel);
         }
         void Speciate()
         {
@@ -256,7 +255,7 @@ namespace NeuroForge
                 // If didn't joined any species, create a new species
                 if(!joined_species)
                 {
-                    species.Add(new Species(agent));
+                    species.Add(new Species(agent, hp.secondChance));
                 }
             }
 
@@ -270,26 +269,8 @@ namespace NeuroForge
         {
             foreach (var spec in species)
             {
-                spec.Kill(1 - Instance.hp.survivalRate);
+                spec.Kill(1f - Instance.hp.survivalRate);
             }
-        }
-        void RemoveEndangeredSpecies()
-        {
-            List<Species> toRemoveSpecies = new List<Species>();
-            for (int i = 0; i < species.Count; i++)
-            {
-                Species spec = species.ElementAt(i);
-                if(spec.IsEndangered())
-                {
-                    spec.GoExtinct();
-                    toRemoveSpecies.Add(spec);
-                }
-            }
-            foreach (var toRem in toRemoveSpecies)
-            {
-                species.Remove(toRem);
-            }
-            
         }
         void Reproduce()
         {         
@@ -303,7 +284,26 @@ namespace NeuroForge
                 }
             }
         }
+        void SpeciesExtinction()
+        {
+            // Species that doesn't reproduce this episode and have low individuals are gone
+            List<Species> toExtinctSpecies = new List<Species>();
+            foreach (var spec in species)
+            {
+                if(spec.IsEndangered(hp.speciesEndangerZone))
+                {
+                    toExtinctSpecies.Add(spec);
+                }
+            }
+            foreach (var extinctSpecies in toExtinctSpecies)
+            {
+                extinctSpecies.GoExtinct();
+                species.Remove(extinctSpecies);
+            }
 
+            // The killed agents are reproduced
+            Reproduce();
+        }
 
         // Distance
         public static bool AreCompatible(NEATNetwork parent1, NEATNetwork parent2)
@@ -316,7 +316,6 @@ namespace NeuroForge
             float distance = (Instance.hp.c1 * E / N) +
                              (Instance.hp.c2 * D / N) +
                              (Instance.hp.c3 * W);
-            //Functions.DebuggerLog("Distance: " + distance + " |N=" + N + " |E=" + E + " |D=" + D + " |W=" + W);
 
             return distance < Instance.hp.delta;
         }
@@ -489,13 +488,13 @@ namespace NeuroForge
             int index = 1;
             foreach (var spec in species)
             {
-                Color color = new Color(FunctionsF.RandomValue(), FunctionsF.RandomValue(), FunctionsF.RandomValue());
+                Color color = new Color(Mathf.Clamp(FunctionsF.RandomValue(),.5f,1f), Mathf.Clamp(FunctionsF.RandomValue(), .5f, 1f), Mathf.Clamp(FunctionsF.RandomValue(), .5f, 1f));
                 text.Append("<color=");
                 text.Append(Functions.HexOf(color));
                 text.Append(">\t    Species: ");
                 text.Append(index);
                 text.Append(" | Members: ");
-                text.Append(spec.GetClients().Count);
+                text.Append(spec.GetIndividuals().Count);
                 text.Append(" | Fitness: ");
                 text.Append(spec.GetFitness());
                 text.Append("</color>\n");
@@ -506,10 +505,10 @@ namespace NeuroForge
         private Species GetRandomSpecies()
         {
             if (species.Count == 1) return species.First();
-  
+                       
             List<float> probs = species.Select(x => x.GetFitness()).ToList();
-            Species randomSpecies = Functions.RandomIn(species, probs);
-            return randomSpecies;
+
+            return Functions.RandomIn(species, probs);
         }
         private NEATNetwork GetBestModel()
         {

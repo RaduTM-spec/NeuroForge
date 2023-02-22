@@ -17,7 +17,7 @@ public class NEATMoveRight : NEATAgent
     protected override void Update()
     {
         base.Update();
-        AddReward(transform.position.x);
+        AddReward(Time.deltaTime);
     }
     public override void CollectObservations(SensorBuffer sensorBuffer)
     {
@@ -54,12 +54,21 @@ public class NEATMoveRight : NEATAgent
     {
         if (collision.collider.name == "Target")
         {
+            AddReward(100f);
             EndEpisode();
         }
         else if (collision.collider.CompareTag("Wall"))
         {
+            AddReward(-1f);
             EndEpisode();
         }
 
+    }
+    public void OnTriggerEnter(Collider other)
+    {
+        if(other.CompareTag("RAY"))
+        {
+            EndEpisode();
+        }
     }
 }

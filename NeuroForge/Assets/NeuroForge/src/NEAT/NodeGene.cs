@@ -20,8 +20,9 @@ namespace NeuroForge
         [SerializeField] public List<int> incomingConnections;
 
         [SerializeField] private bool activated;
+        [SerializeField] public float layer;
 
-        public NodeGene(int innov, NEATNodeType type)
+        public NodeGene(int innov, NEATNodeType type, float layer)
         {
             this.innovation = innov;
             InValue = 0;
@@ -34,7 +35,7 @@ namespace NeuroForge
                             ActivationTypeF.Linear;
 
             incomingConnections = new List<int>();
-
+            this.layer = layer;
             activated = true;
         }
         private NodeGene() { }
@@ -48,6 +49,7 @@ namespace NeuroForge
             clone.type = type;
             clone.incomingConnections = this.incomingConnections.ToList();
             clone.activated = activated;
+            clone.layer = this.layer;
             return clone;
         }
         public void Activate()

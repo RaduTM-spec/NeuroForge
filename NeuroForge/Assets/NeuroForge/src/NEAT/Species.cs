@@ -9,32 +9,34 @@ namespace NeuroForge
 {
     public class Species
     {
-        private List<NEATAgent> clients = new List<NEATAgent>();
+        private List<NEATAgent> individuals = new List<NEATAgent>();
         private NEATAgent representative;
         private float avgFitness = 0;
-        public Species(NEATAgent repr)
+        public bool secondChance = false; // when a species is endangered (it doesn't breed well), it is given a second chance episode to breed (once per life-time)
+        public Species(NEATAgent repr, bool sc)
         {
             repr.SetSpecies(this);
             this.representative = repr;         
-            this.clients.Add(repr);
+            this.individuals.Add(repr);
+            this.secondChance = sc;
         }        
 
-        public void CalculateAvgFitness() => avgFitness = clients.Select(x => x.GetFitness()).Average();
+        public void CalculateAvgFitness() => avgFitness = individuals.Select(x => x.GetFitness()).Average();
 
         public void ClearClients()
         {
             // Clear everything but representative
 
-            representative = Functions.RandomIn(clients);
+            representative = Functions.RandomIn(individuals);
 
-            foreach (var cl in clients)
+            foreach (var cl in individuals)
             {
                 cl.SetSpecies(null);
             }
-            clients.Clear();
+            individuals.Clear();
 
             representative.SetSpecies(this);
-            clients.Add(representative);
+            individuals.Add(representative);
 
             avgFitness = 0;
 
@@ -43,7 +45,7 @@ namespace NeuroForge
         {
             if(NEATTrainer.AreCompatible(agent.model, representative.model))
             {
-                clients.Add(agent);
+                individuals.Add(agent);
                 agent.SetSpecies(this);
                 return true;
             }
@@ -51,46 +53,71 @@ namespace NeuroForge
         }
         public void ForceAdd(NEATAgent agent)
         {
-            clients.Add(agent);
+            individuals.Add(agent);
             agent.SetSpecies(this);
         }      
         public void Kill(float percentage01)
         {
-            clients.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
-            for (int i = 0; i < clients.Count * percentage01; i++) 
+            // never remove this thing here. otherwise there will be error in the last if
+            if (individuals.Count < 3) return;
+
+            individuals.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
+
+            float range = individuals.Count * percentage01;
+            for (int i = 0; i < range - 1; i++) 
             {
-                clients[0].SetSpecies(null);
-                clients[0].model = null;
-                clients.RemoveAt(0);
+                individuals[0].SetSpecies(null);
+                individuals[0].model = null;
+                individuals.RemoveAt(0);
+               
             }
+
             // It is possible to kill the representative in this process, so choose another one
-            if (clients.Count > 0 && !Functions.IsValueIn(representative, clients))
-                representative = clients.Last();
+            if (representative.GetSpecies() == null)
+            {
+                representative = individuals.Last();
+            }
+
+            
         }
         public void GoExtinct()
         {
-            foreach (var ag in clients)
+            foreach (var ag in individuals)
             {
+                ag.model = null;
                 ag.SetSpecies(null);
             }
-
+            individuals.Clear();
             representative = null;
         }
         public NEATNetwork Breed()
         {
             // Select two random parents based on their fitness
             // Theoretically the agents are sorted at this point
+
             NEATAgent parent1 = null;
             NEATAgent parent2 = null;
 
-            List<float> probs = clients.Select(x => x.GetFitness()).ToList();
+            List<float> probs = individuals.Select(x => x.GetFitness()).ToList();
 
-            parent1 = Functions.RandomIn(clients, probs);
-            parent2 = Functions.RandomIn(clients, probs);
+            parent1 = Functions.RandomIn(individuals, probs);
+            parent2 = Functions.RandomIn(individuals, probs);
 
             return CrossOver(parent1.model, parent2.model, parent1.GetFitness(), parent2.GetFitness());
         }
-        
+        public bool IsEndangered(int endangerZone)
+        {
+            // It has enough individuals, it is not going to extinct
+            if(individuals.Count > endangerZone)
+                return false;
+
+            // Yes it is endangered, check the second chance
+            if (!secondChance)
+                return true;
+          
+            secondChance = false;
+            return false;
+        }
 
         private static NEATNetwork CrossOver(NEATNetwork parent1, NEATNetwork parent2, float p1_fitness, float p2_fitness)
         {
@@ -180,11 +207,10 @@ namespace NeuroForge
         }
         
 
-        public bool IsEndangered() => clients.Count < 2;
         public NEATAgent GetBestAgent()
         {
             NEATAgent best_ag = null;
-            foreach (var ag in clients)
+            foreach (var ag in individuals)
             {
                 if (best_ag == null || ag.GetFitness() > best_ag.GetFitness())
                     best_ag = ag;
@@ -192,6 +218,6 @@ namespace NeuroForge
             return best_ag;
         }
         public float GetFitness() => avgFitness;
-        public List<NEATAgent> GetClients() => clients;
+        public List<NEATAgent> GetIndividuals() => individuals;
     }
 }

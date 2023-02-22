@@ -1,4 +1,3 @@
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -39,21 +38,25 @@ namespace NeuroForge
             }
             
         }
-        public static T RandomIn<T>(IEnumerable<T> values, List<float> probabilities)
-        {           
-            for (int i = 0; i < probabilities.Count; i++)
+        public static T RandomIn<T>(IEnumerable<T> values, List<float> probs)
+        {
+            // works perfectly
+            // Negative probs are almost zeroed (it should have been exponentiated but too large values will break the memory) 
+            for (int i = 0; i < probs.Count; i++)
             {
-                probabilities[i] = MathF.Exp(probabilities[i]);
+                if (probs[i] <= 0)
+                    probs[i] = 1e-8f;
             }
-            float sum = probabilities.Sum();
-            float random = FunctionsF.RandomValue() * sum;
+            
+            float random = FunctionsF.RandomValue() * probs.Sum();
             int index = 0;
-            while (random > probabilities[index])
+            while (random > 0)
             {
-                random -= probabilities[index];
+                random -= probs[index];
                 index++;
             }
-            return values.ElementAt(index);   
+
+            return values.ElementAt(index - 1);
         }
         public static void Normalize(List<double> list)
         {

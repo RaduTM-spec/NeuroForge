@@ -34,6 +34,8 @@ namespace NeuroForge
         [SerializeField] List<int> serialized_connections_keys;
         [SerializeField] List<ConnectionGene> serialized_connections_values;
         
+
+        // Initialize
         public NEATNetwork(int inputSize, int[] outputShape, ActionType actionSpace, bool fullyConnected, bool createAsset)
         {
             this.actionSpace = actionSpace;
@@ -42,20 +44,20 @@ namespace NeuroForge
             int innov = 1;
 
             nodes = new Dictionary<int, NodeGene>();
-            NodeGene bias = new NodeGene(innov++, NEATNodeType.bias);
+            NodeGene bias = new NodeGene(innov++, NEATNodeType.bias, 0);
             nodes.Add(bias.innovation, bias);
 
             inputNodes_cache = new List<int>();
             outputNodes_cache = new List<int>();
             for (int i = 0; i < inputSize; i++)
             {
-                NodeGene newInput = new NodeGene(innov++, NEATNodeType.input);
+                NodeGene newInput = new NodeGene(innov++, NEATNodeType.input,0);
                 nodes.Add(newInput.innovation, newInput);
                 inputNodes_cache.Add(newInput.innovation);
             }
             for (int i = 0; i < outputShape.Sum(); i++)
             {
-                NodeGene newOutput = new NodeGene(innov++, NEATNodeType.output);
+                NodeGene newOutput = new NodeGene(innov++, NEATNodeType.output, 1);
                 nodes.Add(newOutput.innovation, newOutput);
                 outputNodes_cache.Add(newOutput.innovation);
             }
@@ -71,7 +73,6 @@ namespace NeuroForge
                     {
                         ConnectionGene newConn = new ConnectionGene(nodes[inp], nodes[outp], innov++);
                         connections.Add(newConn.innovation, newConn);
-
                     }
                 }
                 
@@ -99,6 +100,23 @@ namespace NeuroForge
             this.outputNodes_cache = copy.outputNodes_cache.Select(x => x).ToList();
         }
         private NEATNetwork() { }
+        private void CreateAsset()
+        {
+            short id = 1;
+            try
+            {
+                while (AssetDatabase.LoadAssetAtPath<NEATNetwork>("Assets/NEATNetworkNN#" + id + ".asset") != null)
+                    id++;
+            }
+            catch { }
+
+            string assetName = "NEATNetworkNN#" + id + ".asset";
+
+            AssetDatabase.CreateAsset(this, "Assets/" + assetName);
+            EditorUtility.SetDirty(this);
+            AssetDatabase.SaveAssetIfDirty(this);
+            Debug.Log(assetName + " was created!");
+        }
         public object Clone()
         {
             NEATNetwork clone = new NEATNetwork();
@@ -122,6 +140,7 @@ namespace NeuroForge
             return clone;
         }
 
+        // Serialization
         public void OnBeforeSerialize()
         {
             serialized_nodes = new List<NodeGene>();
@@ -159,25 +178,7 @@ namespace NeuroForge
         }
 
 
-
-
-        private void CreateAsset()
-        {
-            short id = 1;
-            try
-            {
-                while (AssetDatabase.LoadAssetAtPath<NEATNetwork>("Assets/NEATNetworkNN#" + id + ".asset") != null)
-                    id++;
-            }
-            catch { }
-           
-            string assetName = "NEATNetworkNN#" + id + ".asset";
-
-            AssetDatabase.CreateAsset(this, "Assets/" + assetName);
-            EditorUtility.SetDirty(this);
-            AssetDatabase.SaveAssetIfDirty(this);
-            Debug.Log(assetName + " was created!");
-        }
+        // Propagation
         public float[] GetContinuousActions(double[] inputs)
         {
             if (actionSpace != ActionType.Continuous)
@@ -232,8 +233,13 @@ namespace NeuroForge
                     node.Deactivate();
             }
 
-            int tryX = 1_000;
-            while(tryX-- > 0)
+            // Keep maxLoops as it is. 
+            // If there will be the following situation:
+            // node1 -> node2 && node2 -> node1
+            // There will be a deadlock. In this situation is recommended to stop in this way.
+
+            int maxLoops = nodes.Count;
+            while(maxLoops-- > 0)
             {
                 // Something wrong in here
                 foreach (var node in nodes)
@@ -255,6 +261,7 @@ namespace NeuroForge
                            incoming_nw_pairs.Add(x, nodes[x.inNeuron]);
                     });
 
+                    
                     // Check if all incoming nodes are done
                     foreach (var prev_node in incoming_nw_pairs.Values)
                         if (!prev_node.IsActivated())
@@ -302,20 +309,12 @@ namespace NeuroForge
                     continue;
                 }
 
-                int nodes_inactivated = 0;
-                foreach (var node in nodes.Values)
-                {
-                    if(!node.IsActivated())
-                        nodes_inactivated++;
-                }
-                /*if (nodes.Select(x => x.Value).Where(x => !x.IsActivated()).Any() == false)
-                      break;*/
-                // Debug.Log(nodes_inactivated+ " | "+ tryX);
-                
-                if (nodes_inactivated == 0)
-                    break;
+                // If all nodes where activated, stop the while loop
+                if (nodes.Select(x => x.Value).Where(x => !x.IsActivated()).Any() == false)
+                      break;
             }
-           
+            if (maxLoops == 0)
+                RemoveRandomConnection(); // if a deadlock happens, try randomly to remove the deadlock
             
             // Collect outputs
             float[] outputs = new float[GetOutputsNumber()];
@@ -327,7 +326,7 @@ namespace NeuroForge
         }
 
 
-        // Based on Difference-Based Mutation Operation for Neuroevolution of Augmented Topoligies
+        // Mutations
         public delegate void Mutation();
         Dictionary<Mutation, float> mutations;
         public void Mutate()
@@ -346,17 +345,16 @@ namespace NeuroForge
                 // mutations mustn't necesarrily be sorted in ascending order based on the probabilities
             }
 
+            // Select Random Mutation and execute it
             float random = FunctionsF.RandomValue();
-            float cumulated_probability = 0.0f;
             foreach (var mut in mutations)
             {
-                cumulated_probability += mut.Value;
-                if (cumulated_probability > random)
+                random -= mut.Value;
+                if (random <= 0)
                 {
                     mut.Key();
                     return;
-                }
-                
+                }                
             }
            
         }
@@ -371,6 +369,7 @@ namespace NeuroForge
                 normal distributed random number with a mean equal to 0 and standard deviation set
                 to 0.1 (normrand(0, 0.1)). Otherwise, the weight it set close to 1, i.e., normrand(1, 0.1).
                 A new innovation number is assigned to the connection*/
+
             if (connections.Count >= NEATTrainer.GetHP().maxConnections) return;
 
             List<NodeGene> input_bias_hidden = new List<NodeGene>();
@@ -399,6 +398,7 @@ namespace NeuroForge
 
             // weights (nodes more precisely) can be sequencial
             // double connection is allowed
+            // deadlock is allowed (and must be confronted)
 
             ConnectionGene newConnection = new ConnectionGene(neur1, neur2, NEATTrainer.GetInnovation());
 
@@ -544,8 +544,15 @@ namespace NeuroForge
             ConnectionGene oldConnection = connections[Functions.RandomIn(connections.Keys)];
             connections.Remove(oldConnection.innovation);
 
-            // Create splitter node
-            NodeGene newNeuron = new NodeGene(NEATTrainer.GetInnovation(), NEATNodeType.hidden);
+
+
+            // Calculate layer to place the node
+            float prev_lay = nodes[oldConnection.inNeuron].layer;
+            float next_lay = nodes[oldConnection.outNeuron].layer;
+            float layer_to_place = (prev_lay + next_lay) / 2;
+       
+            // Create splitter node        
+            NodeGene newNeuron = new NodeGene(NEATTrainer.GetInnovation(), NEATNodeType.hidden, layer_to_place);
             nodes.Add(newNeuron.innovation, newNeuron);
 
             // Create first connection

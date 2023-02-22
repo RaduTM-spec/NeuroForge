@@ -9,16 +9,21 @@ namespace NeuroForge
     [DisallowMultipleComponent, AddComponentMenu("NeuroForge/HyperParameters")]
     public class NEATHyperParameters : MonoBehaviour 
     {
-        [Min(1)]public int populationSize = 50;
-        [Range(.2f, .8f)] public float survivalRate = .5f;
-        [Min(50)] public int generations = 500;
+        [Header("Session")]
+        [Min(50)] public int generations = 1000;
         [Min(5), Tooltip("seconds")] public int episodeLength = 60;
 
+        [Header("Individuals")]
+        [Min(1)] public int populationSize = 50;
+        [Min(2), Tooltip("species minimal individuals to survive")] public int speciesEndangerZone = 5; 
+        [Range(.2f, .8f)] public float survivalRate = .5f;
+
         [Header("Speciation")]
-        public float delta = 3f;
-        public float c1 = 1f;
-        public float c2 = 1f;
-        public float c3 = 0.4f;
+        [Min(0)] public float delta = 3f;
+        [Min(0)] public float c1 = 1f;
+        [Min(0)] public float c2 = 1f;
+        [Min(0)] public float c3 = 0.4f;
+        public bool secondChance = true;
 
         [Header("Mutation")]
         [Range(0, 1)] public float addConnection = 0.07f;
@@ -30,8 +35,8 @@ namespace NeuroForge
         [Range(0,1)] public float noMutation = 0.10f;
 
         [Header("Genome")]
-        [Min(30)] public int maxConnections = 150;
-        [Min(5)] public int maxNodes = 30;
+        [Min(30)] public int maxConnections = 100;
+        [Min(5)] public int maxNodes = 20;
     }
 
     [CustomEditor(typeof(NEATHyperParameters), true), CanEditMultipleObjects]

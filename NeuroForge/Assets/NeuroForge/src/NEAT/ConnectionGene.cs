@@ -18,7 +18,6 @@ namespace NeuroForge
         [SerializeField] public int inNeuron;
         [SerializeField] public int outNeuron;
 
-
         public ConnectionGene(NodeGene inNeuron, NodeGene outNeuron, int innovation)
         {
             this.innovation = innovation;
