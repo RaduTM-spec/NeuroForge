@@ -2346,7 +2346,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82f4d8722ec8da541b5b310a4c2813fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mainModel: {fileID: 11400000, guid: 96f576c00e0daf140a3d803f25dc72df, type: 2}
 --- !u!1 &1405255271
 GameObject:
   m_ObjectHideFlags: 0
@@ -3296,16 +3295,18 @@ MonoBehaviour:
   generations: 1000
   timeHorizon: 60
   populationSize: 100
+  stagnationAllowance: 14
   survivalRate: 0.5
   delta: 3
   c1: 1
   c2: 1
   c3: 0.4
+  weightDeviationStrength: 0.01
   addConnection: 0.05
-  addNode: 0.05
+  addNode: 0.01
   mutateConnections: 0.8
   mutateNode: 0.05
-  noMutation: 0.05
+  noMutation: 0.09
   maxConnections: 100
   maxNodes: 20
 --- !u!1 &2055724338

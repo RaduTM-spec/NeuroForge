@@ -26,10 +26,9 @@ namespace NeuroForge
         [SerializeField] private int agentsDead = 0;
         [SerializeField] private float episodeTimePassed = 0;
 
-        [SerializeField] private int GENERATION = 0;
-        [SerializeField] private bool SESSION_END = false;
+        [SerializeField] private int generation = 0;
+        [SerializeField] private bool sessionEnd = false;
 
-        private InnovationCounter innovationCounter;
 
         private void Awake()
         {
@@ -49,7 +48,7 @@ namespace NeuroForge
         }
         private void LateUpdate()
         {
-            if (!SESSION_END && Instance != null && (Instance.episodeTimePassed >= Instance.hp.timeHorizon || Instance.agentsDead == Instance.population.Count))
+            if (!sessionEnd && Instance != null && (Instance.episodeTimePassed >= Instance.hp.timeHorizon || Instance.agentsDead == Instance.population.Count))
             {
                 // Update NEAT
                 Instance.Evolution();
@@ -72,9 +71,9 @@ namespace NeuroForge
                 }
 
                 // Check for stop
-                if(GENERATION == hp.generations)
+                if(generation == hp.generations)
                 {
-                    SESSION_END = true;
+                    sessionEnd = true;
                     species = null;
                     foreach (var ag in population)
                     {
@@ -136,7 +135,7 @@ namespace NeuroForge
 
                     List<int> inNeurons_of_incomingCons = incomingCons.Select(x => x.inNeuron).ToList();
                     List<Vector3> incoming_nodes_pos = previous_nodes.Where(x =>
-                            Functions.IsValueIn(x.Key.innovation, inNeurons_of_incomingCons)).Select(x => x.Value).ToList();
+                            Functions.IsValueIn(x.Key.id, inNeurons_of_incomingCons)).Select(x => x.Value).ToList();
 
                     float avg_Y = incoming_nodes_pos.Average(x => x.y);
                     node_pos.Add(hidden_node, new Vector3(hidden_node.layer * X_SCALE, avg_Y, 0f));
@@ -178,8 +177,8 @@ namespace NeuroForge
                 Gizmos.color = connection.Value.enabled == false ? Color.white : Gizmos.color;
 
                 Vector3 left_right_offset = new Vector3(.5f * NODE_SCALE, 0, 0);
-                Vector3 firstPoint = node_pos.Where(x => x.Key.innovation == connection.Value.inNeuron).Select(x => x.Value).FirstOrDefault() + left_right_offset;
-                Vector3 secondPoint = node_pos.Where(x => x.Key.innovation == connection.Value.outNeuron).Select(x => x.Value).FirstOrDefault() - left_right_offset;
+                Vector3 firstPoint = node_pos.Where(x => x.Key.id == connection.Value.inNeuron).Select(x => x.Value).FirstOrDefault() + left_right_offset;
+                Vector3 secondPoint = node_pos.Where(x => x.Key.id == connection.Value.outNeuron).Select(x => x.Value).FirstOrDefault() - left_right_offset;
 
 
                 Gizmos.DrawRay(firstPoint, secondPoint - firstPoint);
@@ -211,7 +210,6 @@ namespace NeuroForge
             Instance.hp = agent.hp;
             Instance.hp.generations = agent.hp.generations;
             Instance.hp.timeHorizon = agent.hp.timeHorizon;
-            Instance.innovationCounter = new InnovationCounter(agent.model.GetHighestInnovation() + 1);
 
             
             Instance.InitPopulation(agent.gameObject, agent.hp.populationSize - 1);
@@ -312,7 +310,7 @@ namespace NeuroForge
             {
                 if(agent.GetSpecies() == null)
                 {
-                    Species spec = GetRandomSpecies();// Species with good overall fitness have more chances to reproduce
+                    Species spec = GetRandomSpecies_AllowedToReproduce();// Species with good overall fitness have more chances to reproduce
                     agent.model = spec.Breed(); // is mutated there already
                     spec.ForceAdd(agent);
                 }
@@ -518,7 +516,7 @@ namespace NeuroForge
         {
             StringBuilder text = new StringBuilder();
             text.Append("<color=#2873eb><b>Generation: ");
-            text.Append(++GENERATION);
+            text.Append(++generation);
             text.Append(" (");
             text.Append(species.Count);
             text.Append(" species)");
@@ -550,13 +548,14 @@ namespace NeuroForge
             }
             return text.ToString();
         }
-        private Species GetRandomSpecies()
+        private Species GetRandomSpecies_AllowedToReproduce()
         {
             if (species.Count == 1) return species.First();
-                       
-            List<float> probs = species.Select(x => x.GetFitness()).ToList();
+            
+            List<Species> allowed_to_reproduce_species = species.Where(x => x.IsAllowedToReproduce(hp.stagnationAllowance)).ToList();
+            List<float> probs = allowed_to_reproduce_species.Select(x => x.GetFitness()).ToList();
 
-            return Functions.RandomIn(species, probs);
+            return Functions.RandomIn(allowed_to_reproduce_species, probs);
         }
         private Genome GetBestModel()
         {
@@ -571,7 +570,6 @@ namespace NeuroForge
         }
 
         public static void Dispose() { Destroy(Instance.gameObject); Instance = null; }
-        public static int GetInnovation() => Instance.innovationCounter.GetInnovation();
         public static void InitializeHyperParameters() => Instance.hp = new NEATHyperParameters();
         public static NEATHyperParameters GetHP() => Instance.hp;
     }

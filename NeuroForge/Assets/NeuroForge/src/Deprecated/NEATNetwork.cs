@@ -16,7 +16,7 @@ using UnityEngine.Networking.Types;
 using UnityEngine.Windows;
 using static UnityEngine.UIElements.UxmlAttributeDescription;
 
-namespace NeuroForge // deprecated
+namespace NeuroForge //COMPLETELY DEPRECATED
 {
     [Serializable]
     public class NEATNetwork : ScriptableObject, ISerializationCallbackReceiver, ICloneable
@@ -45,21 +45,21 @@ namespace NeuroForge // deprecated
 
             nodes = new Dictionary<int, NodeGene>();
             NodeGene bias = new NodeGene(innov++, NEATNodeType.bias, 0);
-            nodes.Add(bias.innovation, bias);
+            nodes.Add(bias.id, bias);
 
             inputNodes_cache = new List<int>();
             outputNodes_cache = new List<int>();
             for (int i = 0; i < inputSize; i++)
             {
                 NodeGene newInput = new NodeGene(innov++, NEATNodeType.input,0);
-                nodes.Add(newInput.innovation, newInput);
-                inputNodes_cache.Add(newInput.innovation);
+                nodes.Add(newInput.id, newInput);
+                inputNodes_cache.Add(newInput.id);
             }
             for (int i = 0; i < outputShape.Sum(); i++)
             {
                 NodeGene newOutput = new NodeGene(innov++, NEATNodeType.output, 1);
-                nodes.Add(newOutput.innovation, newOutput);
-                outputNodes_cache.Add(newOutput.innovation);
+                nodes.Add(newOutput.id, newOutput);
+                outputNodes_cache.Add(newOutput.id);
             }
 
            
@@ -166,7 +166,7 @@ namespace NeuroForge // deprecated
             nodes = new Dictionary<int, NodeGene>();
             foreach (var node in serialized_nodes)
             {
-                nodes.Add(node.innovation, node);
+                nodes.Add(node.id, node);
             }
 
             for (int i = 0; i < serialized_connections_keys.Count; i++)
@@ -400,9 +400,9 @@ namespace NeuroForge // deprecated
             // double connection is allowed
             // deadlock is allowed (and must be confronted)
 
-            ConnectionGene newConnection = new ConnectionGene(neur1, neur2, NEATTrainer.GetInnovation());
+           ////////// ConnectionGene newConnection = new ConnectionGene(neur1, neur2, InnovationHistory.Instance.GetInnovation());
 
-            connections.Add(newConnection.innovation, newConnection);
+           ///////// connections.Add(newConnection.innovation, newConnection);
 
         } 
         public void MutateConnections()
@@ -552,30 +552,30 @@ namespace NeuroForge // deprecated
             float layer_to_place = (prev_lay + next_lay) / 2;
        
             // Create splitter node        
-            NodeGene newNeuron = new NodeGene(NEATTrainer.GetInnovation(), NEATNodeType.hidden, layer_to_place);
-            nodes.Add(newNeuron.innovation, newNeuron);
-
-            // Create first connection
-            ConnectionGene conn1 = new ConnectionGene(nodes[oldConnection.inNeuron], newNeuron, NEATTrainer.GetInnovation());
-            connections.Add(conn1.innovation, conn1);
-
-            // Create second connection
-            ConnectionGene conn2 = new ConnectionGene(newNeuron, nodes[oldConnection.outNeuron], NEATTrainer.GetInnovation());
-            connections.Add(conn2.innovation, conn2);
-            nodes[oldConnection.outNeuron].incomingConnections.Remove(oldConnection.innovation);
-
-            // Assign the weights
-            if (FunctionsF.RandomValue() < .5f)
-            {
-                conn1.weight = 1f;
-                conn2.weight = oldConnection.weight;
-            }
-            else
-            {
-                conn1.weight = oldConnection.weight;
-                conn2.weight = 1f;
-            }
-
+           ////////////////////////////////////     NodeGene newNeuron = new NodeGene(NEATTrainer.GetInnovation(), NEATNodeType.hidden, layer_to_place);
+           ////////////////////////////////////     nodes.Add(newNeuron.id, newNeuron);
+           ////////////////////////////////////    
+           ////////////////////////////////////     // Create first connection
+           ////////////////////////////////////     ConnectionGene conn1 = new ConnectionGene(nodes[oldConnection.inNeuron], newNeuron, NEATTrainer.GetInnovation());
+           ////////////////////////////////////     connections.Add(conn1.innovation, conn1);
+           ////////////////////////////////////    
+           ////////////////////////////////////     // Create second connection
+           ////////////////////////////////////     ConnectionGene conn2 = new ConnectionGene(newNeuron, nodes[oldConnection.outNeuron], NEATTrainer.GetInnovation());
+           ////////////////////////////////////     connections.Add(conn2.innovation, conn2);
+           ////////////////////////////////////     nodes[oldConnection.outNeuron].incomingConnections.Remove(oldConnection.innovation);
+           ////////////////////////////////////    
+          //////////////////////////////////// // Assign the weights
+          //////////////////////////////////// if (FunctionsF.RandomValue() < .5f)
+          //////////////////////////////////// {
+          ////////////////////////////////////     conn1.weight = 1f;
+          ////////////////////////////////////     conn2.weight = oldConnection.weight;
+          //////////////////////////////////// }
+          //////////////////////////////////// else
+          //////////////////////////////////// {
+          ////////////////////////////////////     conn1.weight = oldConnection.weight;
+          ////////////////////////////////////     conn2.weight = 1f;
+          //////////////////////////////////// }
+          ////////////////////////////////////
 
 
 

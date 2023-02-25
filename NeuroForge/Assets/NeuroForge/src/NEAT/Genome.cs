@@ -35,31 +35,31 @@ namespace NeuroForge
             layers.Add(0);
             layers.Add(1);
 
-            int inov = 1;
+            
 
             nodes = new Dictionary<int, NodeGene>();
-            NodeGene bias = new NodeGene(inov++, NEATNodeType.bias, 0);
-            nodes.Add(bias.innovation, bias);
+            NodeGene bias = new NodeGene(GetNextNodeId(), NEATNodeType.bias, 0);
+            nodes.Add(bias.id, bias);
 
             input_cache = new List<NodeGene>();
             output_cache = new List<NodeGene>();
 
             for (int i = 0; i < inputSize; i++)
             {
-                NodeGene newInput = new NodeGene(inov++, NEATNodeType.input, 0);
-                nodes.Add(newInput.innovation, newInput);
+                NodeGene newInput = new NodeGene(GetNextNodeId(), NEATNodeType.input, 0);
+                nodes.Add(newInput.id, newInput);
                 input_cache.Add(newInput);
             }
             for (int i = 0; i < outputShape.Sum(); i++)
             {
-                NodeGene newOutput = new NodeGene(inov++, NEATNodeType.output, 1);
-                nodes.Add(newOutput.innovation, newOutput);
+                NodeGene newOutput = new NodeGene(GetNextNodeId(), NEATNodeType.output, 1);
+                nodes.Add(newOutput.id, newOutput);
                 output_cache.Add(newOutput);
             }
 
 
             connections = new Dictionary<int, ConnectionGene>();
-
+            int inov = 1;
             if (fullyConnected)
             {
                 foreach (var inp in input_cache)
@@ -165,7 +165,7 @@ namespace NeuroForge
             output_cache = new List<NodeGene>();
             foreach (var node in serialized_nodes)
             {
-                nodes.Add(node.innovation, node);
+                nodes.Add(node.id, node);
                 if (node.type == NEATNodeType.input)
                     input_cache.Add(node);
                 else if(node.type == NEATNodeType.output)
@@ -316,7 +316,7 @@ namespace NeuroForge
             if (node1.layer > node2.layer)
                 Functions.Swap(ref node1, ref node2);
 
-            ConnectionGene newConn = new ConnectionGene(node1, node2, GetInnovation());
+            ConnectionGene newConn = new ConnectionGene(node1, node2, GetConnectionInnovation(node1, node2));
             connections.Add(newConn.innovation, newConn);
 
         }
@@ -342,14 +342,18 @@ namespace NeuroForge
             }
 
             // Create node
-            NodeGene new_node = new NodeGene(GetInnovation(), NEATNodeType.hidden, this_node_layer);
-            nodes.Add(new_node.innovation, new_node);
+            NodeGene new_node = new NodeGene(GetNextNodeId(), NEATNodeType.hidden, this_node_layer);
+            nodes.Add(new_node.id, new_node);
             //new_node.activationType = ActivationTypeF.HyperbolicTangent;
 
             // Create connections
-            ConnectionGene conn1 = new ConnectionGene(nodes[conn.inNeuron], new_node, GetInnovation());
+            NodeGene left_most_neuron = nodes[conn.inNeuron];
+            NodeGene right_most_neuron = nodes[conn.outNeuron];
+
+            ConnectionGene conn1 = new ConnectionGene(left_most_neuron, new_node, GetConnectionInnovation(left_most_neuron, new_node));
             connections.Add(conn1.innovation, conn1);
-            ConnectionGene conn2 = new ConnectionGene(new_node, nodes[conn.outNeuron], GetInnovation());
+
+            ConnectionGene conn2 = new ConnectionGene(new_node, right_most_neuron, GetConnectionInnovation(new_node, right_most_neuron));
             connections.Add(conn2.innovation, conn2);
             nodes[conn.outNeuron].incomingConnections.Remove(conn.innovation);
 
@@ -375,7 +379,7 @@ namespace NeuroForge
                 else if (random < 0.1f)
                     connection.weight = FunctionsF.RandomGaussian();
                 else
-                    connection.weight = FunctionsF.RandomGaussian(connection.weight, 0.01f);
+                    connection.weight = FunctionsF.RandomGaussian(connection.weight, NEATTrainer.GetHP().weightDeviationStrength);
             }
         }
         public void MutateNode()
@@ -397,8 +401,8 @@ namespace NeuroForge
 
             // nodes already connected cannot be connected again
 
-            int inNeur = node1.layer < node2.layer? node1.innovation : node2.innovation;
-            int outNeur = node1.layer < node2.layer ? node2.innovation : node1.innovation;
+            int inNeur = node1.layer < node2.layer? node1.id : node2.id;
+            int outNeur = node1.layer < node2.layer ? node2.id : node1.id;
             foreach (var con in connections.Values)
             {
                 if (con.inNeuron == inNeur && con.outNeuron == outNeur)
@@ -407,20 +411,13 @@ namespace NeuroForge
 
             return true;
         }
+        private int GetConnectionInnovation(NodeGene from, NodeGene to) => InnovationHistory.Instance.GetInnovationNumber(from.id, to.id);
+        private int GetNextNodeId() => nodes.Count == 0 ? 1 : nodes.Max(x => x.Key) + 1;
 
 
-        public int GetInnovation()
-        {
-             return NEATTrainer.GetInnovation();
-            // return GetHighestInnovation() + 1;
-        }
-        public int GetHighestInnovation()
-        {
-            int inov_max_nodes = nodes.Max(x => x.Key);
-            int inov_max_cons = connections.Count > 0 ?connections.Max(x => x.Key) : 0;
-            return Math.Max(inov_max_cons, inov_max_nodes);
-        }
-
+        // outside call
+        public int GetLastNodeId() => nodes.Max(x => x.Key);
+        public int GetLastInnovation() => connections.Count > 0 ? connections.Max(x => x.Key) : 0;
         public int GetInputsNumber() => input_cache.Count;
         public int GetOutputsNumber() => output_cache.Count;
         public int GetGenomeLength() => nodes.Count + connections.Count;

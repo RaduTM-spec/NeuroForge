@@ -78,7 +78,7 @@ public class GenomeTest : MonoBehaviour
 
                 List<int> inNeurons_of_incomingCons = incomingCons.Select(x => x.inNeuron).ToList();
                 List<Vector3> incoming_nodes_pos = previous_nodes.Where(x =>
-                        Functions.IsValueIn(x.Key.innovation, inNeurons_of_incomingCons)).Select(x => x.Value).ToList();
+                        Functions.IsValueIn(x.Key.id, inNeurons_of_incomingCons)).Select(x => x.Value).ToList();
 
                 float avg_Y = incoming_nodes_pos.Average(x => x.y);
                 node_pos.Add(hidden_node, new Vector3(hidden_node.layer * X_SCALE, avg_Y, 0f));
@@ -120,8 +120,8 @@ public class GenomeTest : MonoBehaviour
             Gizmos.color = connection.Value.enabled == false ? Color.white : Gizmos.color;
 
             Vector3 left_right_offset = new Vector3(.5f * NODE_SCALE, 0, 0);
-            Vector3 firstPoint = node_pos.Where(x => x.Key.innovation == connection.Value.inNeuron).Select(x => x.Value).FirstOrDefault() + left_right_offset;
-            Vector3 secondPoint = node_pos.Where(x => x.Key.innovation == connection.Value.outNeuron).Select(x => x.Value).FirstOrDefault() - left_right_offset;
+            Vector3 firstPoint = node_pos.Where(x => x.Key.id == connection.Value.inNeuron).Select(x => x.Value).FirstOrDefault() + left_right_offset;
+            Vector3 secondPoint = node_pos.Where(x => x.Key.id == connection.Value.outNeuron).Select(x => x.Value).FirstOrDefault() - left_right_offset;
 
             
             Gizmos.DrawRay(firstPoint, secondPoint - firstPoint);

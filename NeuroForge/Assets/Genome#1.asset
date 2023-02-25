@@ -15,84 +15,84 @@ MonoBehaviour:
   actionSpace: 1
   outputShape: 04000000
   input_cache:
-  - innovation: 2
+  - id: 2
     InValue: 0
-    OutValue: 1.1532085
+    OutValue: 1.9609132
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 3
+  - id: 3
     InValue: 0
-    OutValue: 1.6361494
+    OutValue: 2.7821267
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 4
+  - id: 4
     InValue: 0
-    OutValue: 17.760033
+    OutValue: 17.760002
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 5
+  - id: 5
     InValue: 0
-    OutValue: 6.2508187
+    OutValue: 6.2508273
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 6
+  - id: 6
     InValue: 0
-    OutValue: 11.056782
+    OutValue: 10.249077
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
   output_cache:
-  - innovation: 7
-    InValue: -17.812748
-    OutValue: -17.812748
+  - id: 7
+    InValue: 56.61291
+    OutValue: 56.61291
     activationType: 0
     type: 2
-    incomingConnections: 0b0000000f00000013000000170000001b000000
+    incomingConnections: 0100000005000000090000000d00000011000000
     activated: 1
     layer: 1
-  - innovation: 8
-    InValue: -46.089966
-    OutValue: -46.089966
+  - id: 8
+    InValue: -32.696453
+    OutValue: -32.696453
     activationType: 0
     type: 2
-    incomingConnections: 0c0000001000000014000000180000001c000000
+    incomingConnections: 02000000060000000a0000000e00000012000000
     activated: 1
     layer: 1
-  - innovation: 9
-    InValue: -17.54283
-    OutValue: -17.54283
+  - id: 9
+    InValue: 56.18631
+    OutValue: 56.18631
     activationType: 0
     type: 2
-    incomingConnections: 0d0000001100000015000000190000001d000000
+    incomingConnections: 03000000070000000b0000000f00000013000000
     activated: 1
     layer: 1
-  - innovation: 10
-    InValue: -19.477343
-    OutValue: -19.477343
+  - id: 10
+    InValue: -30.309975
+    OutValue: -30.309975
     activationType: 0
     type: 2
-    incomingConnections: 0e00000012000000160000001a0000001e000000
+    incomingConnections: 04000000080000000c0000001000000014000000
     activated: 1
     layer: 1
   layers:
   - 0
   - 1
   serialized_nodes:
-  - innovation: 1
+  - id: 1
     InValue: 0
     OutValue: 1
     activationType: 0
@@ -100,177 +100,177 @@ MonoBehaviour:
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 2
+  - id: 2
     InValue: 0
-    OutValue: 1.1532085
+    OutValue: 1.9609132
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 3
+  - id: 3
     InValue: 0
-    OutValue: 1.6361494
+    OutValue: 2.7821267
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 4
+  - id: 4
     InValue: 0
-    OutValue: 17.760033
+    OutValue: 17.760002
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 5
+  - id: 5
     InValue: 0
-    OutValue: 6.2508187
+    OutValue: 6.2508273
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 6
+  - id: 6
     InValue: 0
-    OutValue: 11.056782
+    OutValue: 10.249077
     activationType: 0
     type: 0
     incomingConnections: 
     activated: 1
     layer: 0
-  - innovation: 7
-    InValue: -17.812748
-    OutValue: -17.812748
+  - id: 7
+    InValue: 56.61291
+    OutValue: 56.61291
     activationType: 0
     type: 2
-    incomingConnections: 0b0000000f00000013000000170000001b000000
+    incomingConnections: 0100000005000000090000000d00000011000000
     activated: 1
     layer: 1
-  - innovation: 8
-    InValue: -46.089966
-    OutValue: -46.089966
+  - id: 8
+    InValue: -32.696453
+    OutValue: -32.696453
     activationType: 0
     type: 2
-    incomingConnections: 0c0000001000000014000000180000001c000000
+    incomingConnections: 02000000060000000a0000000e00000012000000
     activated: 1
     layer: 1
-  - innovation: 9
-    InValue: -17.54283
-    OutValue: -17.54283
+  - id: 9
+    InValue: 56.18631
+    OutValue: 56.18631
     activationType: 0
     type: 2
-    incomingConnections: 0d0000001100000015000000190000001d000000
+    incomingConnections: 03000000070000000b0000000f00000013000000
     activated: 1
     layer: 1
-  - innovation: 10
-    InValue: -19.477343
-    OutValue: -19.477343
+  - id: 10
+    InValue: -30.309975
+    OutValue: -30.309975
     activationType: 0
     type: 2
-    incomingConnections: 0e00000012000000160000001a0000001e000000
+    incomingConnections: 04000000080000000c0000001000000014000000
     activated: 1
     layer: 1
-  serialized_connections_keys: 0b0000000c0000000d0000000e0000000f000000100000001100000012000000130000001400000015000000160000001700000018000000190000001a0000001b0000001c0000001d0000001e000000
+  serialized_connections_keys: 0100000002000000030000000400000005000000060000000700000008000000090000000a0000000b0000000c0000000d0000000e0000000f0000001000000011000000120000001300000014000000
   serialized_connections_values:
+  - innovation: 1
+    weight: 0.041426644
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 7
+  - innovation: 2
+    weight: -0.10078096
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 8
+  - innovation: 3
+    weight: 0.44174665
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 9
+  - innovation: 4
+    weight: 0.6150761
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 10
+  - innovation: 5
+    weight: 2.3529985
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 7
+  - innovation: 6
+    weight: 0.47548395
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 8
+  - innovation: 7
+    weight: 3.2273018
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 9
+  - innovation: 8
+    weight: -0.72773105
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 10
+  - innovation: 9
+    weight: 4.490793
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 7
+  - innovation: 10
+    weight: -3.471536
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 8
   - innovation: 11
-    weight: -1.8789268
+    weight: 1.9650486
     enabled: 1
-    inNeuron: 2
-    outNeuron: 7
+    inNeuron: 4
+    outNeuron: 9
   - innovation: 12
-    weight: 0.68429196
+    weight: 2.2443514
     enabled: 1
-    inNeuron: 2
-    outNeuron: 8
+    inNeuron: 4
+    outNeuron: 10
   - innovation: 13
-    weight: 1.3358476
+    weight: 2.1101863
     enabled: 1
-    inNeuron: 2
-    outNeuron: 9
+    inNeuron: 5
+    outNeuron: 7
   - innovation: 14
-    weight: 0.86858076
+    weight: 2.0474384
     enabled: 1
-    inNeuron: 2
-    outNeuron: 10
+    inNeuron: 5
+    outNeuron: 8
   - innovation: 15
-    weight: -1.0721055
+    weight: 1.8638155
     enabled: 1
-    inNeuron: 3
-    outNeuron: 7
+    inNeuron: 5
+    outNeuron: 9
   - innovation: 16
-    weight: 0.23379724
+    weight: -3.251146
     enabled: 1
-    inNeuron: 3
-    outNeuron: 8
+    inNeuron: 5
+    outNeuron: 10
   - innovation: 17
-    weight: 0.3764337
+    weight: -4.19175
     enabled: 1
-    inNeuron: 3
-    outNeuron: 9
+    inNeuron: 6
+    outNeuron: 7
   - innovation: 18
-    weight: 0.51220655
+    weight: 1.4669237
     enabled: 1
-    inNeuron: 3
-    outNeuron: 10
+    inNeuron: 6
+    outNeuron: 8
   - innovation: 19
-    weight: -0.63912183
+    weight: -0.020327436
     enabled: 1
-    inNeuron: 4
-    outNeuron: 7
+    inNeuron: 6
+    outNeuron: 9
   - innovation: 20
-    weight: -1.7201072
-    enabled: 1
-    inNeuron: 4
-    outNeuron: 8
-  - innovation: 21
-    weight: -0.63440365
-    enabled: 1
-    inNeuron: 4
-    outNeuron: 9
-  - innovation: 22
-    weight: -0.7178755
-    enabled: 1
-    inNeuron: 4
-    outNeuron: 10
-  - innovation: 23
-    weight: -0.2854227
-    enabled: 1
-    inNeuron: 5
-    outNeuron: 7
-  - innovation: 24
-    weight: -0.57251143
-    enabled: 1
-    inNeuron: 5
-    outNeuron: 8
-  - innovation: 25
-    weight: -0.6926142
-    enabled: 1
-    inNeuron: 5
-    outNeuron: 9
-  - innovation: 26
-    weight: -0.84994733
-    enabled: 1
-    inNeuron: 5
-    outNeuron: 10
-  - innovation: 27
-    weight: -0.068453744
-    enabled: 1
-    inNeuron: 6
-    outNeuron: 7
-  - innovation: 28
-    weight: -1.1878501
-    enabled: 1
-    inNeuron: 6
-    outNeuron: 8
-  - innovation: 29
-    weight: -0.37106696
-    enabled: 1
-    inNeuron: 6
-    outNeuron: 9
-  - innovation: 30
-    weight: -0.29436097
+    weight: -4.783726
     enabled: 1
     inNeuron: 6
     outNeuron: 10

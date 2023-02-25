@@ -14,7 +14,7 @@ namespace NeuroForge
         #region Fields
         public BehaviourType behavior = BehaviourType.Inference;
         [SerializeField] public Genome model;
-        [SerializeField] private bool fullyConnected = false;
+        [SerializeField] private bool fullyConnected = true;
 
         [Space]
         [Min(1), SerializeField] private int observationSize = 2;
@@ -38,6 +38,9 @@ namespace NeuroForge
             hp = GetComponent<NEATHyperParameters>();
 
             InitNetwork();
+
+            // Init Innovation Counter
+            InnovationHistory.Instance = new InnovationHistory(this.model);
 
             // Init buffers
             sensorBuffer = new SensorBuffer(model.GetInputsNumber());
@@ -201,29 +204,37 @@ namespace NeuroForge
     {
         public override void OnInspectorGUI()
         {
-            
-            SerializedProperty actType = serializedObject.FindProperty("actionSpace");
-            List<string> what_not_to_draw = new List<string>();
-            what_not_to_draw.Add("m_Script");
-
-            if (actType.enumValueIndex == (int)ActionType.Continuous)
-            {
-                what_not_to_draw.Add("DiscreteBranches");
-                
-            }
-            else
-            {
-                what_not_to_draw.Add("ContinuousSize");
-            }
-         
             var script = target as NEATAgent;
-            if (script.model != null)
+            List<string> dontDrawMe = new List<string>();
+            dontDrawMe.Add("m_Script");
+
+            // Hide action space
+            SerializedProperty actType = serializedObject.FindProperty("actionSpace");
+            if (actType.enumValueIndex == (int)ActionType.Continuous)
+                dontDrawMe.Add("DiscreteBranches");
+            else
+                dontDrawMe.Add("ContinuousSize");
+
+            // Hide network and fully con
+            SerializedProperty beh = serializedObject.FindProperty("behavior");
+
+            if (beh.enumValueIndex == (int)BehaviourType.Manual)
             {
-                what_not_to_draw.Add("fullyConnected");
+                dontDrawMe.Add("model");
+                dontDrawMe.Add("fullyConnected");
+            }
+            else if (beh.enumValueIndex == (int)BehaviourType.Active ||
+                     beh.enumValueIndex == (int)BehaviourType.Inactive)
+            {
+                dontDrawMe.Add("critic");
+                dontDrawMe.Add("fullyConnected");
+            }
+            else if(script.model != null) // and inference behaviour
+            {
+                dontDrawMe.Add("fullyConnected");
             }
 
-            DrawPropertiesExcluding(serializedObject, what_not_to_draw.ToArray());
-
+            DrawPropertiesExcluding(serializedObject, dontDrawMe.ToArray());
             serializedObject.ApplyModifiedProperties();
         }
     }

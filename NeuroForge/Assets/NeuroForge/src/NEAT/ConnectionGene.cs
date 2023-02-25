@@ -21,8 +21,8 @@ namespace NeuroForge
         public ConnectionGene(NodeGene inNeuron, NodeGene outNeuron, int innovation)
         {
             this.innovation = innovation;
-            this.inNeuron = inNeuron.innovation;
-            this.outNeuron = outNeuron.innovation;
+            this.inNeuron = inNeuron.id;
+            this.outNeuron = outNeuron.id;
             this.enabled = true;
             this.weight = FunctionsF.RandomGaussian();
             outNeuron.incomingConnections.Add(this.innovation);

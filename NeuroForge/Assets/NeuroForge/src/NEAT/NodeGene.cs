@@ -11,7 +11,7 @@ namespace NeuroForge
     [Serializable]
     public class NodeGene : ICloneable
     {
-        [SerializeField] public int innovation;
+        [SerializeField] public int id;
         [SerializeField] public float InValue;
         [SerializeField] public float OutValue;
 
@@ -22,9 +22,9 @@ namespace NeuroForge
         [SerializeField] private bool activated;
         [SerializeField] public float layer;
 
-        public NodeGene(int innov, NEATNodeType type, float layer)
+        public NodeGene(int id, NEATNodeType type, float layer)
         {
-            this.innovation = innov;
+            this.id = id;
             InValue = 0;
             OutValue = type == NEATNodeType.bias ? 1 : 0;
 
@@ -42,7 +42,7 @@ namespace NeuroForge
         public object Clone()
         {
             NodeGene clone = new NodeGene();
-            clone.innovation = innovation;
+            clone.id = id;
             clone.InValue= InValue;
             clone.OutValue= OutValue;
             clone.activationType = activationType;
@@ -63,7 +63,7 @@ namespace NeuroForge
         {
             StringBuilder sb = new StringBuilder();
             sb.Append("[ ");
-            sb.Append(innovation);
+            sb.Append(id);
             sb.Append(", ");
             sb.Append(" in: ");
             foreach (var item in incomingConnections)

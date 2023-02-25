@@ -12,10 +12,12 @@ namespace NeuroForge
         private List<NEATAgent> individuals = new List<NEATAgent>();
         private NEATAgent representative;
         private float avgFitness = 0;
+        private int stagnation = 0;
+        // TO DO , the species that do not increase their score in 15 generations, are not allowed to reproduce
 
         public int id;
         public int age = -1;
-       public Species(NEATAgent repr)
+        public Species(NEATAgent repr)
         {
             repr.SetSpecies(this);
             this.representative = repr;         
@@ -23,7 +25,16 @@ namespace NeuroForge
             id = UnityEngine.Random.Range(0, 100);
         }        
 
-        public void CalculateAvgFitness() => avgFitness = individuals.Select(x => x.GetFitness()).Average();
+        public void CalculateAvgFitness()
+        {
+            float new_average_fitness = individuals.Select(x => x.GetFitness()).Average();
+            if (new_average_fitness <= avgFitness)
+                stagnation++;
+            else
+                stagnation = 0;
+            avgFitness = new_average_fitness;
+
+        }
 
         public void ClearClients()
         {
@@ -60,13 +71,10 @@ namespace NeuroForge
         }      
         public void Kill(float percentage01)
         {
-            // never remove this thing here. otherwise there will be error in the last if
-            if (individuals.Count < 3) return;
-
             individuals.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
 
             float range = individuals.Count * percentage01;
-            for (int i = 0; i < range - 1; i++) 
+            for (int i = 0; i < range && individuals.Count > 1; i++) 
             {
                 individuals[0].SetSpecies(null);
                 individuals[0].model = null;
@@ -111,58 +119,54 @@ namespace NeuroForge
 
         private static Genome CrossOver(Genome parent1, Genome parent2, float p1_fitness, float p2_fitness)
         {
-            p1_fitness = Mathf.Exp(p1_fitness);
-            p2_fitness = Mathf.Exp(p2_fitness);
-            float sum = p1_fitness + p2_fitness;
-            p1_fitness /= sum;
-            p2_fitness /= sum;
+            // parent1 is set as the fittest parent
+            if (p1_fitness < p2_fitness)
+                Functions.Swap(ref parent1, ref parent2);
 
-            // Notes: matching genes are taken randomly weighted (by fitness) from the parent with highest fitness
-            // Notes: the new child (a.k.a. new topology) is mutated afterwards
+            // Notes: matching genes are taken randomly 50/50
+            //        disjoint or excess genes are taken from the fittest parent
+            //        the offspring is mutated afterwards
 
-            Genome child = new Genome(parent1.GetInputsNumber(), parent1.outputShape, parent1.actionSpace, false, false);
-            child.nodes.Clear();
-            child.connections.Clear();
+            Genome offspring = new Genome(parent1.GetInputsNumber(), parent1.outputShape, parent1.actionSpace, false, false);
+            offspring.nodes.Clear();
+            offspring.connections.Clear();
 
-            int max_innovation = Mathf.Max(parent1.GetHighestInnovation(), parent2.GetHighestInnovation());
 
             // Insert nodes
-            for (int i = 0; i <= max_innovation; i++)
+            int max_node_id = Math.Max(parent1.GetLastNodeId(), parent2.GetLastNodeId());
+            for (int i = 1; i <= max_node_id; i++)
             {
-                NodeGene parent1_gene = null;
-                NodeGene parent2_gene = null;
+                NodeGene parent1_node = null;
+                NodeGene parent2_node = null;
 
                 if(parent1.nodes.ContainsKey(i))
-                    parent1_gene= parent1.nodes[i];
+                    parent1_node= parent1.nodes[i];
                 if(parent2.nodes.ContainsKey(i))
-                    parent2_gene= parent2.nodes[i];
+                    parent2_node= parent2.nodes[i];
 
                 NodeGene clone;
-                if (parent1_gene != null && parent2_gene != null)
+                if (parent1_node != null && parent2_node != null)
                 {   
-                    if(FunctionsF.RandomValue() < p1_fitness)
-                        clone = parent1_gene.Clone() as NodeGene;
+                    if(FunctionsF.RandomValue() < 0.5f)
+                        clone = parent1_node.Clone() as NodeGene;
                     else
-                        clone = parent2_gene.Clone() as NodeGene;
+                        clone = parent2_node.Clone() as NodeGene;
+
                     clone.incomingConnections.Clear();
-                    child.nodes.Add(clone.innovation, clone);
+                    offspring.nodes.Add(clone.id, clone);
                 }
-                else if(parent1_gene != null)
+                else if(parent1_node != null)
                 {
-                    clone = parent1_gene.Clone() as NodeGene;
+                    clone = parent1_node.Clone() as NodeGene;
                     clone.incomingConnections.Clear();
-                    child.nodes.Add(clone.innovation, clone);
+                    offspring.nodes.Add(clone.id, clone);
                 }
-                else if(parent2_gene != null)
-                {
-                    clone = parent2_gene.Clone() as NodeGene;
-                    clone.incomingConnections.Clear();
-                    child.nodes.Add(clone.innovation, clone);
-                }
+              
             }
 
             // Insert connections
-            for (int i = 1; i <= max_innovation; i++)
+            int max_conn_innovation = Mathf.Max(parent1.GetLastInnovation(), parent2.GetLastInnovation());         
+            for (int i = 1; i <= max_conn_innovation; i++)
             {
                 ConnectionGene parent1_gene = null;
                 ConnectionGene parent2_gene = null;
@@ -174,26 +178,37 @@ namespace NeuroForge
 
                 if (parent1_gene != null && parent2_gene != null)
                 {
-                    if (FunctionsF.RandomValue() < p1_fitness)
-                        child.connections.Add(parent1_gene.innovation, parent1_gene.Clone() as ConnectionGene);
+                    ConnectionGene clone = FunctionsF.RandomValue() < 0.5f ?
+                            parent1_gene.Clone() as ConnectionGene :
+                            parent2_gene.Clone() as ConnectionGene;
+
+                    // if the gene is disabled in both parents, 75% chances of inherited gene to be disabled. Otherwise if enabled by default
+                    if (!parent1_gene.enabled && !parent2_gene.enabled)
+                        clone.enabled = FunctionsF.RandomValue() < 0.75f ? false : true;
                     else
-                        child.connections.Add(parent2_gene.innovation, parent2_gene.Clone() as ConnectionGene);
+                        clone.enabled = true;
+
+                    offspring.connections.Add(clone.innovation, clone);
                 }
                 else if (parent1_gene != null)
-                    child.connections.Add(parent1_gene.innovation, parent1_gene.Clone() as ConnectionGene);
-                else if (parent2_gene != null)
-                    child.connections.Add(parent2_gene.innovation, parent2_gene.Clone() as ConnectionGene);
+                {
+                    var clone = parent1_gene.Clone() as ConnectionGene;
+                    clone.enabled = true;
+                    offspring.connections.Add(clone.innovation, clone);
+                }
             }
 
             // Calculate incoming connections foreach node
-            foreach (var connection in child.connections)
+            foreach (var connection in offspring.connections)
             {
-                child.nodes[connection.Value.outNeuron].incomingConnections.Add(connection.Value.innovation);
+                offspring.nodes[connection.Value.outNeuron].incomingConnections.Add(connection.Value.innovation);
             }
 
-            child.Mutate();
+            // Offspring receives similar layers with fittest parent
+            offspring.layers = parent1.layers.ToList();
 
-            return child;
+            offspring.Mutate();
+            return offspring;
         }
         
 
@@ -208,6 +223,7 @@ namespace NeuroForge
             return best_ag;
         }
         public float GetFitness() => avgFitness;
+        public bool IsAllowedToReproduce(int stagnationAllowance) => stagnationAllowance > stagnation;
         public List<NEATAgent> GetIndividuals() => individuals;
     }
 }
