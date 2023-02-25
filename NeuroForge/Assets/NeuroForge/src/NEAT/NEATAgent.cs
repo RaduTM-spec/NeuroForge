@@ -14,7 +14,7 @@ namespace NeuroForge
         #region Fields
         public BehaviourType behavior = BehaviourType.Inference;
         [SerializeField] public Genome model;
-        [SerializeField] private bool fullyConnected = true;
+        [SerializeField] private bool fullyConnected = false;
 
         [Space]
         [Min(1), SerializeField] private int observationSize = 2;
@@ -157,6 +157,10 @@ namespace NeuroForge
         public void ForceAddReward<T>(T reward) where T : struct
         {
             this.fitness += Convert.ToSingle(reward);
+        }
+        public void SetReward<T>(T reward)
+        {
+            this.fitness = Convert.ToSingle(reward);
         }
         public void EndEpisode()
         {

@@ -229,8 +229,8 @@ namespace NeuroForge //COMPLETELY DEPRECATED
             // Deactivated all hidden and output
             foreach (var node in nodes.Values)
             {
-                if (node.type == NEATNodeType.hidden || node.type == NEATNodeType.output)
-                    node.Deactivate();
+                //if (node.type == NEATNodeType.hidden || node.type == NEATNodeType.output)
+                    //node.Deactivate();
             }
 
             // Keep maxLoops as it is. 
@@ -244,8 +244,8 @@ namespace NeuroForge //COMPLETELY DEPRECATED
                 // Something wrong in here
                 foreach (var node in nodes)
                 {
-                    if (node.Value.IsActivated())
-                        goto NEXT_NODE;
+                    //if (node.Value.IsActivated())
+                       // goto NEXT_NODE;
 
                     if(node.Value.incomingConnections.Count == 0)
                     {
@@ -263,9 +263,9 @@ namespace NeuroForge //COMPLETELY DEPRECATED
 
                     
                     // Check if all incoming nodes are done
-                    foreach (var prev_node in incoming_nw_pairs.Values)
-                        if (!prev_node.IsActivated())
-                            goto NEXT_NODE;
+                    //foreach (var prev_node in incoming_nw_pairs.Values)
+                        //if (!prev_node.IsActivated())
+                            //goto NEXT_NODE;
                     
                     // -----------------NODE IS PREPARED TO BE ACTIVATED-----------------------//
                     // propagate value from input nodes
@@ -310,8 +310,8 @@ namespace NeuroForge //COMPLETELY DEPRECATED
                 }
 
                 // If all nodes where activated, stop the while loop
-                if (nodes.Select(x => x.Value).Where(x => !x.IsActivated()).Any() == false)
-                      break;
+                //if (nodes.Select(x => x.Value).Where(x => !x.IsActivated()).Any() == false)
+                      //break;
             }
             if (maxLoops == 0)
                 RemoveRandomConnection(); // if a deadlock happens, try randomly to remove the deadlock
@@ -334,13 +334,13 @@ namespace NeuroForge //COMPLETELY DEPRECATED
             if(mutations == null)
             {
                 mutations = new Dictionary<Mutation, float>();
-                mutations.Add(AddConnection, NEATTrainer.GetHP().addConnection);
-                mutations.Add(MutateNode, NEATTrainer.GetHP().mutateNode);
+                mutations.Add(AddConnection, NEATTrainer.GetHyperParam().addConnection);
+                mutations.Add(MutateNode, NEATTrainer.GetHyperParam().mutateNode);
                 //mutations.Add(RemoveRandomConnection, NEATTrainer.GetHP().removeConnection);
                // mutations.Add(MergeConnections, NEATTrainer.GetHP().mergeConnections);
-                mutations.Add(AddNode, NEATTrainer.GetHP().addNode);
-                mutations.Add(MutateConnections, NEATTrainer.GetHP().mutateConnections);
-                mutations.Add(NoMutation, NEATTrainer.GetHP().noMutation);
+                mutations.Add(AddNode, NEATTrainer.GetHyperParam().addNode);
+                mutations.Add(MutateConnections, NEATTrainer.GetHyperParam().mutateConnections);
+                // mutations.Add(NoMutation, NEATTrainer.GetHyperParam().noMutation);
 
                 // mutations mustn't necesarrily be sorted in ascending order based on the probabilities
             }
@@ -370,7 +370,7 @@ namespace NeuroForge //COMPLETELY DEPRECATED
                 to 0.1 (normrand(0, 0.1)). Otherwise, the weight it set close to 1, i.e., normrand(1, 0.1).
                 A new innovation number is assigned to the connection*/
 
-            if (connections.Count >= NEATTrainer.GetHP().maxConnections) return;
+            if (connections.Count >= NEATTrainer.GetHyperParam().maxConnections) return;
 
             List<NodeGene> input_bias_hidden = new List<NodeGene>();
             List<NodeGene> hidden_output = new List<NodeGene>();
@@ -539,7 +539,7 @@ namespace NeuroForge //COMPLETELY DEPRECATED
             */
             // Max hidden allowed = inputs + outputs
             if (connections.Count == 0) return;
-            if (nodes.Count >= NEATTrainer.GetHP().maxNodes) return;
+            if (nodes.Count >= NEATTrainer.GetHyperParam().maxNodes) return;
 
             ConnectionGene oldConnection = connections[Functions.RandomIn(connections.Keys)];
             connections.Remove(oldConnection.innovation);

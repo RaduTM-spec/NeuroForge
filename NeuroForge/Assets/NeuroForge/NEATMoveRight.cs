@@ -2,6 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using NeuroForge;
+using UnityEditor.ProjectWindowCallback;
+
 public class NEATMoveRight : NEATAgent
 {
     [Header("Attributes")]
@@ -54,12 +56,12 @@ public class NEATMoveRight : NEATAgent
     {
         if (collision.collider.name == "Target")
         {
-            AddReward(100f);
+            SetReward(transform.position.z);
             EndEpisode();
         }
         else if (collision.collider.CompareTag("Wall"))
         {
-            AddReward(-1f);
+            SetReward(transform.position.z);
             EndEpisode();
         }
 
@@ -68,6 +70,7 @@ public class NEATMoveRight : NEATAgent
     {
         if(other.CompareTag("RAY"))
         {
+            SetReward(transform.position.z);
             EndEpisode();
         }
     }

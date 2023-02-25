@@ -24,17 +24,15 @@ namespace NeuroForge
         [Min(0)] public float c1 = 1f;
         [Min(0)] public float c2 = 1f;
         [Min(0)] public float c3 = 0.4f;
+        [Range(0, 1)] public float cloneBreeding = 0.25f;
 
-        [Header("Mutation")]
-        [Min(0.01f)] public float weightDeviationStrength = 0.05f;
-
+        [Header("Mutation probabilities")]
         [Range(0, 1)] public float addConnection = 0.05f;
         [Range(0, 1)] public float addNode = 0.01f;
         [Range(0,1)] public float mutateConnections = 0.80f;
         [Range(0, 1)] public float mutateNode = 0.04f;
-        [Range(0,1)] public float noMutation = 0.10f;
 
-        [Header("Genome")]
+        [Header("Genome structure")]
         [Min(30)] public int maxConnections = 100;
         [Min(5)] public int maxNodes = 20;
     }
@@ -47,32 +45,6 @@ namespace NeuroForge
             serializedObject.Update();
 
             DrawPropertiesExcluding(serializedObject, new string[] { "m_Script" });
-
-            // Applied SoftMax on probabilities
-            SerializedProperty addCon = serializedObject.FindProperty("addConnection");
-            SerializedProperty mutCon = serializedObject.FindProperty("mutateConnections");
-            SerializedProperty addNod = serializedObject.FindProperty("addNode");
-            SerializedProperty mutNod = serializedObject.FindProperty("mutateNode");
-            SerializedProperty nonMut = serializedObject.FindProperty("noMutation");
-
-            float exp_sum = 1e-8f;
-            exp_sum += addCon.floatValue;
-            exp_sum += mutCon.floatValue;
-            exp_sum += addNod.floatValue;
-            exp_sum += mutNod.floatValue;
-            exp_sum += nonMut.floatValue;
-
-            addCon.floatValue /= exp_sum;
-            mutCon.floatValue /= exp_sum;
-            addNod.floatValue /= exp_sum;
-            mutNod.floatValue /= exp_sum;
-            nonMut.floatValue /= exp_sum;
-
-            addCon.floatValue = (float)Math.Round((double)addCon.floatValue, 2);
-            mutCon.floatValue = (float)Math.Round((double)mutCon.floatValue, 2);
-            addNod.floatValue = (float)Math.Round((double)addNod.floatValue, 2);
-            mutNod.floatValue = (float)Math.Round((double)mutNod.floatValue, 2);
-            nonMut.floatValue = (float)Math.Round((double)nonMut.floatValue, 2);
 
             serializedObject.ApplyModifiedProperties();
         }

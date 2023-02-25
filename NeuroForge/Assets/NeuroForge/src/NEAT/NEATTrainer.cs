@@ -29,6 +29,7 @@ namespace NeuroForge
         [SerializeField] private int generation = 0;
         [SerializeField] private bool sessionEnd = false;
 
+        private int speciesID_counter = 0;
 
         private void Awake()
         {
@@ -240,10 +241,11 @@ namespace NeuroForge
         private void Evolution()
         {
             Speciate();
-            SortSpeciesByFitness();         
+            SortSpecies();         
             Culling();
-            Reproduce();
             SpeciesExtinction();
+            Reproduce();
+           
 
             mainModel.SetFrom(GetBestModel());
             EditorUtility.SetDirty(mainModel);
@@ -278,7 +280,7 @@ namespace NeuroForge
                 // If didn't joined any species, create a new species
                 if(!joined_species)
                 {
-                    species.Add(new Species(agent));
+                    species.Add(new Species(++speciesID_counter, agent));
                 }
             }
 
@@ -288,13 +290,14 @@ namespace NeuroForge
                 item.age++;
             }
         }
-        void SortSpeciesByFitness()
+        void SortSpecies()
         {
             // Calculate score
             foreach (var spec in species)
             {
                 spec.CalculateAvgFitness();
             }
+
             species.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
         }
         void Culling()
@@ -304,225 +307,48 @@ namespace NeuroForge
                 spec.Kill(1f - Instance.hp.survivalRate);
             }
         }
+        void SpeciesExtinction()
+        {
+            // Species that doesn't reproduce enough are in danger
+ 
+            List<Species> toExtinctSpecies = new List<Species>();
+            foreach (var spec in species)
+            {
+                if (spec.GetIndividuals().Count < 2)
+                {
+                    toExtinctSpecies.Add(spec);
+                }
+            }
+            foreach (var extSpecies in toExtinctSpecies)
+            {
+                extSpecies.GoExtinct();
+                species.Remove(extSpecies);
+            }
+        }
         void Reproduce()
         {         
             foreach (var agent in population)
             {
                 if(agent.GetSpecies() == null)
                 {
-                    Species spec = GetRandomSpecies_AllowedToReproduce();// Species with good overall fitness have more chances to reproduce
+                    Species spec = GetRandomSpecies_AllowedToReproduce();
                     agent.model = spec.Breed(); // is mutated there already
                     spec.ForceAdd(agent);
                 }
             }
         }
-        void SpeciesExtinction()
-        {
-            // Species that doesn't reproduce this episode and have low individuals are gone
-            List<Species> toExtinctSpecies = new List<Species>();
-            foreach (var spec in species)
-            {
-                if(spec.GetIndividuals().Count < 2)
-                {
-                    toExtinctSpecies.Add(spec);
-                }
-            }
-            foreach (var extinctSpecies in toExtinctSpecies)
-            {
-                extinctSpecies.GoExtinct();
-                species.Remove(extinctSpecies);
-            }
+        
 
-            // The killed agents are reproduced
-            Reproduce();
-        }
-
-        // Distance
-        public static bool AreCompatible(Genome parent1, Genome parent2)
-        {
-            float N = Max_GenesNumber(parent1, parent2);
-            float E = Count_ExcessJoints(parent1, parent2);
-            float D = Count_Disjoints(parent1, parent2);
-            float W = Avg_WeightDifference(parent1, parent2);
-
-            float distance = (Instance.hp.c1 * E / N) +
-                             (Instance.hp.c2 * D / N) +
-                             (Instance.hp.c3 * W);
-
-            return distance < Instance.hp.delta;
-        }
-        static int Max_GenesNumber(Genome genome1, Genome genome2)
-        {
-            int gen1_count = genome1.connections.Count + genome1.nodes.Count;
-            int gen2_count = genome2.connections.Count + genome2.nodes.Count;
-
-            int max_gene = Mathf.Max(gen1_count, gen2_count);
-
-            // return Mathf.Clamp(max_gene - 20, 1, max_gene); // max_gene_number is normalized as the paper says
-            return max_gene;
-        }
-        static float Avg_WeightDifference(Genome genome1, Genome genome2)
-        {
-            float dif = 0f;
-            int matchesCount = 0;
-
-            foreach (var conn1 in genome1.connections)
-            {
-                foreach (var conn2 in genome2.connections)
-                {
-                    if (conn1.Key == conn2.Key)
-                    {
-                        dif += Mathf.Abs(conn1.Value.weight - conn2.Value.weight);
-                        matchesCount++;
-                    }
-                }
-            }
-
-            return dif;
-        }
-        static int Count_ExcessJoints(Genome genome1, Genome genome2)
-        {
-            int excessJoints = 0;
-            int highestMatch = 0;
-
-            // Find highest match, excess joints are higher than this number
-            foreach (var node1 in genome1.nodes)
-            {
-                foreach (var node2 in genome2.nodes)
-                {
-                    if (node1.Key == node2.Key)
-                        highestMatch = Mathf.Max(highestMatch, node1.Key);
-                }
-            }
-            foreach (var conn1 in genome1.connections)
-            {
-                foreach (var conn2 in genome2.connections)
-                {
-                    if (conn1.Key == conn2.Key)
-                        highestMatch = Mathf.Max(highestMatch, conn1.Key);
-                }
-            }
-
-            foreach (var node in genome1.nodes)
-            {
-                if (node.Key > highestMatch)
-                    excessJoints++;
-            }
-            foreach (var node in genome2.nodes)
-            {
-                if (node.Key > highestMatch)
-                    excessJoints++;
-            }
-            foreach (var conn in genome1.connections)
-            {
-                if (conn.Key > highestMatch)
-                    excessJoints++;
-            }
-            foreach (var conn in genome2.connections)
-            {
-                if (conn.Key > highestMatch)
-                    excessJoints++;
-            }
-
-            return excessJoints;
-        }
-        static int Count_Disjoints(Genome genome1, Genome genome2)
-        {
-            int disJoints = 0;
-            int highestMatch = 0;
-
-            // Calculate highest match, joints are less than this
-            foreach (var node1 in genome1.nodes)
-            {
-                foreach (var node2 in genome2.nodes)
-                {
-                    if (node1.Key == node2.Key)
-                        highestMatch = Mathf.Max(highestMatch, node1.Key);
-                }
-            }
-            foreach (var conn1 in genome1.connections)
-            {
-                foreach (var conn2 in genome2.connections)
-                {
-                    if (conn1.Key == conn2.Key)
-                        highestMatch = Mathf.Max(highestMatch, conn1.Key);
-                }
-            }
-
-            // now check for disjoints (need to be less than the highest match)
-            foreach (var node1 in genome1.nodes)
-            {
-                bool isMatch = false;
-                foreach (var node2 in genome2.nodes)
-                {
-                    if (node1.Key == node2.Key)
-                    {
-                        isMatch = true;
-                        break;
-                    }
-                }
-
-                if (!isMatch && node1.Key < highestMatch)
-                    disJoints++;
-            }
-            foreach (var node2 in genome2.nodes)
-            {
-                bool isMatch = false;
-                foreach (var node1 in genome1.nodes)
-                {
-                    if (node2.Key == node1.Key)
-                    {
-                        isMatch = true;
-                        break;
-                    }
-                }
-
-                if (!isMatch && node2.Key < highestMatch)
-                    disJoints++;
-            }
-            foreach (var conn1 in genome1.connections)
-            {
-                bool isMatch = false;
-                foreach (var conn2 in genome2.connections)
-                {
-                    if (conn1.Key == conn2.Key)
-                    {
-                        isMatch = true;
-                        break;
-                    }
-                }
-                if (!isMatch && conn1.Key < highestMatch)
-                    disJoints++;
-            }
-            foreach (var conn2 in genome2.connections)
-            {
-                bool isMatch = false;
-                foreach (var conn1 in genome1.connections)
-                {
-                    if (conn2.Key == conn1.Key)
-                    {
-                        isMatch = true;
-                        break;
-                    }
-                }
-                if (!isMatch && conn2.Key < highestMatch)
-                    disJoints++;
-            }
-
-            return disJoints;
-        }
-
+        // Other
         private string GetEpisodeStatistic()
         {
             StringBuilder text = new StringBuilder();
-            text.Append("<color=#2873eb><b>Generation: ");
+            text.Append("<color=#2873eb><b>Generation ");
             text.Append(++generation);
-            text.Append(" (");
-            text.Append(species.Count);
-            text.Append(" species)");
             text.Append("</b></color>\n");
-
-            text.Append("<color=#099c94>\t    Species | Age | Size | Fitness</color>\n");
+            text.Append("<color=#099c94>_________________________________________________\n</color>");
+            text.Append("<color=#099c94>| SpeciesID | Size | Fitness | Age | Stagnation |\n</color>"); 
+            text.Append("<color=#099c94>-------------------------------------------------\n</color>");
             species.Reverse();
             foreach (var spec in species)
             {
@@ -530,22 +356,27 @@ namespace NeuroForge
 
                 text.Append("<color=");
                 text.Append(Functions.HexOf(color));
-                text.Append(">\t        ");
+                text.Append(">|");
 
-                string id = ("#" + spec.id).PadLeft(7, ' ');
-                string age = spec.age.ToString().PadLeft(3, ' ');
-                string size = spec.GetIndividuals().Count.ToString().PadLeft(4, ' ');
-                string fitness = spec.GetFitness().ToString("G5").PadLeft(6,' ');
+                string id = ("#" + spec.id).PadLeft(10, ' ');             
+                string size = spec.GetIndividuals().Count.ToString().PadLeft(5, ' ');
+                string fitness = spec.GetFitness().ToString("0.00").PadLeft(8,' ');
+                string age = spec.age.ToString().PadLeft(4, ' ');
+                string stallness = spec.stagnation.ToString().PadLeft(11, ' ');
 
                 text.Append(id);
-                text.Append("      ");
-                text.Append(age);
-                text.Append("    ");
+                text.Append(" |");
                 text.Append(size);
-                text.Append("    ");
+                text.Append(" |");
                 text.Append(fitness);
-                text.Append("</color>\n");
+                text.Append(" |");
+                text.Append(age);
+                text.Append(" |");
+                text.Append(stallness);
+                
+                text.Append(" |</color>\n");
             }
+            text.Append("<color=#099c94>-------------------------------------------------\n</color>");
             return text.ToString();
         }
         private Species GetRandomSpecies_AllowedToReproduce()
@@ -571,7 +402,7 @@ namespace NeuroForge
 
         public static void Dispose() { Destroy(Instance.gameObject); Instance = null; }
         public static void InitializeHyperParameters() => Instance.hp = new NEATHyperParameters();
-        public static NEATHyperParameters GetHP() => Instance.hp;
+        public static NEATHyperParameters GetHyperParam() => Instance.hp;
     }
 }
 

@@ -9,7 +9,7 @@ namespace NeuroForge
         public static InnovationHistory Instance;
 
         Dictionary<(int, int), int> history; // <(in_id,out_id), innovation>
-        int lastInnovation = 0;
+        int globalLastInnovation = 0;
 
         public InnovationHistory(Genome startingGenome)
         {
@@ -26,7 +26,7 @@ namespace NeuroForge
                     conn.Value.innovation
                     );
             }
-            lastInnovation = startingGenome.GetLastInnovation();         
+            globalLastInnovation = startingGenome.GetLastInnovation();         
         }
 
         public int GetInnovationNumber(int from, int to)
@@ -41,9 +41,9 @@ namespace NeuroForge
             else
             {
                 // the connection is novel
-                lastInnovation++;
-                history.Add((from, to), lastInnovation);
-                return lastInnovation;
+                globalLastInnovation++;
+                history.Add((from, to), globalLastInnovation);
+                return globalLastInnovation;
             }
 
         }

@@ -3272,7 +3272,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   behavior: 1
   model: {fileID: 11400000, guid: 91ee59339cbd9cf4a94dc1fddca073fd, type: 2}
-  fullyConnected: 1
+  fullyConnected: 0
   observationSize: 5
   actionSpace: 1
   ContinuousSize: 0
@@ -3295,18 +3295,17 @@ MonoBehaviour:
   generations: 1000
   timeHorizon: 60
   populationSize: 100
-  stagnationAllowance: 14
+  stagnationAllowance: 15
   survivalRate: 0.5
   delta: 3
   c1: 1
   c2: 1
   c3: 0.4
-  weightDeviationStrength: 0.01
+  cloneBreeding: 0.249
   addConnection: 0.05
   addNode: 0.01
   mutateConnections: 0.8
-  mutateNode: 0.05
-  noMutation: 0.09
+  mutateNode: 0.04
   maxConnections: 100
   maxNodes: 20
 --- !u!1 &2055724338

@@ -12,6 +12,7 @@ namespace NeuroForge
     public class NodeGene : ICloneable
     {
         [SerializeField] public int id;
+        [SerializeField] public float layer;
         [SerializeField] public float InValue;
         [SerializeField] public float OutValue;
 
@@ -19,8 +20,7 @@ namespace NeuroForge
         [SerializeField] public NEATNodeType type;
         [SerializeField] public List<int> incomingConnections;
 
-        [SerializeField] private bool activated;
-        [SerializeField] public float layer;
+        
 
         public NodeGene(int id, NEATNodeType type, float layer)
         {
@@ -36,7 +36,6 @@ namespace NeuroForge
 
             incomingConnections = new List<int>();
             this.layer = layer;
-            activated = true;
         }
         private NodeGene() { }
         public object Clone()
@@ -48,17 +47,10 @@ namespace NeuroForge
             clone.activationType = activationType;
             clone.type = type;
             clone.incomingConnections = this.incomingConnections.ToList();
-            clone.activated = activated;
             clone.layer = this.layer;
             return clone;
         }
-        public void Activate()
-        {
-            OutValue = FunctionsF.Activation.Activate(InValue, activationType);
-            activated = true;
-        }
-        public void Deactivate() => activated = false;
-        public bool IsActivated() => activated;
+        public void Activate() => OutValue = FunctionsF.Activation.Activate(InValue, activationType);
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();

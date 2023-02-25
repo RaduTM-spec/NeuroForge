@@ -268,34 +268,32 @@ namespace NeuroForge
         }
 
         // Mutations
-        public delegate void Mutation();
         public void Mutate()
         {
-            List<Mutation> mutations = new List<Mutation> 
-            {            
-                AddConnection, 
-                AddNode,
-                MutateConnections,
-                MutateNode,
-                NoMutation
-            };
-            List<float> probabilities = new List<float>
-            {         
-               
-                NEATTrainer.GetHP().addConnection,
-                NEATTrainer.GetHP().addNode,
-                NEATTrainer.GetHP().mutateConnections,
-                NEATTrainer.GetHP().mutateNode,
-                NEATTrainer.GetHP().noMutation
-            };
+            if (connections.Count == 0)
+                AddConnection();
 
-            Functions.RandomIn(mutations, probabilities)();
+            float prob_mutate_cons = NEATTrainer.GetHyperParam().mutateConnections;
+            float prob_mutate_node = NEATTrainer.GetHyperParam().mutateNode;
+            float prob_add_conn = NEATTrainer.GetHyperParam().addConnection;
+            float prob_add_node = NEATTrainer.GetHyperParam().addNode;
+
+            if (FunctionsF.RandomValue() < prob_mutate_cons)
+                MutateConnections();
+
+            if (FunctionsF.RandomValue() < prob_mutate_node)
+                MutateNode();
+
+            if (FunctionsF.RandomValue() < prob_add_conn)
+                AddConnection();
+
+            if(FunctionsF.RandomValue() < prob_add_node)
+                AddNode();
+
         }
-
-
-        public void AddConnection()
+        void AddConnection()
         {
-            if (connections.Count >= NEATTrainer.GetHP().maxConnections) return;
+            if (connections.Count >= NEATTrainer.GetHyperParam().maxConnections) return;
 
             List<NodeGene> listed_nodes = nodes.Values.ToList();
             NodeGene node1 = Functions.RandomIn(listed_nodes);
@@ -320,19 +318,17 @@ namespace NeuroForge
             connections.Add(newConn.innovation, newConn);
 
         }
-        public void AddNode()
+        void AddNode()
         {
-            if (nodes.Count >= NEATTrainer.GetHP().maxNodes) return;
+            if (nodes.Count >= NEATTrainer.GetHyperParam().maxNodes) return;
+            if (connections.Count == 0) return; //is not the case, but for testing and other stuff
 
-            if (connections.Count == 0)
-                AddConnection();
-
-            ConnectionGene conn = Functions.RandomIn(connections.Values.ToList());
-            connections.Remove(conn.innovation);
+            ConnectionGene old_conn = Functions.RandomIn(connections.Values.ToList());
+            old_conn.enabled = false;
 
             // Calculate new node layer
-            float prev_node_layer = nodes[conn.inNeuron].layer;
-            float next_node_layer = nodes[conn.outNeuron].layer;
+            float prev_node_layer = nodes[old_conn.inNeuron].layer;
+            float next_node_layer = nodes[old_conn.outNeuron].layer;
             float this_node_layer = (prev_node_layer + next_node_layer) / 2f;
 
             if (!Functions.IsValueIn(this_node_layer, layers))
@@ -347,42 +343,41 @@ namespace NeuroForge
             //new_node.activationType = ActivationTypeF.HyperbolicTangent;
 
             // Create connections
-            NodeGene left_most_neuron = nodes[conn.inNeuron];
-            NodeGene right_most_neuron = nodes[conn.outNeuron];
+            NodeGene left_most_neuron = nodes[old_conn.inNeuron];
+            NodeGene right_most_neuron = nodes[old_conn.outNeuron];
 
             ConnectionGene conn1 = new ConnectionGene(left_most_neuron, new_node, GetConnectionInnovation(left_most_neuron, new_node));
             connections.Add(conn1.innovation, conn1);
 
             ConnectionGene conn2 = new ConnectionGene(new_node, right_most_neuron, GetConnectionInnovation(new_node, right_most_neuron));
             connections.Add(conn2.innovation, conn2);
-            nodes[conn.outNeuron].incomingConnections.Remove(conn.innovation);
 
             conn1.weight = 1f;
-            conn2.weight = conn.weight;
+            conn2.weight = old_conn.weight;
 
             
            
             
         }
-        public void MutateConnections()
+        void MutateConnections()
         {
-            // 5% to enable/disable the connection
-            // 10% chance to completely change weight value
-            // 85% chance to lerp the weight value
+            // 1% to enable/disable the connection
+            // 9% chance to completely change weight value
+            // 90% chance to shift the weight value
 
             foreach (var connection in connections.Values)
             {
                 float random = FunctionsF.RandomValue();
 
-                if (random < 0.05f)
+                if (random < 0.01f)
                     connection.enabled = connection.enabled == true ? false : true;
                 else if (random < 0.1f)
                     connection.weight = FunctionsF.RandomGaussian();
                 else
-                    connection.weight = FunctionsF.RandomGaussian(connection.weight, NEATTrainer.GetHP().weightDeviationStrength);
+                    connection.weight = FunctionsF.RandomGaussian(connection.weight, 0.01f);
             }
         }
-        public void MutateNode()
+        void MutateNode()
         {
             // Get Random Hidden Node
             IEnumerable<NodeGene> hiddens = nodes.Select(x => x.Value).Where(x => x.type == NEATNodeType.hidden);
@@ -391,7 +386,6 @@ namespace NeuroForge
             NodeGene toMutate = Functions.RandomIn(hiddens);
             toMutate.activationType = (ActivationTypeF)(Enum.GetValues(typeof(ActivationTypeF)).Length * FunctionsF.RandomValue());
         }
-        public void NoMutation() { }
 
         public bool CanConnectTheseNodes(NodeGene node1, NodeGene node2)
         {

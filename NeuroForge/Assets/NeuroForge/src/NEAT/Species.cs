@@ -8,55 +8,29 @@ using UnityEngine;
 namespace NeuroForge
 {
     public class Species
-    {
+    {       
+        public int id;
+        private float avgFitness = float.MinValue;
+        private float bestFitness = float.MinValue;
+        public int stagnation = 0;
+        public int age = -1;
+
         private List<NEATAgent> individuals = new List<NEATAgent>();
         private NEATAgent representative;
-        private float avgFitness = 0;
-        private int stagnation = 0;
-        // TO DO , the species that do not increase their score in 15 generations, are not allowed to reproduce
 
-        public int id;
-        public int age = -1;
-        public Species(NEATAgent repr)
+        public Species(int id, NEATAgent repr)
         {
             repr.SetSpecies(this);
             this.representative = repr;         
             this.individuals.Add(repr);
-            id = UnityEngine.Random.Range(0, 100);
+            this.id = id;
         }        
 
-        public void CalculateAvgFitness()
-        {
-            float new_average_fitness = individuals.Select(x => x.GetFitness()).Average();
-            if (new_average_fitness <= avgFitness)
-                stagnation++;
-            else
-                stagnation = 0;
-            avgFitness = new_average_fitness;
-
-        }
-
-        public void ClearClients()
-        {
-            // Clear everything but representative
-
-            representative = Functions.RandomIn(individuals);
-
-            foreach (var cl in individuals)
-            {
-                cl.SetSpecies(null);
-            }
-            individuals.Clear();
-
-            representative.SetSpecies(this);
-            individuals.Add(representative);
-
-            avgFitness = 0;
-
-        }
+        
+        // Joining
         public bool TryAdd(NEATAgent agent)
         {
-            if(NEATTrainer.AreCompatible(agent.model, representative.model))
+            if(SameSpecies(agent.model, representative.model))
             {
                 individuals.Add(agent);
                 agent.SetSpecies(this);
@@ -69,6 +43,8 @@ namespace NeuroForge
             individuals.Add(agent);
             agent.SetSpecies(this);
         }      
+
+        // Killing
         public void Kill(float percentage01)
         {
             individuals.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
@@ -100,26 +76,36 @@ namespace NeuroForge
             individuals.Clear();
             representative = null;
         }
+
+        // Breeding
         public Genome Breed()
         {
-            // Select two random parents based on their fitness
-            // Theoretically the agents are sorted at this point
-
-            NEATAgent parent1 = null;
-            NEATAgent parent2 = null;
-
+            Genome offspring = null;
             List<float> probs = individuals.Select(x => x.GetFitness()).ToList();
 
-            parent1 = Functions.RandomIn(individuals, probs);
-            parent2 = Functions.RandomIn(individuals, probs);
+            // 25% asexual breeding
+            if (FunctionsF.RandomValue() < NEATTrainer.GetHyperParam().cloneBreeding)
+            {
+                
+                NEATAgent parent = Functions.RandomIn(individuals, probs);  
+                
+                offspring = parent.model.Clone() as Genome;
+            }
+            // 75% crossover breeding
+            else
+            {
+                NEATAgent parent1 = Functions.RandomIn(individuals, probs);
+                NEATAgent parent2 = Functions.RandomIn(individuals, probs);
 
-            return CrossOver(parent1.model, parent2.model, parent1.GetFitness(), parent2.GetFitness());
-        }
+                offspring = CrossOver(parent1.model, parent2.model, parent1.GetFitness(), parent2.GetFitness());
+            }
 
-
+            offspring.Mutate();
+            return offspring;
+        }    
         private static Genome CrossOver(Genome parent1, Genome parent2, float p1_fitness, float p2_fitness)
         {
-            // parent1 is set as the fittest parent
+            // Parent1 is set as the fittest parent
             if (p1_fitness < p2_fitness)
                 Functions.Swap(ref parent1, ref parent2);
 
@@ -206,12 +192,161 @@ namespace NeuroForge
 
             // Offspring receives similar layers with fittest parent
             offspring.layers = parent1.layers.ToList();
-
-            offspring.Mutate();
+          
             return offspring;
         }
-        
 
+        // Similarity
+        static bool SameSpecies(Genome genome1, Genome genome2)
+        {
+            float delta = NEATTrainer.GetHyperParam().delta;
+            float c1 = NEATTrainer.GetHyperParam().c1;
+            float c2 = NEATTrainer.GetHyperParam().c2;
+            float c3 = NEATTrainer.GetHyperParam().c3;
+
+            float N = Calculate_N(genome1, genome2);
+            float E = Calculate_E(genome1, genome2);
+            float D = Calculate_D(genome1, genome2);
+            float W = Calculate_W(genome1, genome2);
+
+            float distance = (c1 * E / N) + (c2 * D / N) + (c3 * W);
+            return distance < delta;
+        }
+        static int Calculate_N(Genome genome1, Genome genome2)
+        {
+            // N is the length of the largest genome
+            int N = Math.Max(genome1.connections.Count, genome2.connections.Count);
+
+            // Normalize N (as in original paper)
+            N = Math.Max(1, N - 20);
+
+            return N;
+        }     
+        static int Calculate_E(Genome genome1, Genome genome2)
+        {
+            int excessJoints = 0;
+            int highestMatch = 0;
+
+            // Find highest match, excess joints are higher than this number
+            foreach (var conn1 in genome1.connections.Keys)
+            {
+                foreach (var conn2 in genome2.connections.Keys)
+                {
+                    if (conn1 == conn2)
+                        highestMatch = Math.Max(highestMatch, conn1);
+                }
+            }
+
+            foreach (var conn in genome1.connections.Keys)
+            {
+                if (conn > highestMatch)
+                    excessJoints++;
+            }
+            foreach (var conn in genome2.connections.Keys)
+            {
+                if (conn > highestMatch)
+                    excessJoints++;
+            }
+
+            return excessJoints;
+        }
+        static int Calculate_D(Genome genome1, Genome genome2)
+        {
+            int disJoints = 0;
+            int highestMatch = 0;
+
+            // Calculate highest match, joints are less than this
+            foreach (var conn1 in genome1.connections)
+            {
+                foreach (var conn2 in genome2.connections)
+                {
+                    if (conn1.Key == conn2.Key)
+                        highestMatch = Mathf.Max(highestMatch, conn1.Key);
+                }
+            }
+
+            // now check for disjoints (need to be less than the highest match)
+            foreach (var conn1 in genome1.connections.Keys)
+            {
+                bool isMatch = false;
+                foreach (var conn2 in genome2.connections.Keys)
+                {
+                    if (conn1 == conn2)
+                    {
+                        isMatch = true;
+                        break;
+                    }
+                }
+                if (!isMatch && conn1 < highestMatch)
+                    disJoints++;
+            }
+            foreach (var conn2 in genome2.connections.Keys)
+            {
+                bool isMatch = false;
+                foreach (var conn1 in genome1.connections.Keys)
+                {
+                    if (conn2 == conn1)
+                    {
+                        isMatch = true;
+                        break;
+                    }
+                }
+                if (!isMatch && conn2 < highestMatch)
+                    disJoints++;
+            }
+
+            return disJoints;
+        }
+        static float Calculate_W(Genome genome1, Genome genome2)
+        {
+            float dif = 1e-8f;
+            float matchesCount = 1e-10f;
+
+            foreach (var conn1 in genome1.connections)
+            {
+                foreach (var conn2 in genome2.connections)
+                {
+                    if (conn1.Key == conn2.Key)
+                    {
+                        dif += Mathf.Abs(conn1.Value.weight - conn2.Value.weight);
+                        matchesCount++;
+                        break;
+                    }
+                }
+            }
+            
+            return dif / matchesCount;
+        }
+
+
+        // Other
+        public void ClearClients()
+        {
+            // Clear everything but representative
+            foreach (var cl in individuals)
+            {
+                cl.SetSpecies(null);
+            }
+            individuals.Clear();
+
+            representative.SetSpecies(this);
+            individuals.Add(representative);
+        }
+        public void CalculateAvgFitness()
+        {
+            float new_average_fitness = individuals.Select(x => x.GetFitness()).Average();
+            bestFitness = Math.Max(bestFitness, new_average_fitness);
+
+            if (new_average_fitness < bestFitness)
+                stagnation++;
+            else
+                stagnation = 0;
+
+            avgFitness = new_average_fitness;
+
+        }
+        public float GetFitness() => avgFitness;
+        public bool IsAllowedToReproduce(int stagnationAllowance) => stagnationAllowance > stagnation;
         public NEATAgent GetBestAgent()
         {
             NEATAgent best_ag = null;
@@ -222,8 +357,6 @@ namespace NeuroForge
             }
             return best_ag;
         }
-        public float GetFitness() => avgFitness;
-        public bool IsAllowedToReproduce(int stagnationAllowance) => stagnationAllowance > stagnation;
         public List<NEATAgent> GetIndividuals() => individuals;
     }
 }
