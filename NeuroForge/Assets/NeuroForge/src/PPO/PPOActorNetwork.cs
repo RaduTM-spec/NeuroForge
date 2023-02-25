@@ -33,10 +33,10 @@ namespace NeuroForge
 
         int backwardsCount = 0;
 
-        #region Gradient Descent
+        // Gradient Descent
         public void BackPropagation(double[] inputs, double[] losses)
         {
-            // losses = Derivative of the loss function values
+            // losses = Derivative of the loss function values here
             if (weightGradients == null || weightGradients.Length < 1)
                 InitGradients();
 
@@ -84,7 +84,55 @@ namespace NeuroForge
 
             backwardsCount++;
         }
-        public void OptimizeParameters(float learningRate, float momentum, float regularization)
+        public void GradientsClipNorm(float threshold)
+        {
+            double global_sum = 0;
+
+            // Sum weights' gradients
+            foreach (var grad_layer in weightGradients)
+            {
+                foreach (var clump in grad_layer.weights)
+                {
+                    foreach (var w_grad in clump)
+                    {
+                        global_sum += w_grad * w_grad;
+                    }
+                }
+            }
+
+            // Sum biases' gradients
+            foreach (var bias_layer in biasGradients)
+            {
+                foreach (var b_grad in bias_layer.biases)
+                {
+                    global_sum += b_grad * b_grad;
+                }
+            }
+
+            double scalar = threshold / Math.Max(threshold, global_sum);
+
+            // Normalize weights
+            for (int lay = 0; lay < weightGradients.Length; lay++)
+            {
+                for (int i = 0; i < weightGradients[lay].weights.Length; i++)
+                {
+                    for (int j = 0; j < weightGradients[lay].weights[i].Length; j++)
+                    {
+                        weightGradients[lay].weights[i][j] *= scalar;
+                    }
+                }
+            }
+
+            // Normalize biases
+            for (int lay = 0; lay < biasGradients.Length; lay++)
+            {
+                for (int i = 0; i < biasGradients[lay].biases.Length; i++)
+                {
+                    biasGradients[lay].biases[i] *= scalar;
+                }
+            }
+        }
+        public void OptimiseParameters(float learningRate, float momentum, float regularization)
         {
             learningRate /= backwardsCount;
             backwardsCount = 0;
@@ -120,6 +168,7 @@ namespace NeuroForge
                 }
             }    
         }
+       
 
         private void InitGradients()
         {
@@ -173,6 +222,7 @@ namespace NeuroForge
                 layer.neurons[i].CostValue = costVal;
             }
         }
+        
         private void UpdateGradients(WeightLayer weightGradient, BiasLayer biasGradient, NeuronLayer previousNeuronLayer, NeuronLayer nextNeuronLayer)
         {
             //Related to Backpropagation
@@ -197,9 +247,7 @@ namespace NeuroForge
         }
 
 
-        #endregion
-
-        #region Continuous
+        // Continuous
         public PPOActorNetwork(int inputsNum, int continuousSpaceSize, int hiddenUnits, int layersNum, ActivationType activation, InitializationType initType)
         {
             // Set format
@@ -308,9 +356,8 @@ namespace NeuroForge
             return log_probs;
         }
 
-        #endregion
 
-        #region Discrete
+        // Discrete
         public PPOActorNetwork(int inputsNum, int[] discreteOutputShape, int hiddenUnits, int layersNum, ActivationType activation, InitializationType initType)
         {
 
@@ -431,9 +478,8 @@ namespace NeuroForge
             return log_probs;
         }
 
-        #endregion
-
-        #region Other
+ 
+        // Other
         private void CreateAsset()
         {
             short id = 1;
@@ -446,7 +492,7 @@ namespace NeuroForge
             Debug.Log(assetName + " was created!");
         }
         public int GetObservationsNumber() => format[0];
-        public int GetActionsNumber() => actionSpace == ActionType.Continuous ? outputBranches[0] : outputBranches.Length;
+        public int GetActionsNumber() => actionSpace == ActionType.Continuous ? outputBranches[0] : outputBranches.Length; // 1 branch is 1 action for discrete
         public double GetMaxGradientValue()
         {
             double max = 0;
@@ -464,9 +510,7 @@ namespace NeuroForge
                 }
             }
             return max;
-        }
-
-        #endregion
+        }//to be deleted
     }
 }
 

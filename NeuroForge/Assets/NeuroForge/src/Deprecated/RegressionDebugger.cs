@@ -152,7 +152,7 @@ public class RegressionDebugger : MonoBehaviour
 
             data_acc += net.BackPropagation(inputsData[i], labelsData[i]);
             if(i%batch_size == 0)
-                net.OptimizeParameters(learn_rate, momentum, regularization);
+                net.OptimiseParameters(learn_rate, momentum, regularization);
         }
 
         epoch++;

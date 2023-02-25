@@ -1,0 +1,276 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4752d252c5d9a474a99733f277d713d3, type: 3}
+  m_Name: Genome#1
+  m_EditorClassIdentifier: 
+  actionSpace: 1
+  outputShape: 04000000
+  input_cache:
+  - innovation: 2
+    InValue: 0
+    OutValue: 1.1532085
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 3
+    InValue: 0
+    OutValue: 1.6361494
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 4
+    InValue: 0
+    OutValue: 17.760033
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 5
+    InValue: 0
+    OutValue: 6.2508187
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 6
+    InValue: 0
+    OutValue: 11.056782
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  output_cache:
+  - innovation: 7
+    InValue: -17.812748
+    OutValue: -17.812748
+    activationType: 0
+    type: 2
+    incomingConnections: 0b0000000f00000013000000170000001b000000
+    activated: 1
+    layer: 1
+  - innovation: 8
+    InValue: -46.089966
+    OutValue: -46.089966
+    activationType: 0
+    type: 2
+    incomingConnections: 0c0000001000000014000000180000001c000000
+    activated: 1
+    layer: 1
+  - innovation: 9
+    InValue: -17.54283
+    OutValue: -17.54283
+    activationType: 0
+    type: 2
+    incomingConnections: 0d0000001100000015000000190000001d000000
+    activated: 1
+    layer: 1
+  - innovation: 10
+    InValue: -19.477343
+    OutValue: -19.477343
+    activationType: 0
+    type: 2
+    incomingConnections: 0e00000012000000160000001a0000001e000000
+    activated: 1
+    layer: 1
+  layers:
+  - 0
+  - 1
+  serialized_nodes:
+  - innovation: 1
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 3
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 2
+    InValue: 0
+    OutValue: 1.1532085
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 3
+    InValue: 0
+    OutValue: 1.6361494
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 4
+    InValue: 0
+    OutValue: 17.760033
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 5
+    InValue: 0
+    OutValue: 6.2508187
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 6
+    InValue: 0
+    OutValue: 11.056782
+    activationType: 0
+    type: 0
+    incomingConnections: 
+    activated: 1
+    layer: 0
+  - innovation: 7
+    InValue: -17.812748
+    OutValue: -17.812748
+    activationType: 0
+    type: 2
+    incomingConnections: 0b0000000f00000013000000170000001b000000
+    activated: 1
+    layer: 1
+  - innovation: 8
+    InValue: -46.089966
+    OutValue: -46.089966
+    activationType: 0
+    type: 2
+    incomingConnections: 0c0000001000000014000000180000001c000000
+    activated: 1
+    layer: 1
+  - innovation: 9
+    InValue: -17.54283
+    OutValue: -17.54283
+    activationType: 0
+    type: 2
+    incomingConnections: 0d0000001100000015000000190000001d000000
+    activated: 1
+    layer: 1
+  - innovation: 10
+    InValue: -19.477343
+    OutValue: -19.477343
+    activationType: 0
+    type: 2
+    incomingConnections: 0e00000012000000160000001a0000001e000000
+    activated: 1
+    layer: 1
+  serialized_connections_keys: 0b0000000c0000000d0000000e0000000f000000100000001100000012000000130000001400000015000000160000001700000018000000190000001a0000001b0000001c0000001d0000001e000000
+  serialized_connections_values:
+  - innovation: 11
+    weight: -1.8789268
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 7
+  - innovation: 12
+    weight: 0.68429196
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 8
+  - innovation: 13
+    weight: 1.3358476
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 9
+  - innovation: 14
+    weight: 0.86858076
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 10
+  - innovation: 15
+    weight: -1.0721055
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 7
+  - innovation: 16
+    weight: 0.23379724
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 8
+  - innovation: 17
+    weight: 0.3764337
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 9
+  - innovation: 18
+    weight: 0.51220655
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 10
+  - innovation: 19
+    weight: -0.63912183
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 7
+  - innovation: 20
+    weight: -1.7201072
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 8
+  - innovation: 21
+    weight: -0.63440365
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 9
+  - innovation: 22
+    weight: -0.7178755
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 10
+  - innovation: 23
+    weight: -0.2854227
+    enabled: 1
+    inNeuron: 5
+    outNeuron: 7
+  - innovation: 24
+    weight: -0.57251143
+    enabled: 1
+    inNeuron: 5
+    outNeuron: 8
+  - innovation: 25
+    weight: -0.6926142
+    enabled: 1
+    inNeuron: 5
+    outNeuron: 9
+  - innovation: 26
+    weight: -0.84994733
+    enabled: 1
+    inNeuron: 5
+    outNeuron: 10
+  - innovation: 27
+    weight: -0.068453744
+    enabled: 1
+    inNeuron: 6
+    outNeuron: 7
+  - innovation: 28
+    weight: -1.1878501
+    enabled: 1
+    inNeuron: 6
+    outNeuron: 8
+  - innovation: 29
+    weight: -0.37106696
+    enabled: 1
+    inNeuron: 6
+    outNeuron: 9
+  - innovation: 30
+    weight: -0.29436097
+    enabled: 1
+    inNeuron: 6
+    outNeuron: 10

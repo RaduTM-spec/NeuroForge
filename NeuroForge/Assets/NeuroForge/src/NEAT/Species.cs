@@ -12,13 +12,15 @@ namespace NeuroForge
         private List<NEATAgent> individuals = new List<NEATAgent>();
         private NEATAgent representative;
         private float avgFitness = 0;
-        public bool secondChance = false; // when a species is endangered (it doesn't breed well), it is given a second chance episode to breed (once per life-time)
-        public Species(NEATAgent repr, bool sc)
+
+        public int id;
+        public int age = -1;
+       public Species(NEATAgent repr)
         {
             repr.SetSpecies(this);
             this.representative = repr;         
             this.individuals.Add(repr);
-            this.secondChance = sc;
+            id = UnityEngine.Random.Range(0, 100);
         }        
 
         public void CalculateAvgFitness() => avgFitness = individuals.Select(x => x.GetFitness()).Average();
@@ -90,7 +92,7 @@ namespace NeuroForge
             individuals.Clear();
             representative = null;
         }
-        public NEATNetwork Breed()
+        public Genome Breed()
         {
             // Select two random parents based on their fitness
             // Theoretically the agents are sorted at this point
@@ -105,21 +107,9 @@ namespace NeuroForge
 
             return CrossOver(parent1.model, parent2.model, parent1.GetFitness(), parent2.GetFitness());
         }
-        public bool IsEndangered(int endangerZone)
-        {
-            // It has enough individuals, it is not going to extinct
-            if(individuals.Count > endangerZone)
-                return false;
 
-            // Yes it is endangered, check the second chance
-            if (!secondChance)
-                return true;
-          
-            secondChance = false;
-            return false;
-        }
 
-        private static NEATNetwork CrossOver(NEATNetwork parent1, NEATNetwork parent2, float p1_fitness, float p2_fitness)
+        private static Genome CrossOver(Genome parent1, Genome parent2, float p1_fitness, float p2_fitness)
         {
             p1_fitness = Mathf.Exp(p1_fitness);
             p2_fitness = Mathf.Exp(p2_fitness);
@@ -130,7 +120,7 @@ namespace NeuroForge
             // Notes: matching genes are taken randomly weighted (by fitness) from the parent with highest fitness
             // Notes: the new child (a.k.a. new topology) is mutated afterwards
 
-            NEATNetwork child = new NEATNetwork(parent1.GetInputsNumber(), parent1.outputShape, parent1.actionSpace, false, false);
+            Genome child = new Genome(parent1.GetInputsNumber(), parent1.outputShape, parent1.actionSpace, false, false);
             child.nodes.Clear();
             child.connections.Clear();
 

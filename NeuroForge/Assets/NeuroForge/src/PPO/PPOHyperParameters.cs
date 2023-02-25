@@ -26,14 +26,15 @@ namespace NeuroForge
         [Range(0.8f, 0.995f), Tooltip("gamma")] public float discountFactor = 0.9f;                                                                                                             
         [Range(0.9f, 0.95f), Tooltip("lambda")] public float gaeFactor = 0.95f;                                                                                                                 
         [Range(0.1f, 0.3f), Tooltip("epsilon")] public float clipFactor = 0.2f;                                                                                                                 
-        [Range(1e-4f, 1e-2f), Tooltip("beta")] public float entropyRegularization = 0.001f;                                                                                                     
+        [Range(1e-4f, 1e-2f), Tooltip("beta")] public float entropyRegularization = 0.005f;                                                                                                     
                                                                                                                                                                                                 
         [Header("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")]
         [SerializeField] private BufferSize bufferSize = BufferSize.size256;    
         [SerializeField] private BatchSize batchSize = BatchSize.size32;
+        [Range(0.2f, 1.5f)] public float maxGradNorm = 0.5f;
         [Min(1)] public int epochs = 32;
-        public bool normalizeObservations = true;
-        public bool normalizeAdvantages = true;
+        public bool normObservations = false;
+        public bool normAdvantages = false;
 
         [HideInInspector] public int buffer_size;
         [HideInInspector] public int batch_size;

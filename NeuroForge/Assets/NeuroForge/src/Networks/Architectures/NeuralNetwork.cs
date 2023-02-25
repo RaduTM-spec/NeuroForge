@@ -106,7 +106,55 @@ namespace NeuroForge {
             updatesCount++;
             return error;
         }
-        public void OptimizeParameters(float learningRate, float momentum, float regularization)
+        public void GradientsClipNorm(float threshold)
+        {
+            double global_sum = 0;
+
+            // Sum weights' gradients
+            foreach (var grad_layer in weightGradients)
+            {
+                foreach (var clump in grad_layer.weights)
+                {
+                    foreach (var w_grad in clump)
+                    {
+                        global_sum += w_grad * w_grad;
+                    }
+                }
+            }
+
+            // Sum biases' gradients
+            foreach (var bias_layer in biasGradients)
+            {
+                foreach (var b_grad in bias_layer.biases)
+                {
+                    global_sum += b_grad * b_grad;
+                }
+            }
+
+            double scalar = threshold / Math.Max(threshold, global_sum);
+
+            // Normalize weights
+            for (int lay = 0; lay < weightGradients.Length; lay++)
+            {
+                for (int i = 0; i < weightGradients[lay].weights.Length; i++)
+                {
+                    for (int j = 0; j < weightGradients[lay].weights[i].Length; j++)
+                    {
+                        weightGradients[lay].weights[i][j] *= scalar;
+                    }
+                }
+            }
+
+            // Normalize biases
+            for (int lay = 0; lay < biasGradients.Length; lay++)
+            {
+                for (int i = 0; i < biasGradients[lay].biases.Length; i++)
+                {
+                    biasGradients[lay].biases[i] *= scalar;
+                }
+            }
+        }
+        public void OptimiseParameters(float learningRate, float momentum, float regularization)
         {
             learningRate /= updatesCount;
             updatesCount = 0;

@@ -100,7 +100,7 @@ public class MNISTTrain : MonoBehaviour
                
                 count++;
                 network.BackPropagation(input, losses);
-                network.OptimizeParameters(learnRate, momentum, regularization);
+                network.OptimiseParameters(learnRate, momentum, regularization);
             }         
         }
         trainAcc = ((1.0 - err / count) * 100).ToString("0.000");

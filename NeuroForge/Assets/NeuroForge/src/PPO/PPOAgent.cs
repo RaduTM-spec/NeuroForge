@@ -14,22 +14,24 @@ namespace NeuroForge
     public class PPOAgent : MonoBehaviour
     {
         // Displayed fields
-        public BehaviourType behaviour = BehaviourType.Inference;
-        [SerializeField] public PPONetwork model;
-        [HideInInspector] public PPOMemory Memory;
+        public BehaviourType behavior = BehaviourType.Inference;
+        [SerializeField] public PPOActorNetwork actor;
+        [SerializeField] public NeuralNetwork critic;
+        [HideInInspector] public PPOMemory memory;
 
         [Space,Min(1), SerializeField] private int observationSize = 2;
         [SerializeField] private ActionType actionSpace = ActionType.Continuous;
         [Min(1), SerializeField] private int ContinuousSize;
         [Min(1), SerializeField] private int[] DiscreteBranches;
 
-        [Space, Min(10), Tooltip("seconds")] public int episodeMaxLength = 60;
+        [Space, Min(10), Tooltip("seconds")] public int timeHorizon = 60;
         [SerializeField] private OnEpisodeEndType onEpisodeEnd = OnEpisodeEndType.ResetEnvironment;
 
 
         // Hidden fields
         [HideInInspector] public PPOHyperParameters hp;
         private TransformReseter personalEnvironment;
+        RunningNormalizer observationsNormalizer;
 
         private AgentSensor agentSensor;
         private SensorBuffer sensorBuffer;
@@ -48,11 +50,11 @@ namespace NeuroForge
             InitNetwork();
            
             // Init memory
-            Memory = new PPOMemory(false);
+            memory = new PPOMemory(false);
            
             // Init buffers
             sensorBuffer = new SensorBuffer(observationSize);
-            actionBuffer = new ActionBuffer(model.actorNetwork.GetActionsNumber());
+            actionBuffer = new ActionBuffer(actor.GetActionsNumber());
             
             // Init sensors
             agentSensor = new AgentSensor(this.transform);
@@ -63,30 +65,30 @@ namespace NeuroForge
                                   personalEnvironment = new TransformReseter(this.transform);
 
             // Subscribe to trainer instance
-            if(behaviour == BehaviourType.Inference)
+            if(behavior == BehaviourType.Inference)
                 PPOTrainer.Subscribe(this);
         }
         private void InitNetwork()
         {
-            if (model)
+            // change the inspector vars if actor network exists
+            if (actor)
             {
-                observationSize = model.actorNetwork.GetObservationsNumber();
+                observationSize = actor.GetObservationsNumber();
                 
-                if (model.actorNetwork.actionSpace == ActionType.Continuous)
+                if (actor.actionSpace == ActionType.Continuous)
                 {
                     actionSpace = ActionType.Continuous;
-                    ContinuousSize = model.actorNetwork.GetActionsNumber();
+                    ContinuousSize = actor.GetActionsNumber();
                 }
                 else
                 {
                     actionSpace = ActionType.Discrete;
-                    DiscreteBranches = model.actorNetwork.outputBranches;
+                    DiscreteBranches = actor.outputBranches;
                 }
                 return;
             }
 
-            // Create new model
-
+            // if doesn't exist, create the actor network
             if (actionSpace == ActionType.Discrete)
             {
                 for (int i = 0; i < DiscreteBranches.Length; i++)
@@ -95,7 +97,7 @@ namespace NeuroForge
                         UnityEngine.Debug.LogError("Branch " + DiscreteBranches[i] + " cannot have 0 discrete actions");
                         throw new Exception("Error");
                     }
-                model = new PPONetwork(observationSize, DiscreteBranches, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType);
+                actor = new PPOActorNetwork(observationSize, DiscreteBranches, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType);
             }
             else
             {
@@ -104,7 +106,14 @@ namespace NeuroForge
                     UnityEngine.Debug.LogError("Agent cannot have 0 continuous actions");
                     throw new Exception("Error");
                 }
-                model = new PPONetwork(observationSize, ContinuousSize, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType);
+                actor = new PPOActorNetwork(observationSize, ContinuousSize, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType);              
+            }
+
+            // create the critic network
+            if(critic == null && behavior == BehaviourType.Inference)
+            {
+                critic = new NeuralNetwork(observationSize, 1, hp.hiddenUnits, hp.layersNumber, hp.activationType, ActivationType.Linear, LossType.MeanSquare, InitializationType.NormalDistribution, true, GetCriticName());
+                observationsNormalizer = new RunningNormalizer(observationSize);
             }
         }
 
@@ -112,7 +121,7 @@ namespace NeuroForge
         // Loop
         protected virtual void Update()
         {
-            switch (behaviour)
+            switch (behavior)
             {
                 case BehaviourType.Active:
                     SelfAction();
@@ -126,10 +135,10 @@ namespace NeuroForge
             }
 
             episodeTimePassed += Time.deltaTime;
-            if (episodeTimePassed >= episodeMaxLength && behaviour == BehaviourType.Inference)
+            if (episodeTimePassed >= timeHorizon && behavior == BehaviourType.Inference)
                 EndEpisode();
             
-            if (behaviour == BehaviourType.Inference && Memory.IsFull(hp.buffer_size))
+            if (behavior == BehaviourType.Inference && memory.IsFull(hp.buffer_size))
             {
                 PPOTrainer.Ready();
             }
@@ -146,16 +155,16 @@ namespace NeuroForge
             CollectObservations(sensorBuffer);
             agentSensor.CollectObservations(sensorBuffer);
             
-            if(hp.normalizeObservations) 
-                model.observationsNormalizer.NormalizeMinusOneOne(sensorBuffer.observations, false);
+            if(hp.normObservations) 
+                observationsNormalizer.NormalizeMinusOneOne(sensorBuffer.observations, false);
 
             if(actionSpace == ActionType.Continuous)
             {
-                actionBuffer.continuousActions = model.actorNetwork.ContinuousForwardPropagation(sensorBuffer.observations).Item2;           
+                actionBuffer.continuousActions = actor.ContinuousForwardPropagation(sensorBuffer.observations).Item2;           
             }
             else
             {
-                actionBuffer.discreteActions = model.actorNetwork.DiscreteForwardPropagation(sensorBuffer.observations).Item2;
+                actionBuffer.discreteActions = actor.DiscreteForwardPropagation(sensorBuffer.observations).Item2;
             }
             OnActionReceived(actionBuffer);
 
@@ -168,32 +177,32 @@ namespace NeuroForge
             CollectObservations(sensorBuffer);
             agentSensor.CollectObservations(sensorBuffer);
             
-            if(hp.normalizeObservations)
-                model.observationsNormalizer.NormalizeMinusOneOne(sensorBuffer.observations, true);
+            if(hp.normObservations)
+                observationsNormalizer.NormalizeMinusOneOne(sensorBuffer.observations, true);
 
             if(actionSpace == ActionType.Continuous)
             {
-                (double[], float[]) outs_acts = model.actorNetwork.ContinuousForwardPropagation(sensorBuffer.observations);
+                (double[], float[]) outs_acts = actor.ContinuousForwardPropagation(sensorBuffer.observations);
                 actionBuffer.continuousActions = outs_acts.Item2;
 
                 double[] state = sensorBuffer.observations;
                 double[] action = outs_acts.Item1;
-                double[] log_probs = model.actorNetwork.GetContinuousLogProbs(outs_acts.Item1, outs_acts.Item2);
-                double value = model.criticNetwork.ForwardPropagation(sensorBuffer.observations)[0];
+                double[] log_probs = actor.GetContinuousLogProbs(outs_acts.Item1, outs_acts.Item2);
+                double value = critic.ForwardPropagation(sensorBuffer.observations)[0];
                 
-                Memory.Store(state, action, reward, log_probs, value, isEpisodeEnd);
+                memory.Store(state, action, reward, log_probs, value, isEpisodeEnd);
             }
             else
             {
-                (double[],int[]) dist_acts = model.actorNetwork.DiscreteForwardPropagation(sensorBuffer.observations);
+                (double[],int[]) dist_acts = actor.DiscreteForwardPropagation(sensorBuffer.observations);
                 actionBuffer.discreteActions = dist_acts.Item2;
 
                 double[] state = sensorBuffer.observations;
                 double[] action = dist_acts.Item1;
                 double[] log_probs = PPOActorNetwork.GetDiscreteLogProbs(dist_acts.Item1);
-                double value = model.criticNetwork.ForwardPropagation(sensorBuffer.observations)[0];
+                double value = critic.ForwardPropagation(sensorBuffer.observations)[0];
                 
-                Memory.Store(state, action, reward, log_probs, value, isEpisodeEnd);
+                memory.Store(state, action, reward, log_probs, value, isEpisodeEnd);
             }
        
             reward = 0;
@@ -221,7 +230,7 @@ namespace NeuroForge
         }
         public void AddReward<T>(T reward) where T : struct
         {         
-            if (behaviour == BehaviourType.Inactive) return;
+            if (behavior == BehaviourType.Inactive) return;
             
             this.reward = Convert.ToDouble(reward);
             this.cumulativeReward += this.reward;
@@ -258,6 +267,13 @@ namespace NeuroForge
 
 
         // Other
+        private string GetCriticName()
+        {
+            short id = 1;
+            while (AssetDatabase.LoadAssetAtPath<NeuralNetwork>("Assets/CriticNN#" + id + ".asset") != null)
+                id++;
+            return "CriticNN#" + id;
+        }
         public ActionType GetActionSpace() => actionSpace;
 
     }
@@ -278,17 +294,32 @@ namespace NeuroForge
     {
         public override void OnInspectorGUI()
         {
+            var script = target as PPOAgent;
+            List<string> dontDrawMe = new List<string>();
+            dontDrawMe.Add("m_Script");
+
+            // Hide action space
             SerializedProperty actType = serializedObject.FindProperty("actionSpace");
             if (actType.enumValueIndex == (int)ActionType.Continuous)
-            {
-                DrawPropertiesExcluding(serializedObject, new string[] { "m_Script", "DiscreteBranches" });
-
-            }
+                dontDrawMe.Add("DiscreteBranches");
             else
-            {
-                DrawPropertiesExcluding(serializedObject, new string[] { "m_Script", "ContinuousSize" });
-            }
+                dontDrawMe.Add("ContinuousSize");
 
+            // Hide networks
+            SerializedProperty beh = serializedObject.FindProperty("behavior");
+            if (beh.enumValueIndex == (int)BehaviourType.Manual)
+            {
+                dontDrawMe.Add("actor");
+                dontDrawMe.Add("critic");
+            }
+            else if (beh.enumValueIndex == (int)BehaviourType.Active || 
+                     beh.enumValueIndex == (int)BehaviourType.Inactive)
+            {
+                dontDrawMe.Add("critic");
+            }
+            
+
+            DrawPropertiesExcluding(serializedObject, dontDrawMe.ToArray());
             serializedObject.ApplyModifiedProperties();
         }
     }

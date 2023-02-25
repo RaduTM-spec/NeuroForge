@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+using Unity.VisualScripting;
 using UnityEngine;
 
 namespace NeuroForge
@@ -154,6 +155,12 @@ namespace NeuroForge
             }
             return false;
         }
+        public static void Swap<T>(ref T obj1, ref T obj2)
+        {
+            T temp = obj1;
+            obj1 = obj2;
+            obj2 = temp;
+        }    
 
         public readonly struct Activation
         {

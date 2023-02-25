@@ -398,7 +398,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e717c1880feede4e8bc08135d30aab6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 5.04
+  speed: 6.08
 --- !u!65 &72652643
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1103,6 +1103,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 658588198}
+  - component: {fileID: 658588199}
   m_Layer: 0
   m_Name: Debugger
   m_TagString: Untagged
@@ -1125,6 +1126,19 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 6
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &658588199
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 658588196}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ed19f8ace566dd44b0d88f533b94bc1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  genome: {fileID: 11400000, guid: 91ee59339cbd9cf4a94dc1fddca073fd, type: 2}
 --- !u!1 &689186977
 GameObject:
   m_ObjectHideFlags: 0
@@ -1864,14 +1878,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dff28b5197199154db124ac02b19a6d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  behaviour: 1
-  model: {fileID: 11400000, guid: a733abb1f89c0e3428d1ef43ea20e395, type: 2}
-  Memory: {fileID: 11400000, guid: b6a4b883b1bd0d743bc8c67465dad823, type: 2}
+  behavior: 1
+  actor: {fileID: 0}
+  critic: {fileID: 0}
+  memory: {fileID: 0}
   observationSize: 6
   actionSpace: 1
   ContinuousSize: 2
   DiscreteBranches: 0400000002000000
-  episodeMaxLength: 5
+  timeHorizon: 60
   onEpisodeEnd: 1
   hp: {fileID: 0}
   speed: 5
@@ -1902,9 +1917,10 @@ MonoBehaviour:
   entropyRegularization: 0.01
   bufferSize: 0
   batchSize: 0
-  epochs: 1
-  normalizeObservations: 0
-  normalizeAdvantages: 0
+  maxGradNorm: 0.2
+  epochs: 16
+  normObservations: 0
+  normAdvantages: 0
   buffer_size: 0
   batch_size: 0
 --- !u!1 &1102195299
@@ -3255,16 +3271,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d908a49190228d4a867123c6a47c0f3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  behaviour: 1
-  model: {fileID: 11400000, guid: 577ded77a4b6f0047b0a09b813c4b947, type: 2}
-  fullyConnected: 0
+  behavior: 1
+  model: {fileID: 11400000, guid: 91ee59339cbd9cf4a94dc1fddca073fd, type: 2}
+  fullyConnected: 1
   observationSize: 5
   actionSpace: 1
   ContinuousSize: 0
   DiscreteBranches: 04000000
   hp: {fileID: 0}
-  fitness: 0
-  speed: 10.04
+  speed: 10
   target: {fileID: 1038018896}
 --- !u!114 &2005809428
 MonoBehaviour:
@@ -3278,25 +3293,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ca894bcd623b054c8da9c0030e9fd8e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  generations: 500
-  episodeLength: 56
+  generations: 1000
+  timeHorizon: 60
   populationSize: 100
-  speciesEndangerZone: 5
-  survivalRate: 0.2
+  survivalRate: 0.5
   delta: 3
   c1: 1
   c2: 1
   c3: 0.4
-  secondChance: 0
-  addConnection: 0.07
-  removeConnection: 0.03
-  mergeConnections: 0.03
-  mutateConnections: 0.7
-  addNode: 0.02
+  addConnection: 0.05
+  addNode: 0.05
+  mutateConnections: 0.8
   mutateNode: 0.05
-  noMutation: 0.1
-  maxConnections: 150
-  maxNodes: 30
+  noMutation: 0.05
+  maxConnections: 100
+  maxNodes: 20
 --- !u!1 &2055724338
 GameObject:
   m_ObjectHideFlags: 0

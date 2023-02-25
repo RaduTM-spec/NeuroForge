@@ -16,7 +16,7 @@ using UnityEngine.Networking.Types;
 using UnityEngine.Windows;
 using static UnityEngine.UIElements.UxmlAttributeDescription;
 
-namespace NeuroForge
+namespace NeuroForge // deprecated
 {
     [Serializable]
     public class NEATNetwork : ScriptableObject, ISerializationCallbackReceiver, ICloneable
@@ -336,8 +336,8 @@ namespace NeuroForge
                 mutations = new Dictionary<Mutation, float>();
                 mutations.Add(AddConnection, NEATTrainer.GetHP().addConnection);
                 mutations.Add(MutateNode, NEATTrainer.GetHP().mutateNode);
-                mutations.Add(RemoveRandomConnection, NEATTrainer.GetHP().removeConnection);
-                mutations.Add(MergeConnections, NEATTrainer.GetHP().mergeConnections);
+                //mutations.Add(RemoveRandomConnection, NEATTrainer.GetHP().removeConnection);
+               // mutations.Add(MergeConnections, NEATTrainer.GetHP().mergeConnections);
                 mutations.Add(AddNode, NEATTrainer.GetHP().addNode);
                 mutations.Add(MutateConnections, NEATTrainer.GetHP().mutateConnections);
                 mutations.Add(NoMutation, NEATTrainer.GetHP().noMutation);
@@ -434,7 +434,7 @@ namespace NeuroForge
                 else
                 {
                     // slight lerp
-                    connection.weight = FunctionsF.RandomGaussian(connection.weight, 0.1f);
+                    connection.weight = FunctionsF.RandomGaussian(connection.weight, 0.01f);
                 }
 
 

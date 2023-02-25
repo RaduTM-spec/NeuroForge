@@ -12,8 +12,8 @@ namespace NeuroForge
     public class NEATAgent : MonoBehaviour
     {
         #region Fields
-        public BehaviourType behaviour = BehaviourType.Inference;
-        [SerializeField] public NEATNetwork model;
+        public BehaviourType behavior = BehaviourType.Inference;
+        [SerializeField] public Genome model;
         [SerializeField] private bool fullyConnected = false;
 
         [Space]
@@ -29,7 +29,7 @@ namespace NeuroForge
         private ActionBuffer actionBuffer;
 
         private Species species;
-        [SerializeField] private float fitness = 0;
+        private float fitness = 0;
         #endregion
 
         // Setup
@@ -47,7 +47,7 @@ namespace NeuroForge
             agentSensor = new AgentSensor(this.transform);
 
             // Init trainer
-            if (behaviour == BehaviourType.Inference)
+            if (behavior == BehaviourType.Inference)
                 NEATTrainer.Initialize(this);
         }
         public void InitNetwork()
@@ -85,14 +85,14 @@ namespace NeuroForge
                 outputShape = DiscreteBranches;
             }
 
-            model = new NEATNetwork(observationSize, outputShape, actionSpace, fullyConnected, true);
+            model = new Genome(observationSize, outputShape, actionSpace, fullyConnected, true);
         }
 
 
         // Loop
         protected virtual void Update()
         {
-            switch (behaviour)
+            switch (behavior)
             {
                 case BehaviourType.Active:
                     ActiveAction();
@@ -148,7 +148,7 @@ namespace NeuroForge
         }
         public void AddReward<T>(T reward) where T : struct
         {
-            if (behaviour == BehaviourType.Inactive) return;          
+            if (behavior == BehaviourType.Inactive) return;          
             this.fitness += Convert.ToSingle(reward);
         }
         public void ForceAddReward<T>(T reward) where T : struct
@@ -157,9 +157,9 @@ namespace NeuroForge
         }
         public void EndEpisode()
         {
-            if(behaviour == BehaviourType.Inference)
+            if(behavior == BehaviourType.Inference)
             {
-                behaviour = BehaviourType.Inactive;
+                behavior = BehaviourType.Inactive;
                 NEATTrainer.Ready();
             }
             
@@ -171,7 +171,7 @@ namespace NeuroForge
         public float GetFitness() => fitness;
         public Species GetSpecies() => species;
         public void SetSpecies(Species species) => this.species = species;
-        public void Resurrect() => behaviour = BehaviourType.Inference;
+        public void Resurrect() => behavior = BehaviourType.Inference;
         public void ResetFitness() => fitness = 0f;
         public ActionType GetActionSpace() => actionSpace;
     }
@@ -201,6 +201,7 @@ namespace NeuroForge
     {
         public override void OnInspectorGUI()
         {
+            
             SerializedProperty actType = serializedObject.FindProperty("actionSpace");
             List<string> what_not_to_draw = new List<string>();
             what_not_to_draw.Add("m_Script");

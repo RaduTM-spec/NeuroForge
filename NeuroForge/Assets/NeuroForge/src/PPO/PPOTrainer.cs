@@ -15,7 +15,8 @@ namespace NeuroForge
         public static PPOTrainer Instance;
 
         [SerializeField] private List<PPOAgent> agents;
-        private PPONetwork model;
+        private PPOActorNetwork actorNetwork;
+        private NeuralNetwork criticNetwork;
         private PPOHyperParameters hp;
         private ActionType actionSpace;
         private int agentsReady = 0;
@@ -46,7 +47,8 @@ namespace NeuroForge
                 GameObject go = new GameObject("PPOTrainer");
                 go.AddComponent<PPOTrainer>();
                 Instance.agents = new List<PPOAgent>();
-                Instance.model = mainAgent.model;
+                Instance.actorNetwork = mainAgent.actor;
+                Instance.criticNetwork = mainAgent.critic;
                 Instance.hp = mainAgent.hp;
                 Instance.actionSpace = mainAgent.GetActionSpace();        
             }
@@ -67,9 +69,9 @@ namespace NeuroForge
             {
                 List<double> advantages;
                 List<double> returns;
-                GAE(agent.Memory.records, out advantages, out returns);
+                GAE(agent.memory.records, out advantages, out returns);
 
-                trainData.playback.AddRange(agent.Memory.records);
+                trainData.playback.AddRange(agent.memory.records);
                 trainData.advantages.AddRange(advantages);
                 trainData.returns.AddRange(returns);
             }
@@ -99,7 +101,7 @@ namespace NeuroForge
             }
 
             // Clear memories
-            agents.ForEach(x => x.Memory.Clear());
+            agents.ForEach(x => x.memory.Clear());
             Instance.agentsReady = 0;
         }
 
@@ -108,7 +110,7 @@ namespace NeuroForge
         {
             for (int t = 0; t < mb_playback.Count; t++)
             {
-                double[] distributions = Instance.model.actorNetwork.DiscreteForwardPropagation(mb_playback[t].state).Item1;
+                double[] distributions = Instance.actorNetwork.DiscreteForwardPropagation(mb_playback[t].state).Item1;
 
                 double[] old_log_probs = mb_playback[t].log_probs;
                 double[] new_log_probs = PPOActorNetwork.GetDiscreteLogProbs(distributions);
@@ -121,30 +123,35 @@ namespace NeuroForge
                 }
 
                 // Calculate surrogate loss
-                double[] clipped_surrogate_objective = new double[ratios.Length];
+                double[] L_CLIP = new double[ratios.Length];
                 for (int r = 0; r < ratios.Length; r++)
                 {
-                    // gradient ascent, so loss *= -1
-                    clipped_surrogate_objective[r] = -Math.Min
-                                                     (
-                                                           ratios[r] * mb_advantages[t],
-                                                           Math.Clamp(ratios[r], 1.0 - Instance.hp.clipFactor, 1.0 + Instance.hp.clipFactor) * mb_advantages[t]
-                                                     );
+                    L_CLIP[r] = -Math.Min
+                                (
+                                      ratios[r] * mb_advantages[t],
+                                      Math.Clamp(ratios[r], 1.0 - Instance.hp.clipFactor, 1.0 + Instance.hp.clipFactor) * mb_advantages[t]
+                                );
                 }
 
                 // Add entropy
-                for (int i = 0; i < clipped_surrogate_objective.Length; i++)
+                for (int i = 0; i < L_CLIP.Length; i++)
                 {
-                    double entropy = -distributions[i] * new_log_probs[i]; // phi log phi (phi = aforementioned parameterization or output)
-                    clipped_surrogate_objective[i] -= entropy * Instance.hp.entropyRegularization;
+                    double L_H = -distributions[i] * new_log_probs[i]; // phi log phi (phi = aforementioned parameterization or output)
+                    L_CLIP[i] -= L_H * Instance.hp.entropyRegularization;
                 }
 
-                // Update policy with SGD
-                Instance.model.actorNetwork.BackPropagation(mb_playback[t].state, clipped_surrogate_objective);
-                Instance.model.criticNetwork.BackPropagation(mb_playback[t].state, new double[] { mb_returns[t] });
+                // critic label (not loss)
+                double[] L_V = new double[] { mb_returns[t] };
 
-                Instance.model.actorNetwork.OptimizeParameters(Instance.hp.actorLearnRate, Instance.hp.momentum, Instance.hp.regularization);
-                Instance.model.criticNetwork.OptimizeParameters(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
+                // Update policy with SGD
+                Instance.actorNetwork.BackPropagation(mb_playback[t].state, L_CLIP);
+                Instance.criticNetwork.BackPropagation(mb_playback[t].state, L_V);
+
+                Instance.actorNetwork.GradientsClipNorm(hp.maxGradNorm);
+                Instance.criticNetwork.GradientsClipNorm(hp.maxGradNorm);
+
+                Instance.actorNetwork.OptimiseParameters(Instance.hp.actorLearnRate, Instance.hp.momentum, Instance.hp.regularization);
+                Instance.criticNetwork.OptimiseParameters(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
 
             }
         }
@@ -152,10 +159,10 @@ namespace NeuroForge
         {
             for (int t = 0; t < mini_batch.Count; t++)
             {
-                (double[], float[]) forwardPropagation = Instance.model.actorNetwork.ContinuousForwardPropagation(mini_batch[t].state);
+                (double[], float[]) forwardPropagation = Instance.actorNetwork.ContinuousForwardPropagation(mini_batch[t].state);
 
                 double[] old_log_probs = mini_batch[t].log_probs;
-                double[] new_log_probs = Instance.model.actorNetwork.GetContinuousLogProbs(forwardPropagation.Item1, forwardPropagation.Item2);
+                double[] new_log_probs = Instance.actorNetwork.GetContinuousLogProbs(forwardPropagation.Item1, forwardPropagation.Item2);
 
                 // Calculate ratios
                 double[] ratios = new double[new_log_probs.Length];
@@ -165,15 +172,14 @@ namespace NeuroForge
                 }
                 
                 // Calculate surroagate loss
-                double[] clipped_surrogate_objective = new double[ratios.Length];
+                double[] L_CLIP = new double[ratios.Length];       
                 for (int r = 0; r < ratios.Length; r++)
                 {
-                    // gradient ascent, so loss *= -1
-                    clipped_surrogate_objective[r] = -Math.Min
-                                                     (
-                                                           ratios[r] * mb_advantages[t],
-                                                           Math.Clamp(ratios[r], 1.0 - Instance.hp.clipFactor, 1.0 + Instance.hp.clipFactor) * mb_advantages[t]
-                                                     );
+                    L_CLIP[r] = -Math.Min
+                                (
+                                      ratios[r] * mb_advantages[t],
+                                      Math.Clamp(ratios[r], 1.0 - Instance.hp.clipFactor, 1.0 + Instance.hp.clipFactor) * mb_advantages[t]
+                                );
                 }
 
                 // Calculate entropies
@@ -188,20 +194,60 @@ namespace NeuroForge
                 }
 
                 // Apply entropies
-                for (int i = 0; i < clipped_surrogate_objective.Length; i++)
+                for (int i = 0; i < L_CLIP.Length; i++)
                 {
-                    clipped_surrogate_objective[i] -= entropies[i] * Instance.hp.entropyRegularization;
+                    double L_H = entropies[i] * Instance.hp.entropyRegularization;
+                    L_CLIP[i] -= L_H;
                 }
 
-                // Update policy SGD 
-                Instance.model.actorNetwork.BackPropagation(mini_batch[t].state, clipped_surrogate_objective);
-                Instance.model.criticNetwork.BackPropagation(mini_batch[t].state, new double[] { mb_returns[t] });
+                // critic label (not loss)
+                double[] L_V = new double[] { mb_returns[t] };
 
-                Instance.model.actorNetwork.OptimizeParameters(Instance.hp.actorLearnRate, Instance.hp.momentum, Instance.hp.regularization);
-                Instance.model.criticNetwork.OptimizeParameters(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
+                // Update policy SGD 
+                Instance.actorNetwork.BackPropagation(mini_batch[t].state, L_CLIP);
+                Instance.criticNetwork.BackPropagation(mini_batch[t].state, L_V);
+
+                Instance.actorNetwork.GradientsClipNorm(hp.maxGradNorm);
+                Instance.criticNetwork.GradientsClipNorm(hp.maxGradNorm);
+
+                Instance.actorNetwork.OptimiseParameters(Instance.hp.actorLearnRate, Instance.hp.momentum, Instance.hp.regularization);
+                Instance.criticNetwork.OptimiseParameters(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
             }
         }
 
+        void TD(List<PPOSample> playback, out List<double> advantages, out List<double> returns)
+        {
+            float gamma = Instance.hp.discountFactor;
+
+            returns = new List<double>();
+            advantages = new List<double>();
+
+            for (int i = 0; i < playback.Count; i++)
+            {
+                double discount = 1;
+                double Vt = 0;
+
+                for (int j = i; j < playback.Count; j++)
+                {
+                    if (j == playback.Count - 1)
+                    {
+                        Vt += discount * playback[j].value;
+                    }
+                    else
+                    {
+                        Vt += playback[j].reward * discount;
+                        discount *= gamma;
+
+                        if (playback[i].done)
+                            break;
+                    }  
+                }
+
+                returns.Add(Vt);
+                advantages.Add(Vt - playback[i].value);
+            }
+
+        }
         void GAE(List<PPOSample> playback, out List<double> advantages, out List<double> returns)
         {
             double gamma = Instance.hp.discountFactor;
