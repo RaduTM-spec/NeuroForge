@@ -22,7 +22,6 @@ namespace NeuroForge
             string name = GenerateName();
             AssetDatabase.CreateAsset(this, "Assets/" + name + ".asset");
             AssetDatabase.SaveAssets();
-            Debug.Log(name + " was created!");
         }
 
         public void Store(double[] observations, double[] outputs, double reward, double[] log_probs,double value, bool isEpisodeEnd) 
@@ -43,9 +42,9 @@ namespace NeuroForge
         string GenerateName()
         {
             short id = 1;
-            while (AssetDatabase.LoadAssetAtPath<NeuralNetwork>("Assets/BufferXP#" + id + ".asset") != null)
+            while (AssetDatabase.LoadAssetAtPath<NeuralNetwork>("Assets/Memory#" + id + ".asset") != null)
                 id++;
-            return "BufferXP#" + id;
+            return "Memory#" + id;
         }
     }
  

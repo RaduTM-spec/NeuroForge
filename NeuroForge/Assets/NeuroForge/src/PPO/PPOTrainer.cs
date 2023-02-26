@@ -15,7 +15,7 @@ namespace NeuroForge
         public static PPOTrainer Instance;
 
         [SerializeField] private List<PPOAgent> agents;
-        private PPOActorNetwork actorNetwork;
+        private PPOActor actorNetwork;
         private NeuralNetwork criticNetwork;
         private PPOHyperParameters hp;
         private ActionType actionSpace;
@@ -113,7 +113,7 @@ namespace NeuroForge
                 double[] distributions = Instance.actorNetwork.DiscreteForwardPropagation(mb_playback[t].state).Item1;
 
                 double[] old_log_probs = mb_playback[t].log_probs;
-                double[] new_log_probs = PPOActorNetwork.GetDiscreteLogProbs(distributions);
+                double[] new_log_probs = PPOActor.GetDiscreteLogProbs(distributions);
 
                 // Calculate ratios
                 double[] ratios = new double[new_log_probs.Length];

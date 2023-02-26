@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class DiscreteActorDebugger : MonoBehaviour
 {
-    public PPOActorNetwork discreteNet;
+    public PPOActor discreteNet;
 
     private void Update()
     {

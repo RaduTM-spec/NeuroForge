@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 
@@ -126,7 +127,7 @@ namespace NeuroForge
             short id = 1;
             try
             {
-                while (AssetDatabase.LoadAssetAtPath<NEATNetwork>("Assets/Genome#" + id + ".asset") != null)
+                while (AssetDatabase.LoadAssetAtPath<Genome>("Assets/Genome#" + id + ".asset") != null)
                     id++;
             }
             catch { }
@@ -136,7 +137,6 @@ namespace NeuroForge
             AssetDatabase.CreateAsset(this, "Assets/" + assetName);
             EditorUtility.SetDirty(this);
             AssetDatabase.SaveAssetIfDirty(this);
-            Debug.Log(assetName + " was created!");
         }
         public void OnBeforeSerialize()
         {

@@ -31,6 +31,7 @@ namespace NeuroForge
         [SerializeField] private bool sessionEnd = false;
 
         private int speciesID_counter = 0;
+        private float fitnessRecord = float.MinValue;
 
         private void Awake()
         {
@@ -361,7 +362,8 @@ namespace NeuroForge
                 string id = ("#" + spec.id).PadLeft(10, ' ');             
                 string size = spec.GetIndividuals().Count.ToString().PadLeft(5, ' ');
                 string fitness = spec.GetFitness().ToString("0.000").PadLeft(16,' ');
-                string bestFitness = spec.GetChampion().GetFitness().ToString("0.000").PadLeft(13, ' ');
+                float bestFit = spec.GetChampion().GetFitness();
+                string bestFitness = bestFit.ToString("0.000").PadLeft(13, ' ');
                 string age = spec.age.ToString().PadLeft(4, ' ');
                 string stallness = spec.stagnation.ToString().PadLeft(11, ' ');
 
@@ -383,8 +385,16 @@ namespace NeuroForge
                 text.Append(stallness);
                 
                 text.Append(" |</color>\n");
+
+                fitnessRecord = Math.Max(fitnessRecord, bestFit);
             }
             text.Append("<color=#099c94>------------------------------------------------------------------------\n</color>");
+
+            // Insert fit record
+            
+            text.Append("<color=#099c94>                                            (Fitness record: <b>");
+            text.Append(fitnessRecord.ToString().PadLeft(10, ' '));
+            text.Append("</b>)</color>");
             return text.ToString();
         }
         private Species GetRandomSpecies_AllowedToReproduce()

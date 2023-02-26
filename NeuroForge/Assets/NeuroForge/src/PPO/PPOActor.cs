@@ -13,7 +13,7 @@ using static NeuroForge.Functions;
 namespace NeuroForge
 {
     [Serializable]
-    public class PPOActorNetwork : ScriptableObject
+    public class PPOActor : ScriptableObject
     {
         [SerializeField] public int[] format;
         [SerializeField] public int[] outputBranches;
@@ -247,7 +247,7 @@ namespace NeuroForge
 
 
         // Continuous
-        public PPOActorNetwork(int inputsNum, int continuousSpaceSize, int hiddenUnits, int layersNum, ActivationType activation, InitializationType initType)
+        public PPOActor(int inputsNum, int continuousSpaceSize, int hiddenUnits, int layersNum, ActivationType activation, InitializationType initType)
         {
             // Set format
             format = new int[2 + layersNum];
@@ -357,7 +357,7 @@ namespace NeuroForge
 
 
         // Discrete
-        public PPOActorNetwork(int inputsNum, int[] discreteOutputShape, int hiddenUnits, int layersNum, ActivationType activation, InitializationType initType)
+        public PPOActor(int inputsNum, int[] discreteOutputShape, int hiddenUnits, int layersNum, ActivationType activation, InitializationType initType)
         {
 
             // Set format
@@ -482,13 +482,12 @@ namespace NeuroForge
         private void CreateAsset()
         {
             short id = 1;
-            while (AssetDatabase.LoadAssetAtPath<PPOActorNetwork>("Assets/ActorNN#" + id + ".asset") != null)
+            while (AssetDatabase.LoadAssetAtPath<PPOActor>("Assets/Actor#" + id + ".asset") != null)
                 id++;
-            string assetName = "ActorNN#" + id + ".asset";
+            string assetName = "Actor#" + id + ".asset";
 
             AssetDatabase.CreateAsset(this, "Assets/" + assetName);
             AssetDatabase.SaveAssets();
-            Debug.Log(assetName + " was created!");
         }
         public int GetObservationsNumber() => format[0];
         public int GetActionsNumber() => actionSpace == ActionType.Continuous ? outputBranches[0] : outputBranches.Length; // 1 branch is 1 action for discrete

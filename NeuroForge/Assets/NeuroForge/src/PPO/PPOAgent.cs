@@ -15,7 +15,7 @@ namespace NeuroForge
     {
         // Displayed fields
         public BehaviourType behavior = BehaviourType.Inference;
-        [SerializeField] public PPOActorNetwork actor;
+        [SerializeField] public PPOActor actor;
         [SerializeField] public NeuralNetwork critic;
         [HideInInspector] public PPOMemory memory;
 
@@ -97,7 +97,7 @@ namespace NeuroForge
                         UnityEngine.Debug.LogError("Branch " + DiscreteBranches[i] + " cannot have 0 discrete actions");
                         throw new Exception("Error");
                     }
-                actor = new PPOActorNetwork(observationSize, DiscreteBranches, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType);
+                actor = new PPOActor(observationSize, DiscreteBranches, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType);
             }
             else
             {
@@ -106,7 +106,7 @@ namespace NeuroForge
                     UnityEngine.Debug.LogError("Agent cannot have 0 continuous actions");
                     throw new Exception("Error");
                 }
-                actor = new PPOActorNetwork(observationSize, ContinuousSize, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType);              
+                actor = new PPOActor(observationSize, ContinuousSize, hp.hiddenUnits, hp.layersNumber, hp.activationType, hp.initializationType);              
             }
 
             // create the critic network
@@ -203,7 +203,7 @@ namespace NeuroForge
 
                 double[] state = sensorBuffer.Observations;
                 double[] action = dist_acts.Item1;
-                double[] log_probs = PPOActorNetwork.GetDiscreteLogProbs(dist_acts.Item1);
+                double[] log_probs = PPOActor.GetDiscreteLogProbs(dist_acts.Item1);
                 double value = critic.ForwardPropagation(sensorBuffer.Observations)[0];
                 
                 memory.Store(state, action, reward, log_probs, value, isEpisodeEnd);
@@ -274,9 +274,9 @@ namespace NeuroForge
         private string GetCriticName()
         {
             short id = 1;
-            while (AssetDatabase.LoadAssetAtPath<NeuralNetwork>("Assets/CriticNN#" + id + ".asset") != null)
+            while (AssetDatabase.LoadAssetAtPath<NeuralNetwork>("Assets/Critic#" + id + ".asset") != null)
                 id++;
-            return "CriticNN#" + id;
+            return "Critic#" + id;
         }
         public ActionType GetActionSpace() => actionSpace;
 

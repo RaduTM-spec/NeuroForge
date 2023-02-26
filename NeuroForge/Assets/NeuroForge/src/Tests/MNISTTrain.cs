@@ -8,7 +8,7 @@ using static UnityEngine.Mesh;
 
 public class MNISTTrain : MonoBehaviour
 {
-    public PPOActorNetwork network;
+    public PPOActor network;
     public int miniBatchSize = 64;
     Dictionary<int, List<float[]>> trainData;
     Dictionary<int, List<float[]>> testData;
@@ -25,7 +25,7 @@ public class MNISTTrain : MonoBehaviour
     {
         if(network == null)
         {
-            network = new PPOActorNetwork(784, new int[] { 10 }, 50, 1, ActivationType.Relu, InitializationType.He);
+            network = new PPOActor(784, new int[] { 10 }, 50, 1, ActivationType.Relu, InitializationType.He);
         }
     }
 

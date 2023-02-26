@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace NeuroForge
 {
-    public class Species
+    public class Species : IResetable
     {       
         public int id;
         private float avgFitness = float.MinValue;
