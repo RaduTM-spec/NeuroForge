@@ -9,7 +9,6 @@ using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.Windows;
 using static NeuroForge.Functions;
-using static TMPro.SpriteAssetUtilities.TexturePacker_JsonArray;
 
 namespace NeuroForge
 {

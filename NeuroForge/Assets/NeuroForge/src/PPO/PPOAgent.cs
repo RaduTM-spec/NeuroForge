@@ -119,7 +119,7 @@ namespace NeuroForge
 
 
         // Loop
-        protected virtual void Update()
+        protected virtual void FixedUpdate()
         {
             switch (behavior)
             {
@@ -133,7 +133,9 @@ namespace NeuroForge
                     ManualAction();
                     break;
             }
-
+        }
+        protected virtual void Update()
+        {
             episodeTimePassed += Time.deltaTime;
             if (episodeTimePassed >= timeHorizon && behavior == BehaviourType.Inference)
                 EndEpisode();
@@ -145,7 +147,9 @@ namespace NeuroForge
         }
         private void ManualAction()
         {
-
+            actionBuffer.Clear();
+            Heuristic(actionBuffer);
+            OnActionReceived(actionBuffer);
         }
         private void SelfAction()
         {
@@ -156,15 +160,15 @@ namespace NeuroForge
             agentSensor.CollectObservations(sensorBuffer);
             
             if(hp.normObservations) 
-                observationsNormalizer.NormalizeMinusOneOne(sensorBuffer.observations, false);
+                observationsNormalizer.NormalizeMinusOneOne(sensorBuffer.Observations, false);
 
             if(actionSpace == ActionType.Continuous)
             {
-                actionBuffer.continuousActions = actor.ContinuousForwardPropagation(sensorBuffer.observations).Item2;           
+                actionBuffer.ContinuousActions = actor.ContinuousForwardPropagation(sensorBuffer.Observations).Item2;           
             }
             else
             {
-                actionBuffer.discreteActions = actor.DiscreteForwardPropagation(sensorBuffer.observations).Item2;
+                actionBuffer.DiscreteActions = actor.DiscreteForwardPropagation(sensorBuffer.Observations).Item2;
             }
             OnActionReceived(actionBuffer);
 
@@ -178,29 +182,29 @@ namespace NeuroForge
             agentSensor.CollectObservations(sensorBuffer);
             
             if(hp.normObservations)
-                observationsNormalizer.NormalizeMinusOneOne(sensorBuffer.observations, true);
+                observationsNormalizer.NormalizeMinusOneOne(sensorBuffer.Observations, true);
 
             if(actionSpace == ActionType.Continuous)
             {
-                (double[], float[]) outs_acts = actor.ContinuousForwardPropagation(sensorBuffer.observations);
-                actionBuffer.continuousActions = outs_acts.Item2;
+                (double[], float[]) outs_acts = actor.ContinuousForwardPropagation(sensorBuffer.Observations);
+                actionBuffer.ContinuousActions = outs_acts.Item2;
 
-                double[] state = sensorBuffer.observations;
+                double[] state = sensorBuffer.Observations;
                 double[] action = outs_acts.Item1;
                 double[] log_probs = actor.GetContinuousLogProbs(outs_acts.Item1, outs_acts.Item2);
-                double value = critic.ForwardPropagation(sensorBuffer.observations)[0];
+                double value = critic.ForwardPropagation(sensorBuffer.Observations)[0];
                 
                 memory.Store(state, action, reward, log_probs, value, isEpisodeEnd);
             }
             else
             {
-                (double[],int[]) dist_acts = actor.DiscreteForwardPropagation(sensorBuffer.observations);
-                actionBuffer.discreteActions = dist_acts.Item2;
+                (double[],int[]) dist_acts = actor.DiscreteForwardPropagation(sensorBuffer.Observations);
+                actionBuffer.DiscreteActions = dist_acts.Item2;
 
-                double[] state = sensorBuffer.observations;
+                double[] state = sensorBuffer.Observations;
                 double[] action = dist_acts.Item1;
                 double[] log_probs = PPOActorNetwork.GetDiscreteLogProbs(dist_acts.Item1);
-                double value = critic.ForwardPropagation(sensorBuffer.observations)[0];
+                double value = critic.ForwardPropagation(sensorBuffer.Observations)[0];
                 
                 memory.Store(state, action, reward, log_probs, value, isEpisodeEnd);
             }
@@ -224,7 +228,7 @@ namespace NeuroForge
         {
 
         }
-        public virtual void Heuristic(ActionBuffer actionBuffer)
+        public virtual void Heuristic(ActionBuffer actionSet)
         {
 
         }

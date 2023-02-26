@@ -11,7 +11,7 @@ namespace NeuroForge
     {       
         public int id;
         private float avgFitness = float.MinValue;
-        private float bestFitness = float.MinValue;
+        private float bestFitness = float.MinValue; // best fitness managed by an individual ever in this species
         public int stagnation = 0;
         public int age = -1;
 
@@ -26,11 +26,25 @@ namespace NeuroForge
             this.id = id;
         }        
 
-        
+        public void Reset()
+        {
+            // If the representative is always maintained here, this species will eventually dissapear and will be transformed in another one.
+            // So to keep the same species object, i always change the representative with a random nextgen individual
+            representative = Functions.RandomIn(individuals);
+
+            foreach (var ind in individuals)
+            {
+                ind.SetSpecies(null);
+            }
+            individuals.Clear();
+            
+            representative.SetSpecies(this);
+            individuals.Add(representative);
+        }
         // Joining
         public bool TryAdd(NEATAgent agent)
         {
-            if(SameSpecies(agent.model, representative.model))
+            if(AreCompatible(agent.model, representative.model))
             {
                 individuals.Add(agent);
                 agent.SetSpecies(this);
@@ -64,6 +78,7 @@ namespace NeuroForge
                 representative = individuals.Last();
             }
 
+
             
         }
         public void GoExtinct()
@@ -73,11 +88,16 @@ namespace NeuroForge
                 ag.model = null;
                 ag.SetSpecies(null);
             }
-            individuals.Clear();
-            representative = null;
         }
 
         // Breeding
+        public void ShareFitness()
+        {
+            foreach (var indiv in individuals)
+            {
+                indiv.SetFitness(indiv.GetFitness() / individuals.Count);
+            }
+        }
         public Genome Breed()
         {
             Genome offspring = null;
@@ -197,7 +217,7 @@ namespace NeuroForge
         }
 
         // Similarity
-        static bool SameSpecies(Genome genome1, Genome genome2)
+        static bool AreCompatible(Genome genome1, Genome genome2)
         {
             float delta = NEATTrainer.GetHyperParam().delta;
             float c1 = NEATTrainer.GetHyperParam().c1;
@@ -233,7 +253,10 @@ namespace NeuroForge
                 foreach (var conn2 in genome2.connections.Keys)
                 {
                     if (conn1 == conn2)
+                    {
                         highestMatch = Math.Max(highestMatch, conn1);
+                        break;
+                    }
                 }
             }
 
@@ -255,13 +278,16 @@ namespace NeuroForge
             int disJoints = 0;
             int highestMatch = 0;
 
-            // Calculate highest match, joints are less than this
+            // Calculate highest match, disjoints are less than this
             foreach (var conn1 in genome1.connections)
             {
                 foreach (var conn2 in genome2.connections)
                 {
                     if (conn1.Key == conn2.Key)
+                    {
                         highestMatch = Mathf.Max(highestMatch, conn1.Key);
+                        break;
+                    }
                 }
             }
 
@@ -299,6 +325,9 @@ namespace NeuroForge
         }
         static float Calculate_W(Genome genome1, Genome genome2)
         {
+            if (genome1.connections.Count == 0 && genome2.connections.Count == 0)
+                return 0;
+
             float dif = 1e-8f;
             float matchesCount = 1e-10f;
 
@@ -317,37 +346,24 @@ namespace NeuroForge
             
             return dif / matchesCount;
         }
-
+        
 
         // Other
-        public void ClearClients()
-        {
-            // Clear everything but representative
-            foreach (var cl in individuals)
-            {
-                cl.SetSpecies(null);
-            }
-            individuals.Clear();
-
-            representative.SetSpecies(this);
-            individuals.Add(representative);
-        }
         public void CalculateAvgFitness()
         {
-            float new_average_fitness = individuals.Select(x => x.GetFitness()).Average();
-            bestFitness = Math.Max(bestFitness, new_average_fitness);
+            NEATAgent bestAgent = GetChampion();
 
-            if (new_average_fitness < bestFitness)
+            if (bestAgent.GetFitness() <= bestFitness)
                 stagnation++;
             else
                 stagnation = 0;
 
-            avgFitness = new_average_fitness;
-
+            bestFitness = Math.Max(bestFitness, bestAgent.GetFitness());
+            avgFitness = individuals.Average(x => x.GetFitness());
         }
         public float GetFitness() => avgFitness;
         public bool IsAllowedToReproduce(int stagnationAllowance) => stagnationAllowance > stagnation;
-        public NEATAgent GetBestAgent()
+        public NEATAgent GetChampion()
         {
             NEATAgent best_ag = null;
             foreach (var ag in individuals)

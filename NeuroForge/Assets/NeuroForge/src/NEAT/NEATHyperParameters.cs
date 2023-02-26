@@ -17,7 +17,6 @@ namespace NeuroForge
         [Min(1)] public int populationSize = 100;
         [Min(5), Tooltip("generations")] public int stagnationAllowance = 15;
         [Range(.2f, .8f)] public float survivalRate = .5f;
-        
 
         [Header("Speciation")]
         [Min(0)] public float delta = 3f;

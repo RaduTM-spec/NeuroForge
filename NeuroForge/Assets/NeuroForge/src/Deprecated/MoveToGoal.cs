@@ -22,22 +22,22 @@ public class MoveToGoal : PPOAgent
     public override void OnActionReceived(in ActionBuffer actionBuffer)
     {
         //transform.position += new Vector3(actionBuffer.continuousActions[0], 0, actionBuffer.continuousActions[1]) * Time.deltaTime * speed;
-       switch(actionBuffer.discreteActions[0])
+       switch(actionBuffer.DiscreteActions[0])
         {
             case 0:
-                transform.position += Vector3.left * Time.deltaTime * speed;
+                transform.position += Vector3.left * Time.fixedDeltaTime * speed;
                 break;
             case 1:
-                transform.position += Vector3.forward * Time.deltaTime * speed;
+                transform.position += Vector3.forward * Time.fixedDeltaTime * speed;
                 break;
             case 2:
-                transform.position += Vector3.right * Time.deltaTime * speed;
+                transform.position += Vector3.right * Time.fixedDeltaTime * speed;
                 break;
             case 3:
-                transform.position += Vector3.back * Time.deltaTime * speed;
+                transform.position += Vector3.back * Time.fixedDeltaTime * speed;
                 break;
         }
-       switch(actionBuffer.discreteActions[1])
+       switch(actionBuffer.DiscreteActions[1])
         {
             case 0:
                 break;
@@ -49,8 +49,8 @@ public class MoveToGoal : PPOAgent
     }
     public override void Heuristic(ActionBuffer actionSet)
     {
-        actionSet.continuousActions[0] = Input.GetAxisRaw("Horizontal");
-        actionSet.continuousActions[1] = Input.GetAxisRaw("Vertical");
+        actionSet.ContinuousActions[0] = Input.GetAxisRaw("Horizontal");
+        actionSet.ContinuousActions[1] = Input.GetAxisRaw("Vertical");
     }
     public void OnCollisionEnter(Collision collision)
     {

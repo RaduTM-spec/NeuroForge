@@ -39,9 +39,6 @@ namespace NeuroForge
 
             InitNetwork();
 
-            // Init Innovation Counter
-            InnovationHistory.Instance = new InnovationHistory(this.model);
-
             // Init buffers
             sensorBuffer = new SensorBuffer(model.GetInputsNumber());
             actionBuffer = new ActionBuffer(model.GetOutputsNumber());
@@ -49,9 +46,15 @@ namespace NeuroForge
             // Init sensors
             agentSensor = new AgentSensor(this.transform);
 
-            // Init trainer
+
             if (behavior == BehaviourType.Inference)
+            {
+                // Init Innovation Counter
+                InnovationHistory.Instance = new InnovationHistory(this.model);
+
+                // Init trainer
                 NEATTrainer.Initialize(this);
+            }          
         }
         public void InitNetwork()
         {
@@ -93,7 +96,7 @@ namespace NeuroForge
 
 
         // Loop
-        protected virtual void Update()
+        protected virtual void FixedUpdate()
         {
             switch (behavior)
             {
@@ -106,14 +109,15 @@ namespace NeuroForge
                 case BehaviourType.Manual:
                     ManualAction();
                     break;
-                default:
-                    // Inactive
+                default: // Inactive
                     break;
             }
         }
         private void ManualAction()
         {
-
+            actionBuffer.Clear();
+            Heuristic(actionBuffer);
+            OnActionReceived(actionBuffer);
         }
         private void ActiveAction()
         {
@@ -125,11 +129,11 @@ namespace NeuroForge
 
             if (actionSpace == ActionType.Continuous)
             {
-                actionBuffer.continuousActions = model.GetContinuousActions(sensorBuffer.observations);
+                actionBuffer.ContinuousActions = model.GetContinuousActions(sensorBuffer.Observations);
             }
             else
             {
-                actionBuffer.discreteActions = model.GetDiscreteActions(sensorBuffer.observations);
+                actionBuffer.DiscreteActions = model.GetDiscreteActions(sensorBuffer.Observations);
             }
             OnActionReceived(actionBuffer);
         }
@@ -137,31 +141,61 @@ namespace NeuroForge
 
 
         // User Call 
+        /// <summary>
+        /// Called in FixedUpdate().
+        /// </summary>
+        /// <param name="sensorBuffer"></param>
         public virtual void CollectObservations(SensorBuffer sensorBuffer)
         {
 
         }
+        /// <summary>
+        /// Called in FixedUpdate().
+        /// </summary>
+        /// <param name="actionBuffer"></param>
         public virtual void OnActionReceived(in ActionBuffer actionBuffer)
         {
 
         }
-        public virtual void Heuristic(ActionBuffer actionBuffer)
+        /// <summary>
+        /// Called in FixedUpdate(). In NEAT is used for manual control only.
+        /// </summary>
+        /// <param name="actionBuffer"></param>
+        public virtual void Heuristic(ActionBuffer actionSet)
         {
 
         }
+        /// <summary>
+        /// Add reward only if the agent is alive
+        /// </summary>
+        /// <typeparam name="T">Any of: double, int, float, long etc.</typeparam>
+        /// <param name="reward"></param>
         public void AddReward<T>(T reward) where T : struct
         {
             if (behavior == BehaviourType.Inactive) return;          
             this.fitness += Convert.ToSingle(reward);
         }
+        /// <summary>
+        /// Add reward even if the agent is dead
+        /// </summary>
+        /// <typeparam name="T">Any of: double, int, float, long etc.</typeparam>
+        /// <param name="reward"></param>
         public void ForceAddReward<T>(T reward) where T : struct
         {
             this.fitness += Convert.ToSingle(reward);
         }
+        /// <summary>
+        /// Set reward even if the agent is dead
+        /// </summary>
+        /// <typeparam name="T">Any of: double, int, float, long etc.</typeparam>
+        /// <param name="reward"></param>
         public void SetReward<T>(T reward)
         {
             this.fitness = Convert.ToSingle(reward);
         }
+        /// <summary>
+        /// Set behaviour from inference to inactive.
+        /// </summary>
         public void EndEpisode()
         {
             if(behavior == BehaviourType.Inference)
@@ -179,7 +213,7 @@ namespace NeuroForge
         public Species GetSpecies() => species;
         public void SetSpecies(Species species) => this.species = species;
         public void Resurrect() => behavior = BehaviourType.Inference;
-        public void ResetFitness() => fitness = 0f;
+        public void SetFitness(float fit) => fitness = fit;
         public ActionType GetActionSpace() => actionSpace;
     }
 

@@ -9,6 +9,7 @@ using System.Text;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
+using static Unity.VisualScripting.LudiqRootObjectEditor;
 
 namespace NeuroForge
 {
@@ -68,7 +69,7 @@ namespace NeuroForge
                 foreach (var agent in Instance.population)
                 {
                     agent.Resurrect();
-                    agent.ResetFitness();
+                    agent.SetFitness(0f);
                 }
 
                 // Check for stop
@@ -80,7 +81,7 @@ namespace NeuroForge
                     {
                         ag.behavior = BehaviourType.Inactive;
                     }
-                    Debug.Log("<color=green> Training session ended! </color>");
+                    Debug.Log("<color=#2873eb><b>Training session ended!</b></color>");
                     EditorApplication.isPlaying = false;
                    
                 }
@@ -190,6 +191,7 @@ namespace NeuroForge
                 Gizmos.DrawWireSphere(secondPoint, NODE_SCALE * 0.1f);
             }
         }
+
         // Trainer
         public static void Ready()
         {
@@ -243,7 +245,7 @@ namespace NeuroForge
             Speciate();
             SortSpecies();         
             Culling();
-            SpeciesExtinction();
+            RemoveExtinctSpecies();
             Reproduce();
            
 
@@ -253,20 +255,19 @@ namespace NeuroForge
         }
         void Speciate()
         {
-            // Clear species
+            // Reset species - representative is cleared too
             foreach (var spec in species)
             {
-                spec.ClearClients();
+                spec.Reset();
             }
 
             // Set species
             foreach (var agent in population)
             {
-                // If he is a representative of a species
+                // Representatives already joined species
                 if (agent.GetSpecies() != null)
-                    continue;
+                    continue; 
 
-                // Else introduce him in a species
                 bool joined_species = false;
                 foreach (var spc in species)
                 {
@@ -284,20 +285,12 @@ namespace NeuroForge
                 }
             }
 
-            // Increment the age foreach species
-            foreach (var item in species)
-            {
-                item.age++;
-            }
         }
         void SortSpecies()
         {
-            // Calculate score
-            foreach (var spec in species)
-            {
+            foreach (var spec in species)            
                 spec.CalculateAvgFitness();
-            }
-
+            
             species.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
         }
         void Culling()
@@ -306,20 +299,21 @@ namespace NeuroForge
             {
                 spec.Kill(1f - Instance.hp.survivalRate);
             }
+           
         }
-        void SpeciesExtinction()
+        void RemoveExtinctSpecies()
         {
             // Species that doesn't reproduce enough are in danger
  
-            List<Species> toExtinctSpecies = new List<Species>();
+            List<Species> toRemove = new List<Species>();
             foreach (var spec in species)
             {
                 if (spec.GetIndividuals().Count < 2)
                 {
-                    toExtinctSpecies.Add(spec);
+                    toRemove.Add(spec);
                 }
             }
-            foreach (var extSpecies in toExtinctSpecies)
+            foreach (var extSpecies in toRemove)
             {
                 extSpecies.GoExtinct();
                 species.Remove(extSpecies);
@@ -336,6 +330,12 @@ namespace NeuroForge
                     spec.ForceAdd(agent);
                 }
             }
+
+            // Increment the age foreach species
+            foreach (var item in species)
+            {
+                item.age++;
+            }
         }
         
 
@@ -346,9 +346,9 @@ namespace NeuroForge
             text.Append("<color=#2873eb><b>Generation ");
             text.Append(++generation);
             text.Append("</b></color>\n");
-            text.Append("<color=#099c94>_________________________________________________\n</color>");
-            text.Append("<color=#099c94>| SpeciesID | Size | Fitness | Age | Stagnation |\n</color>"); 
-            text.Append("<color=#099c94>-------------------------------------------------\n</color>");
+            text.Append("<color=#099c94>________________________________________________________________________\n</color>");
+            text.Append("<color=#099c94>| SpeciesID | Size | Average Fitness | Best Fitness | Age | Stagnation |\n</color>"); 
+            text.Append("<color=#099c94>------------------------------------------------------------------------\n</color>");
             species.Reverse();
             foreach (var spec in species)
             {
@@ -360,23 +360,31 @@ namespace NeuroForge
 
                 string id = ("#" + spec.id).PadLeft(10, ' ');             
                 string size = spec.GetIndividuals().Count.ToString().PadLeft(5, ' ');
-                string fitness = spec.GetFitness().ToString("0.00").PadLeft(8,' ');
+                string fitness = spec.GetFitness().ToString("0.000").PadLeft(16,' ');
+                string bestFitness = spec.GetChampion().GetFitness().ToString("0.000").PadLeft(13, ' ');
                 string age = spec.age.ToString().PadLeft(4, ' ');
                 string stallness = spec.stagnation.ToString().PadLeft(11, ' ');
 
                 text.Append(id);
+
                 text.Append(" |");
                 text.Append(size);
+
                 text.Append(" |");
                 text.Append(fitness);
+
+                text.Append(" |");
+                text.Append(bestFitness);
+
                 text.Append(" |");
                 text.Append(age);
+
                 text.Append(" |");
                 text.Append(stallness);
                 
                 text.Append(" |</color>\n");
             }
-            text.Append("<color=#099c94>-------------------------------------------------\n</color>");
+            text.Append("<color=#099c94>------------------------------------------------------------------------\n</color>");
             return text.ToString();
         }
         private Species GetRandomSpecies_AllowedToReproduce()
@@ -384,13 +392,17 @@ namespace NeuroForge
             if (species.Count == 1) return species.First();
             
             List<Species> allowed_to_reproduce_species = species.Where(x => x.IsAllowedToReproduce(hp.stagnationAllowance)).ToList();
+
+            if (allowed_to_reproduce_species.Count == 0)
+                return species.First();
+
             List<float> probs = allowed_to_reproduce_species.Select(x => x.GetFitness()).ToList();
 
             return Functions.RandomIn(allowed_to_reproduce_species, probs);
         }
         private Genome GetBestModel()
         {
-            List<NEATAgent> best_foreach_species = species.Select(x => x.GetBestAgent()).ToList();
+            List<NEATAgent> best_foreach_species = species.Select(x => x.GetChampion()).ToList();
             NEATAgent best = null;
             foreach (var some in best_foreach_species)
             {

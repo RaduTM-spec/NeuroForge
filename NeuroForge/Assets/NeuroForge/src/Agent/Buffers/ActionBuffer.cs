@@ -6,12 +6,12 @@ namespace NeuroForge
 {
     public class ActionBuffer : IClearable
     {
-        public float[] continuousActions;
-        public int[] discreteActions;
+        public float[] ContinuousActions;
+        public int[] DiscreteActions;
         public ActionBuffer(int capacity)
         {
-            continuousActions = new float[capacity];
-            discreteActions = new int[capacity];
+            ContinuousActions = new float[capacity];
+            DiscreteActions = new int[capacity];
         }
 
         public double[] ActionsToDouble(ActionType type)
@@ -20,9 +20,9 @@ namespace NeuroForge
             switch(type)
             {
                 case ActionType.Continuous:
-                    return continuousActions.Select(x => (double)x).ToArray();
+                    return ContinuousActions.Select(x => (double)x).ToArray();
                 case ActionType.Discrete:
-                    return discreteActions.Select(x => (double)x).ToArray();
+                    return DiscreteActions.Select(x => (double)x).ToArray();
                 default:
                     throw new System.Exception("invalid actions type");
             }
@@ -30,15 +30,15 @@ namespace NeuroForge
         }
         public void Clear()
         {
-            continuousActions = Enumerable.Repeat(0f, continuousActions.Length).ToArray();
-            discreteActions = Enumerable.Repeat(0, discreteActions.Length).ToArray();
+            ContinuousActions = Enumerable.Repeat(0f, ContinuousActions.Length).ToArray();
+            DiscreteActions = Enumerable.Repeat(0, DiscreteActions.Length).ToArray();
         }
         public override string ToString()
         {
             StringBuilder stringBuilder = new StringBuilder();
 
             stringBuilder.Append("continuous:[ ");
-            foreach (var c in continuousActions)
+            foreach (var c in ContinuousActions)
             {
                 stringBuilder.Append(c);
                 stringBuilder.Append(", ");
@@ -47,7 +47,7 @@ namespace NeuroForge
             stringBuilder.Append("]");
 
             stringBuilder.Append("discrete:[ ");
-            foreach (var d in discreteActions)
+            foreach (var d in DiscreteActions)
             {
                 stringBuilder.Append(d);
                 stringBuilder.Append(", ");

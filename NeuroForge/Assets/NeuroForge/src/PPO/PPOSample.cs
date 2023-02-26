@@ -1,7 +1,7 @@
-using JetBrains.Annotations;
 using System;
 using System.Text;
 using UnityEngine;
+
 namespace NeuroForge
 {
     [Serializable]
