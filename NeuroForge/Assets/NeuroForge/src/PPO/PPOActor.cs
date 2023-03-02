@@ -35,9 +35,9 @@ namespace NeuroForge
         // Gradient Descent
         public void BackPropagation(double[] inputs, double[] losses)
         {
-            // losses = Derivative of the loss function values here
+            // losses represent the derivative of the loss function values
             if (weightGradients == null || weightGradients.Length < 1)
-                InitGradients();
+                ZeroGradients();
 
             NeuronLayer outLayer = neuronLayers[neuronLayers.Length - 1];
 
@@ -87,7 +87,7 @@ namespace NeuroForge
         {
             double global_sum = 0;
 
-            // Sum weights' gradients
+            // Sum weights' gradients square
             foreach (var grad_layer in weightGradients)
             {
                 foreach (var clump in grad_layer.weights)
@@ -99,7 +99,7 @@ namespace NeuroForge
                 }
             }
 
-            // Sum biases' gradients
+            // Sum biases' gradients square
             foreach (var bias_layer in biasGradients)
             {
                 foreach (var b_grad in bias_layer.biases)
@@ -169,7 +169,7 @@ namespace NeuroForge
         }
        
 
-        private void InitGradients()
+        private void ZeroGradients()
         {
             biasGradients = new BiasLayer[format.Length];
             biasMomentums = new BiasLayer[format.Length];

@@ -22,17 +22,14 @@ namespace NeuroForge
 
         
 
-        public NodeGene(int id, NEATNodeType type, float layer)
+        public NodeGene(int id, NEATNodeType type, float layer, ActivationTypeF activation)
         {
             this.id = id;
             InValue = 0;
             OutValue = type == NEATNodeType.bias ? 1 : 0;
 
             this.type = type;
-
-            activationType = type == NEATNodeType.hidden? 
-                            (ActivationTypeF)(int)(FunctionsF.RandomValue() * Enum.GetValues(typeof(ActivationTypeF)).Length) :     
-                            ActivationTypeF.Linear;
+            activationType = activation;
 
             incomingConnections = new List<int>();
             this.layer = layer;

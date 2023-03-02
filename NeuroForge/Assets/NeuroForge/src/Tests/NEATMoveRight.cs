@@ -22,12 +22,12 @@ public class NEATMoveRight : NEATAgent
     }
     public override void CollectObservations(SensorBuffer sensorBuffer)
     {
-
+        
     }
     public override void OnActionReceived(in ActionBuffer actionBuffer)
     {
-        //transform.position += new Vector3(actionBuffer.continuousActions[0], 0, actionBuffer.continuousActions[1]) * Time.deltaTime * speed;
-        switch (actionBuffer.DiscreteActions[0])
+        transform.position += new Vector3(actionBuffer.ContinuousActions[0], 0, actionBuffer.ContinuousActions[1]) * Time.fixedDeltaTime * speed;
+        /*switch (actionBuffer.DiscreteActions[0])
         {
             case 0:
                 transform.position += Vector3.left * Time.fixedDeltaTime * speed;
@@ -44,7 +44,7 @@ public class NEATMoveRight : NEATAgent
             case 4:
                 //do nothing
                 break;
-        }
+        }*/
     }
     public override void Heuristic(ActionBuffer actionSet)
     {
@@ -73,12 +73,12 @@ public class NEATMoveRight : NEATAgent
     {
         if (collision.collider.name == "Target")
         {
-            SetReward(transform.position.z);
+            SetReward(transform.position.z + 100f);
             EndEpisode();
         }
         else if (collision.collider.CompareTag("Wall"))
         {
-            SetReward(transform.position.z);
+            SetReward(transform.position.z - 5f);
             EndEpisode();
         }
 

@@ -41,16 +41,17 @@ namespace NeuroForge
         }
         public static T RandomIn<T>(IEnumerable<T> values, List<float> probs)
         {
-            // works perfectly
-            // Negative probs are almost zeroed (it should have been exponentiated but too large values will break the memory) 
+            // recommended to let it as it is
+            // Push or drag them such way the minimum value in probs is 0
             for (int i = 0; i < probs.Count; i++)
             {
                 if (probs[i] <= 0)
                     probs[i] = 1e-8f;
             }
-            
+
             float random = FunctionsF.RandomValue() * probs.Sum();
-            int index = 0;
+            int index = 0; // dont modify this and that -1 at the end, is case for 0 0 0 0 on probs
+
             while (random > 0)
             {
                 random -= probs[index];
@@ -70,13 +71,11 @@ namespace NeuroForge
             {
                 sum += (item - mean) * (item - mean);
             }
-            double std = Math.Sqrt(sum / list.Count);
+            double variance = sum / list.Count;
+            double std = Math.Sqrt(variance);
 
             // Normalize list
-            for (int i = 0; i < list.Count; i++)
-            {
-                list[i] = (list[i] - mean) / (std + 1e-8);
-            }
+            list = list.Select(x => (x - mean) / (std + 1e-8)).ToList();
         }
         public static void Shuffle<T>(List<T> list, int iterations = 1)
         {

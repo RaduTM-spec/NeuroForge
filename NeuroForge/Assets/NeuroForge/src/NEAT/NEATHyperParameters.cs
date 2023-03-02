@@ -10,19 +10,19 @@ namespace NeuroForge
     public class NEATHyperParameters : MonoBehaviour 
     {
         [Header("Session")]
-        [Min(50)] public int generations = 1000;
+        [Min(5)] public int generations = 1000;
         [Min(5), Tooltip("seconds")] public int timeHorizon = 60;
 
         [Header("Individuals")]
-        [Min(1)] public int populationSize = 100;
-        [Min(5), Tooltip("generations")] public int stagnationAllowance = 15;
+        [Min(1)] public int populationSize = 150;
+        [Min(5), Tooltip("generations")] public int stagnationAllowance = 20;
         [Range(.2f, .8f)] public float survivalRate = .5f;
 
         [Header("Speciation")]
-        [Min(0)] public float delta = 3f;
-        [Min(0)] public float c1 = 1f;
-        [Min(0)] public float c2 = 1f;
-        [Min(0)] public float c3 = 0.4f;
+        [Min(0), Tooltip("distance")] public float delta = 3f;
+        [Min(0), Tooltip("excess coef")] public float c1 = 1f;
+        [Min(0), Tooltip("disjoint coef")] public float c2 = 1f;
+        [Min(0), Tooltip("weight diff coef")] public float c3 = 0.4f;
         [Range(0, 1)] public float cloneBreeding = 0.25f;
 
         [Header("Mutation probabilities")]
@@ -32,8 +32,17 @@ namespace NeuroForge
         [Range(0, 1)] public float mutateNode = 0.04f;
 
         [Header("Genome structure")]
-        [Min(30)] public int maxConnections = 100;
-        [Min(5)] public int maxNodes = 20;
+        [Min(30)] public int maxConnections = 150;
+        [Min(5)] public int maxNodes = 30;
+        public bool oneActivationType = false;
+
+        [Header("Display")]
+        public Color biasNodeColor = Color.blue;
+        public Color inputNodesColor = Color.yellow;
+        public Color hiddenNodesColor = Color.green;
+        public Color outputNodesColor = Color.red;
+        public Color disabledConnectionsColor = Color.white;
+        public NodesDrawShape nodeShape = NodesDrawShape.Sphere;
     }
 
     [CustomEditor(typeof(NEATHyperParameters), true), CanEditMultipleObjects]

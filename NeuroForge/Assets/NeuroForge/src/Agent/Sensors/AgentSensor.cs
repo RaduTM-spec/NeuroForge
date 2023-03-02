@@ -23,12 +23,12 @@ namespace NeuroForge
                 if (item.GetType() == typeof(RaySensor))
                 {
                     RaySensor sens = (RaySensor)item;
-                    buffer.AddObservation(sens.GetObservations());
+                    buffer.AddObservation(sens.Observations);
                 }
                 else
-                if (item.GetType() == typeof(CameraSensor))
+                if (item.GetType() == typeof(CamSensor))
                 {
-                    CameraSensor sens = (CameraSensor)item;
+                    CamSensor sens = (CamSensor)item;
                     buffer.AddObservation(sens.FlatCapture());
                 }
             }
@@ -37,7 +37,7 @@ namespace NeuroForge
         private void InitSensors(Transform parent)
         {
             RaySensor rayFound = parent.GetComponent<RaySensor>();
-            CameraSensor camFound = parent.GetComponent<CameraSensor>();
+            CamSensor camFound = parent.GetComponent<CamSensor>();
 
             if (rayFound != null && rayFound.enabled)
                 sensors.Add(rayFound);

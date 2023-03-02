@@ -11,7 +11,6 @@ namespace NeuroForge
     [DisallowMultipleComponent, RequireComponent(typeof(NEATHyperParameters))]
     public class NEATAgent : MonoBehaviour
     {
-        #region Fields
         public BehaviourType behavior = BehaviourType.Inference;
         [SerializeField] public Genome model;
         [SerializeField] private bool fullyConnected = false;
@@ -30,7 +29,8 @@ namespace NeuroForge
 
         private Species species;
         private float fitness = 0;
-        #endregion
+        private float adjustedFitness = 0;
+        
 
         // Setup
         protected virtual void Awake()
@@ -139,7 +139,6 @@ namespace NeuroForge
         }
        
 
-
         // User Call 
         /// <summary>
         /// Called in FixedUpdate().
@@ -207,13 +206,18 @@ namespace NeuroForge
         }
        
 
-
-        // Other
-        public float GetFitness() => fitness;
+        // Species
         public Species GetSpecies() => species;
         public void SetSpecies(Species species) => this.species = species;
+
+        // Fitness
+        public float GetFitness() => fitness;
+        public float GetAdjustedFitness() => adjustedFitness;
+        public void SetFitness(float fit) => fitness = fit;       
+        public void SetAdjustedFitness(float shFit) => adjustedFitness = shFit;
+
+        // Other
         public void Resurrect() => behavior = BehaviourType.Inference;
-        public void SetFitness(float fit) => fitness = fit;
         public ActionType GetActionSpace() => actionSpace;
     }
 

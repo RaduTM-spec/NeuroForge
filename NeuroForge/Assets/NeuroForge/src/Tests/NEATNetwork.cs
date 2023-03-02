@@ -44,20 +44,20 @@ namespace NeuroForge //COMPLETELY DEPRECATED
             int innov = 1;
 
             nodes = new Dictionary<int, NodeGene>();
-            NodeGene bias = new NodeGene(innov++, NEATNodeType.bias, 0);
+            NodeGene bias = new NodeGene(innov++, NEATNodeType.bias, 0, ActivationTypeF.Linear);
             nodes.Add(bias.id, bias);
 
             inputNodes_cache = new List<int>();
             outputNodes_cache = new List<int>();
             for (int i = 0; i < inputSize; i++)
             {
-                NodeGene newInput = new NodeGene(innov++, NEATNodeType.input,0);
+                NodeGene newInput = new NodeGene(innov++, NEATNodeType.input,0, ActivationTypeF.Linear);
                 nodes.Add(newInput.id, newInput);
                 inputNodes_cache.Add(newInput.id);
             }
             for (int i = 0; i < outputShape.Sum(); i++)
             {
-                NodeGene newOutput = new NodeGene(innov++, NEATNodeType.output, 1);
+                NodeGene newOutput = new NodeGene(innov++, NEATNodeType.output, 1, ActivationTypeF.Linear);
                 nodes.Add(newOutput.id, newOutput);
                 outputNodes_cache.Add(newOutput.id);
             }

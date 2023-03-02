@@ -10,6 +10,7 @@ using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 using static Unity.VisualScripting.LudiqRootObjectEditor;
+using static UnityEditor.PlayerSettings;
 
 namespace NeuroForge
 {
@@ -64,7 +65,7 @@ namespace NeuroForge
                 Instance.episodeTimePassed = 0;
 
                 // Print Episode Statistic
-                Debug.Log(GetEpisodeStatistic());
+                PrintEpisodeStatistic();
 
                 // Resurrect agents
                 foreach (var agent in Instance.population)
@@ -82,7 +83,7 @@ namespace NeuroForge
                     {
                         ag.behavior = BehaviourType.Inactive;
                     }
-                    Debug.Log("<color=#2873eb><b>Training session ended!</b></color>");
+                    Debug.Log("<color=#2873eb><b>Training session ended!\n\n\n\n\n\n\n\n\n\n\n</b></color>");
                     EditorApplication.isPlaying = false;
                    
                 }
@@ -91,6 +92,8 @@ namespace NeuroForge
         private void OnDrawGizmos()
         {
             if (!mainModel) return;
+
+            bool drawSphereNodes = Instance.hp.nodeShape == NodesDrawShape.Sphere ? true : false;
 
             Dictionary<NodeGene, Vector3> node_pos = new Dictionary<NodeGene, Vector3>();
 
@@ -154,19 +157,22 @@ namespace NeuroForge
                 switch (node.Key.type)
                 {
                     case NEATNodeType.input:
-                        Gizmos.color = Color.yellow;
-                        break;
-                    case NEATNodeType.hidden:
-                        Gizmos.color = Color.green;
+                        Gizmos.color = hp.inputNodesColor;
                         break;
                     case NEATNodeType.output:
-                        Gizmos.color = Color.red;
+                        Gizmos.color = hp.outputNodesColor;
                         break;
+                    case NEATNodeType.hidden:
+                        Gizmos.color = hp.hiddenNodesColor;
+                        break;                 
                     case NEATNodeType.bias:
-                        Gizmos.color = Color.blue;
+                        Gizmos.color = hp.biasNodeColor;
                         break;
                 }
-                Gizmos.DrawCube(new Vector3(node.Value.x, node.Value.y, node.Value.z), Vector3.one * NODE_SCALE);
+                if(drawSphereNodes) 
+                    Gizmos.DrawSphere(new Vector3(node.Value.x, node.Value.y, node.Value.z), NODE_SCALE);
+                else
+                    Gizmos.DrawCube(new Vector3(node.Value.x, node.Value.y, node.Value.z), Vector3.one * NODE_SCALE);
 
             }
 
@@ -179,7 +185,7 @@ namespace NeuroForge
                                     new Color(0, 0, connection.Value.weight);
                 Gizmos.color = connection.Value.enabled == false ? Color.white : Gizmos.color;
 
-                Vector3 left_right_offset = new Vector3(.5f * NODE_SCALE, 0, 0);
+                Vector3 left_right_offset = new Vector3(drawSphereNodes ? NODE_SCALE : 0.5f * NODE_SCALE, 0, 0);
                 Vector3 firstPoint = node_pos.Where(x => x.Key.id == connection.Value.inNeuron).Select(x => x.Value).FirstOrDefault() + left_right_offset;
                 Vector3 secondPoint = node_pos.Where(x => x.Key.id == connection.Value.outNeuron).Select(x => x.Value).FirstOrDefault() - left_right_offset;
 
@@ -192,6 +198,7 @@ namespace NeuroForge
                 Gizmos.DrawWireSphere(secondPoint, NODE_SCALE * 0.1f);
             }
         }
+
 
         // Trainer
         public static void Ready()
@@ -215,7 +222,9 @@ namespace NeuroForge
             Instance.hp.generations = agent.hp.generations;
             Instance.hp.timeHorizon = agent.hp.timeHorizon;
 
-            
+            if (Instance.hp.oneActivationType)
+                Instance.hp.mutateNode = 0;
+
             Instance.InitPopulation(agent.gameObject, agent.hp.populationSize - 1);
             Instance.trainingEnvironment = new TransformReseter(agent.transform.parent); // is ok placed here, to get reference of all other agents
             Instance.Evolution();
@@ -243,10 +252,19 @@ namespace NeuroForge
         // NEAT
         private void Evolution()
         {
+            /*
+             *  Every species is
+             *  assigned a potentially different number of offspring in proportion to the sum of adjusted
+             *  fitnesses f0
+             *  i of its member organisms. Species then reproduce by first eliminating
+             *  the lowest performing members from the population. The entire population is then
+             *  replaced by the offspring of the remaining organisms in each species
+             */
+
             Speciate();
-            SortSpecies();         
+            SpeciesCalculations();         
             Culling();
-            RemoveExtinctSpecies();
+            SpeciesRemoveExtinct();
             Reproduce();
            
 
@@ -256,7 +274,7 @@ namespace NeuroForge
         }
         void Speciate()
         {
-            // Reset species - representative is cleared too
+            // Reset species - Champion becomes the representative
             foreach (var spec in species)
             {
                 spec.Reset();
@@ -287,22 +305,31 @@ namespace NeuroForge
             }
 
         }
-        void SortSpecies()
+        void SpeciesCalculations()
         {
-            foreach (var spec in species)            
-                spec.CalculateAvgFitness();
-            
-            species.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
+            species.ForEach(x => x.AdjustFitness());
+            species.ForEach(x => x.CalculateShFitSum());
+            species.ForEach(s => s.UpdateStagnation());
+
+            // The sort is done by comparing their champions' fitnesses
+            species.Sort((x, y) =>
+            {
+                float x_fit = x.GetChampion().GetFitness();
+                float y_fit = y.GetChampion().GetFitness();
+                if (x_fit == y_fit)
+                    return 0;
+                return x_fit > y_fit ? -1 : 1;
+
+            });
         }
         void Culling()
         {
             foreach (var spec in species)
             {
                 spec.Kill(1f - Instance.hp.survivalRate);
-            }
-           
+            }         
         }
-        void RemoveExtinctSpecies()
+        void SpeciesRemoveExtinct()
         {
             // Species that doesn't reproduce enough are in danger
  
@@ -326,7 +353,7 @@ namespace NeuroForge
             {
                 if(agent.GetSpecies() == null)
                 {
-                    Species spec = GetRandomSpecies_AllowedToReproduce();
+                    Species spec = GetNotSoRandomSpecies();
                     agent.model = spec.Breed(); // is mutated there already
                     spec.ForceAdd(agent);
                 }
@@ -341,31 +368,34 @@ namespace NeuroForge
         
 
         // Other
-        private string GetEpisodeStatistic()
+        private void PrintEpisodeStatistic()
         {
             StringBuilder text = new StringBuilder();
             text.Append("<color=#2873eb><b>Generation ");
             text.Append(++generation);
             text.Append("</b></color>\n");
-            text.Append("<color=#099c94>________________________________________________________________________\n</color>");
-            text.Append("<color=#099c94>| SpeciesID | Size | Average Fitness | Best Fitness | Age | Stagnation |\n</color>"); 
-            text.Append("<color=#099c94>------------------------------------------------------------------------\n</color>");
-            species.Reverse();
+            text.Append("<color=#099c94>_______________________________________________________________________\n</color>");
+            text.Append("<color=#099c94>| SpeciesID | Size | Shared Fitness | Best Fitness | Age | Stagnation |\n</color>"); 
+            text.Append("<color=#099c94>-----------------------------------------------------------------------\n</color>");
             foreach (var spec in species)
             {
                 Color color = new Color(Mathf.Clamp(FunctionsF.RandomValue(),.5f,1f), Mathf.Clamp(FunctionsF.RandomValue(), .5f, 1f), Mathf.Clamp(FunctionsF.RandomValue(), .5f, 1f));
 
                 text.Append("<color=");
-                text.Append(Functions.HexOf(color));
+                if (spec.stagnation >= hp.stagnationAllowance)
+                    text.Append("red");
+                else
+                    text.Append(Functions.HexOf(color));
                 text.Append(">|");
 
                 string id = ("#" + spec.id).PadLeft(10, ' ');             
                 string size = spec.GetIndividuals().Count.ToString().PadLeft(5, ' ');
-                string fitness = spec.GetFitness().ToString("0.000").PadLeft(16,' ');
+                string shFitness = spec.GetShFitSum().ToString("0.000").PadLeft(15,' ');
                 float bestFit = spec.GetChampion().GetFitness();
                 string bestFitness = bestFit.ToString("0.000").PadLeft(13, ' ');
                 string age = spec.age.ToString().PadLeft(4, ' ');
-                string stallness = spec.stagnation.ToString().PadLeft(11, ' ');
+                string stallness = spec.stagnation < hp.stagnationAllowance || species.Count == 1? "" : "*";
+                stallness = (stallness + spec.stagnation.ToString()).PadLeft(11, ' ');
 
                 text.Append(id);
 
@@ -373,7 +403,7 @@ namespace NeuroForge
                 text.Append(size);
 
                 text.Append(" |");
-                text.Append(fitness);
+                text.Append(shFitness);
 
                 text.Append(" |");
                 text.Append(bestFitness);
@@ -383,30 +413,40 @@ namespace NeuroForge
 
                 text.Append(" |");
                 text.Append(stallness);
-                
+
                 text.Append(" |</color>\n");
 
                 fitnessRecord = Math.Max(fitnessRecord, bestFit);
             }
-            text.Append("<color=#099c94>------------------------------------------------------------------------\n</color>");
+            text.Append("<color=#099c94>-----------------------------------------------------------------------\n</color>");
 
             // Insert fit record
-            
-            text.Append("<color=#099c94>                                            (Fitness record: <b>");
-            text.Append(fitnessRecord.ToString().PadLeft(10, ' '));
-            text.Append("</b>)</color>");
-            return text.ToString();
+            string fit_record = ("<color=#099c94>(Fitness record: <b>" + fitnessRecord.ToString("0.000") + "</b>)</color>").PadLeft(101, ' ');
+            text.Append(fit_record);
+            Debug.Log(text.ToString());
         }
-        private Species GetRandomSpecies_AllowedToReproduce()
+        private Species GetNotSoRandomSpecies()
         {
+            // Note:
+            // Paper: Every species is assigned a potentially different number of offspring in proportion to the sum of adjusted fitnesses f'[i] of its member organisms.
+            // Though, instead we assigned a probability of breeding to that species.
+            // The number assigned for both situation is the sum of the adjusted fitness of all individuals
+            // On numbers in range [100-1000], the probability might work ok
+
             if (species.Count == 1) return species.First();
             
             List<Species> allowed_to_reproduce_species = species.Where(x => x.IsAllowedToReproduce(hp.stagnationAllowance)).ToList();
 
+            // Papar reference:
+            // In rare cases when the fitness of the entire population does not improve for more than 20 generations,
+            // only the top two species are allowed to reproduce, refocusing the search into the most promising spaces.
             if (allowed_to_reproduce_species.Count == 0)
-                return species.First();
+            {
+                allowed_to_reproduce_species.Add(species[0]);
+                allowed_to_reproduce_species.Add(species[1]);
+            }
 
-            List<float> probs = allowed_to_reproduce_species.Select(x => x.GetFitness()).ToList();
+            List<float> probs = allowed_to_reproduce_species.Select(x => x.GetShFitSum()).ToList();
 
             return Functions.RandomIn(allowed_to_reproduce_species, probs);
         }
@@ -425,6 +465,27 @@ namespace NeuroForge
         public static void Dispose() { Destroy(Instance.gameObject); Instance = null; }
         public static void InitializeHyperParameters() => Instance.hp = new NEATHyperParameters();
         public static NEATHyperParameters GetHyperParam() => Instance.hp;
+        public static ActivationTypeF GetHiddenNodeActivationType()
+        {
+            // Better results with random activations!
+            // Modified sigmoid is actually shit idk why
+            if (Instance.hp.oneActivationType)
+            {
+                if (Instance.mainModel.actionSpace == ActionType.Continuous)
+                    return ActivationTypeF.HyperbolicTangent;
+                else
+                    return ActivationTypeF.ModifiedSigmoid;
+            }
+            else
+                return (ActivationTypeF)(int)(FunctionsF.RandomValue() * Enum.GetValues(typeof(ActivationTypeF)).Length); 
+            
+        }
+    }
+
+    public enum NodesDrawShape
+    {
+        Sphere,
+        Cube
     }
 }
 

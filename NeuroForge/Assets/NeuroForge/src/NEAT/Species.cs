@@ -1,3 +1,4 @@
+using Palmmedia.ReportGenerator.Core;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -10,8 +11,8 @@ namespace NeuroForge
     public class Species : IResetable
     {       
         public int id;
-        private float avgFitness = float.MinValue;
-        private float bestFitness = float.MinValue; // best fitness managed by an individual ever in this species
+        private float bestFitness = float.MinValue; // best fitness managed by an individual ever in this species (not shared)
+        private float sharedFitnessSum = float.MinValue;
         public int stagnation = 0;
         public int age = -1;
 
@@ -25,11 +26,11 @@ namespace NeuroForge
             this.individuals.Add(repr);
             this.id = id;
         }        
-
         public void Reset()
         {
-            // If the representative is always maintained here, this species will eventually dissapear and will be transformed in another one.
-            // So to keep the same species object, i always change the representative with a random nextgen individual
+            // Paper reference: 
+            // Each existing species is represented by a random genome inside the species from the previous generation.
+
             representative = Functions.RandomIn(individuals);
 
             foreach (var ind in individuals)
@@ -41,6 +42,7 @@ namespace NeuroForge
             representative.SetSpecies(this);
             individuals.Add(representative);
         }
+
         // Joining
         public bool TryAdd(NEATAgent agent)
         {
@@ -66,16 +68,18 @@ namespace NeuroForge
             float range = individuals.Count * percentage01;
             for (int i = 0; i < range && individuals.Count > 1; i++) 
             {
+                individuals[0].SetFitness(0);
+                individuals[0].SetAdjustedFitness(0);
                 individuals[0].SetSpecies(null);
                 individuals[0].model = null;
                 individuals.RemoveAt(0);
                
             }
 
-            // It is possible to kill the representative in this process, so choose another one
+            // It is possible to kill the representative in this process, so choose another one randomly, even if we do not really care at this moment
             if (representative.GetSpecies() == null)
             {
-                representative = individuals.Last();
+                representative = Functions.RandomIn(individuals);
             }
 
 
@@ -89,19 +93,25 @@ namespace NeuroForge
                 ag.SetSpecies(null);
             }
         }
-
-        // Breeding
-        public void ShareFitness()
+        public void AdjustFitness()
         {
+            // f'[i] = f[i] / Sum(sh(i,j))
+            // f' = shared fitness
+            // Sum is the sum of total fitnesses in this species
+            // sh is 1 if (i,j) are compatible (they are not exceed delta)
+            // sh is 0 if (i,j) are not compatible
+
             foreach (var indiv in individuals)
             {
-                indiv.SetFitness(indiv.GetFitness() / individuals.Count);
+                indiv.SetAdjustedFitness(indiv.GetFitness() / individuals.Count);
             }
         }
+
+        // Breeding
         public Genome Breed()
         {
             Genome offspring = null;
-            List<float> probs = individuals.Select(x => x.GetFitness()).ToList();
+            List<float> probs = individuals.Select(x => x.GetAdjustedFitness()).ToList();//Here works with normal fit too
 
             // 25% asexual breeding
             if (FunctionsF.RandomValue() < NEATTrainer.GetHyperParam().cloneBreeding)
@@ -279,13 +289,13 @@ namespace NeuroForge
             int highestMatch = 0;
 
             // Calculate highest match, disjoints are less than this
-            foreach (var conn1 in genome1.connections)
+            foreach (var conn1 in genome1.connections.Keys)
             {
-                foreach (var conn2 in genome2.connections)
+                foreach (var conn2 in genome2.connections.Keys)
                 {
-                    if (conn1.Key == conn2.Key)
+                    if (conn1 == conn2)
                     {
-                        highestMatch = Mathf.Max(highestMatch, conn1.Key);
+                        highestMatch = Math.Max(highestMatch, conn1);
                         break;
                     }
                 }
@@ -346,10 +356,12 @@ namespace NeuroForge
             
             return dif / matchesCount;
         }
-        
+
 
         // Other
-        public void CalculateAvgFitness()
+        public void CalculateShFitSum() => sharedFitnessSum = individuals.Sum(x => x.GetAdjustedFitness());
+        public float GetShFitSum() => sharedFitnessSum;
+        public void UpdateStagnation()
         {
             NEATAgent bestAgent = GetChampion();
 
@@ -359,9 +371,7 @@ namespace NeuroForge
                 stagnation = 0;
 
             bestFitness = Math.Max(bestFitness, bestAgent.GetFitness());
-            avgFitness = individuals.Average(x => x.GetFitness());
         }
-        public float GetFitness() => avgFitness;
         public bool IsAllowedToReproduce(int stagnationAllowance) => stagnationAllowance > stagnation;
         public NEATAgent GetChampion()
         {

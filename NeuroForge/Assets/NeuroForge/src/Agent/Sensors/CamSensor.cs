@@ -7,20 +7,22 @@ using UnityEngine.UI;
 
 namespace NeuroForge
 {
-    [AddComponentMenu("NeuroForge/CameraSensor")]
-    public class CameraSensor : MonoBehaviour
+    [AddComponentMenu("NeuroForge/Cam Sensor")]
+    public class CamSensor : MonoBehaviour
     {
         public Camera cam;
         [Min(16)]public int Width = 640;
         [Min(9)]public int Height = 480;
         public ImageType type = ImageType.RGB;
-        
+        [Range(1,5)] public int convolutionLevel = 3;
+        [Tooltip("float values")] public int estimatedSize = 921_600;
+      
 
         public void Awake()
         {
             if(cam == null)
             {
-                Debug.LogError("<color=red>CameraSensor camera not set to an instance of an object.</color>");
+                Debug.LogError("<color=red>CamSensor cam not set to an instance of an object.</color>");
                 return;
             }
             cam.targetTexture = new RenderTexture(Width, Height, 0);
@@ -77,7 +79,7 @@ namespace NeuroForge
             }
             if (cam.targetTexture == null)
             {
-                Debug.LogError("<color=red>Camera target texture object reference not set to an instance of an object.</color>");
+                Debug.LogError("<color=red>You cannot take shots on Editor Mode (only on Play Mode). Camera target texture object reference not set to an instance of an object.</color>");
                 return;
             }
 
@@ -103,26 +105,45 @@ namespace NeuroForge
             }
             texture.SetPixels(pixels);
         }   
+        private void ConvolutedTexture(Texture2D texture)
+        {
+
+        }
     }
 
     public enum ImageType
     {
         RGB,
         Greyscale,
+        HeightMap
     }
 
     #region Editor
-    [CustomEditor(typeof(CameraSensor)), CanEditMultipleObjects]
+    [CustomEditor(typeof(CamSensor)), CanEditMultipleObjects]
     class ScriptlessCameraSensor : Editor
-    {
-        private static readonly string[] _dontIncludeMe = new string[] { "m_Script" };
- 
+    { 
         public override void OnInspectorGUI()
         {
-            CameraSensor script = (CameraSensor)target; 
+            List<string> dontInclude = new List<string>() { "m_Script" };
+            CamSensor script = (CamSensor)target;
 
-            serializedObject.Update();
-            DrawPropertiesExcluding(serializedObject, _dontIncludeMe);
+            if (script.type == ImageType.RGB)
+            {
+                dontInclude.Add("convolutionLevel");
+                script.estimatedSize = script.Width * script.Height * 3;
+            }
+            else if (script.type == ImageType.Greyscale)
+            {
+                dontInclude.Add("convolutionLevel");
+                script.estimatedSize = script.Width * script.Height;
+            }
+            else if (script.type == ImageType.HeightMap)
+            {
+                // Formula to calculate estimated size
+            }
+
+           
+                DrawPropertiesExcluding(serializedObject, dontInclude.ToArray());
             serializedObject.ApplyModifiedProperties();
 
             EditorGUILayout.Separator();

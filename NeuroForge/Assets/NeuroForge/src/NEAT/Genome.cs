@@ -32,14 +32,10 @@ namespace NeuroForge
             this.actionSpace = actionSpace;
             this.outputShape = outputShape;
 
-            layers = new List<float>();
-            layers.Add(0);
-            layers.Add(1);
-
-            
+            layers = new List<float>() { 0f, 1f };
 
             nodes = new Dictionary<int, NodeGene>();
-            NodeGene bias = new NodeGene(GetNextNodeId(), NEATNodeType.bias, 0);
+            NodeGene bias = new NodeGene(GetNextNodeId(), NEATNodeType.bias, 0, ActivationTypeF.Linear);
             nodes.Add(bias.id, bias);
 
             input_cache = new List<NodeGene>();
@@ -47,13 +43,13 @@ namespace NeuroForge
 
             for (int i = 0; i < inputSize; i++)
             {
-                NodeGene newInput = new NodeGene(GetNextNodeId(), NEATNodeType.input, 0);
+                NodeGene newInput = new NodeGene(GetNextNodeId(), NEATNodeType.input, 0, ActivationTypeF.Linear);
                 nodes.Add(newInput.id, newInput);
                 input_cache.Add(newInput);
             }
             for (int i = 0; i < outputShape.Sum(); i++)
             {
-                NodeGene newOutput = new NodeGene(GetNextNodeId(), NEATNodeType.output, 1);
+                NodeGene newOutput = new NodeGene(GetNextNodeId(), NEATNodeType.output, 1, ActivationTypeF.Linear);
                 nodes.Add(newOutput.id, newOutput);
                 output_cache.Add(newOutput);
             }
@@ -338,7 +334,7 @@ namespace NeuroForge
             }
 
             // Create node
-            NodeGene new_node = new NodeGene(GetNextNodeId(), NEATNodeType.hidden, this_node_layer);
+            NodeGene new_node = new NodeGene(GetNextNodeId(), NEATNodeType.hidden, this_node_layer, NEATTrainer.GetHiddenNodeActivationType());
             nodes.Add(new_node.id, new_node);
             //new_node.activationType = ActivationTypeF.HyperbolicTangent;
 

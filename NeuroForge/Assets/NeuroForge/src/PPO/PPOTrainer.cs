@@ -71,11 +71,15 @@ namespace NeuroForge
                 List<double> returns;
                 GAE(agent.memory.records, out advantages, out returns);
 
+                // Normalize the advantages
+                if (hp.normAdvantages)
+                    Functions.Normalize(advantages);
+
                 trainData.playback.AddRange(agent.memory.records);
                 trainData.advantages.AddRange(advantages);
                 trainData.returns.AddRange(returns);
             }
-           
+
             // Train for K epochs
             for (int k = 0; k < Instance.hp.epochs; k++)
             {
@@ -86,11 +90,11 @@ namespace NeuroForge
                 int no_mini_batches = (Instance.hp.buffer_size * agents.Count) / Instance.hp.batch_size;
                 for (int mb = 0; mb < no_mini_batches; mb++)
                 {
-                    int posInBuffer = mb * Instance.hp.batch_size;
+                    int start = mb * Instance.hp.batch_size;
 
-                    var miniBatch_playback = new List<PPOSample>(trainData.playback.GetRange(posInBuffer, Instance.hp.batch_size));
-                    var miniBatch_advantages = new List<double>(trainData.advantages.GetRange(posInBuffer, Instance.hp.batch_size));
-                    var miniBatch_returns = new List<double>(trainData.returns.GetRange(posInBuffer, Instance.hp.batch_size));
+                    var miniBatch_playback = new List<PPOSample>(trainData.playback.GetRange(start, Instance.hp.batch_size));
+                    var miniBatch_advantages = new List<double>(trainData.advantages.GetRange(start, Instance.hp.batch_size));
+                    var miniBatch_returns = new List<double>(trainData.returns.GetRange(start, Instance.hp.batch_size));
 
                     if (Instance.actionSpace == ActionType.Continuous)
                         UpdateContinuousModel(miniBatch_playback, miniBatch_advantages, miniBatch_returns);
@@ -215,8 +219,9 @@ namespace NeuroForge
             }
         }
 
-        void TD(List<PPOSample> playback, out List<double> advantages, out List<double> returns)
+        void TD_deprecated(List<PPOSample> playback, out List<double> advantages, out List<double> returns)
         {
+            // This does not take momentarily in account 'done' var
             float gamma = Instance.hp.discountFactor;
 
             returns = new List<double>();

@@ -8,7 +8,7 @@ namespace NeuroForge
     [AddComponentMenu("NeuroForge/Ray Sensor")]
     public class RaySensor : MonoBehaviour
     {
-        List<float> observations = new List<float>();
+        public List<float> Observations = new List<float>();
         [SerializeField, Tooltip("@scene type")] World world = World.World3d;
         [SerializeField, Tooltip("@LayerMask used when casting the rays")] LayerMask layerMask = ~0;
         [SerializeField, Tooltip("@observation value returned by the rays")] Info info = Info.Distance;
@@ -28,11 +28,6 @@ namespace NeuroForge
         [SerializeField] Color rayColor = Color.green;
         [SerializeField] Color missRayColor = Color.red;
 
-        bool simStarted = false;
-        private void Awake()
-        {
-            simStarted = true;
-        }
         private void Start()
         {
             CastRays();
@@ -43,12 +38,9 @@ namespace NeuroForge
         }
         private void OnDrawGizmos()
         {
-            if (simStarted)
-                return;
+            float oneAngle = rays == 1 ? 0 : -fieldOfView / (rays - 1f);
 
-            float oneAngle = rays == 1 ? 0 : (float)-fieldOfView / (rays - 1f);
-
-            float begin = (float)-oneAngle * (rays - 1) / 2 + rotationOffset;
+            float begin = (float)-oneAngle * (rays - 1f) / 2f + rotationOffset;
             Vector3 startAngle;
 
             if (world == World.World3d)
@@ -108,10 +100,10 @@ namespace NeuroForge
 
         private void CastRays()
         {
-            observations.Clear();
-            float oneAngle = rays == 1 ? 0 : (float)-fieldOfView / (rays - 1f);
+            Observations.Clear();
+            float oneAngle = rays == 1 ? 0 : -fieldOfView / (rays - 1f);
 
-            float begin = (float)-oneAngle * (rays - 1) / 2 + rotationOffset;
+            float begin = (float)-oneAngle * (rays - 1f) / 2f + rotationOffset;
             Vector3 startAngle;
             if (world == World.World3d)
                 startAngle = Quaternion.AngleAxis(tilt, transform.right) * Quaternion.AngleAxis(tilt, transform.forward) * Quaternion.AngleAxis(begin, transform.up) * transform.forward;
@@ -148,18 +140,18 @@ namespace NeuroForge
                 switch(info)
                 {
                     case Info.Distance:
-                        observations.Add(hit.distance);
+                        Observations.Add(hit.distance);
                         break;
                     case Info.Layer:
-                        observations.Add(hit.collider.gameObject.layer);
+                        Observations.Add(hit.collider.gameObject.layer);
                         break;
                     case Info.Angle:
-                        observations.Add(Vector3.Angle(hit.normal, rayDirection));
+                        Observations.Add(Vector3.Angle(hit.normal, rayDirection));
                         break;
                     case Info.All:
-                        observations.Add(hit.distance);
-                        observations.Add(hit.collider.gameObject.layer);
-                        observations.Add(Vector3.Angle(hit.normal, rayDirection));
+                        Observations.Add(hit.distance);
+                        Observations.Add(hit.collider.gameObject.layer);
+                        Observations.Add(Vector3.Angle(hit.normal, rayDirection));
                         break;
                 }
             }
@@ -168,18 +160,18 @@ namespace NeuroForge
                 switch (info)
                 {
                     case Info.Distance:
-                        observations.Add(0);
+                        Observations.Add(0);
                         break;
                     case Info.Layer:
-                        observations.Add(0);
+                        Observations.Add(0);
                         break;
                     case Info.Angle:
-                        observations.Add(0);
+                        Observations.Add(0);
                         break;
                     case Info.All:
-                        observations.Add(0);
-                        observations.Add(0);
-                        observations.Add(0);
+                        Observations.Add(0);
+                        Observations.Add(0);
+                        Observations.Add(0);
                         break;
                 }
             }
@@ -192,18 +184,18 @@ namespace NeuroForge
                 switch (info)
                 {
                     case Info.Distance:
-                        observations.Add(hit.distance);
+                        Observations.Add(hit.distance);
                         break;
                     case Info.Layer:
-                        observations.Add(hit.collider.gameObject.layer);
+                        Observations.Add(hit.collider.gameObject.layer);
                         break;
                     case Info.Angle:
-                        observations.Add(Vector3.Angle(hit.normal, rayDirection));
+                        Observations.Add(Vector3.Angle(hit.normal, rayDirection));
                         break;
                     case Info.All:
-                        observations.Add(hit.distance);
-                        observations.Add(hit.collider.gameObject.layer);
-                        observations.Add(Vector3.Angle(hit.normal, rayDirection));
+                        Observations.Add(hit.distance);
+                        Observations.Add(hit.collider.gameObject.layer);
+                        Observations.Add(Vector3.Angle(hit.normal, rayDirection));
                         break;
                 }
             }
@@ -212,27 +204,22 @@ namespace NeuroForge
                 switch (info)
                 {
                     case Info.Distance:
-                        observations.Add(0);
+                        Observations.Add(0);
                         break;
                     case Info.Layer:
-                        observations.Add(0);
+                        Observations.Add(0);
                         break;
                     case Info.Angle:
-                        observations.Add(0);
+                        Observations.Add(0);
                         break;
                     case Info.All:
-                        observations.Add(0);
-                        observations.Add(0);
-                        observations.Add(0);
+                        Observations.Add(0);
+                        Observations.Add(0);
+                        Observations.Add(0);
                         break;
                 }
             }
         }
-
-        public int GetObservationSize() => observations.Count;
-        public float[] GetObservations() => observations.ToArray();
-        public List<float> GetListedObservations() => observations;
-
 
         public enum World
         {

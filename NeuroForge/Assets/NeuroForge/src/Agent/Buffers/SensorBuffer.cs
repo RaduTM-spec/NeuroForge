@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
@@ -178,7 +179,7 @@ namespace NeuroForge
         {
             if (this.Observations.Length - counter < observations.Length)
             {
-                Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". Double array observations is too large.");
+                Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". double[] observations is too large.");
                 return;
             }
             foreach (var item in observations)
@@ -194,7 +195,39 @@ namespace NeuroForge
         {
             if (this.Observations.Length - counter < observations.Length)
             {
-                Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". Float array observations size is " + observations.Length + ".");
+                Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". float[] observations size is " + observations.Length + ".");
+                return;
+            }
+            foreach (var item in observations)
+            {
+                AddObservation(item);
+            }
+        }
+        /// <summary>
+        /// Appends a list of double values to the SensorBuffer.
+        /// </summary>
+        /// <param name="observations">Values of the observations</param>
+        public void AddObservation(List<double> observations)
+        {
+            if(this.Observations.Length - counter < observations.Count)
+            {
+                Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". List<double> observations is too large.");
+                return;
+            }
+            foreach (var item in observations)
+            {
+                AddObservation(item);
+            }
+        }
+        /// <summary>
+        /// Appends a list of float values to the SensorBuffer.
+        /// </summary>
+        /// <param name="observations">Values of the observations</param>
+        public void AddObservation(List<float> observations)
+        {
+            if (this.Observations.Length - counter < observations.Count)
+            {
+                Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". List<float> observations is too large.");
                 return;
             }
             foreach (var item in observations)
@@ -205,7 +238,7 @@ namespace NeuroForge
         /// <summary>
         /// Appends the distances/infos of each RayCast by the RaySensor to SensorBuffer.
         /// </summary>
-        /// <param name="raySensor">RaySensor object</param>
+        /// <param name="raySensor">RaySensor object</param>       
         public void AddObservation(RaySensor raySensor)
         {
             if (raySensor == null)
@@ -213,13 +246,15 @@ namespace NeuroForge
                 Debug.LogError("<color=red>RaySensor added as an observation is null!.</color>");
                 return;
             }
-            if (this.Observations.Length - counter < raySensor.GetObservationSize())
+            if (this.Observations.Length - counter < raySensor.Observations.Count)
             {
                 Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". Sensor's observations array is too large.");
                 return;
             }
-            AddObservation(raySensor.GetObservations());
+            AddObservation(raySensor.Observations);
         }
+
+
 
         public override string ToString()
         {
