@@ -53,7 +53,7 @@ namespace NeuroForge
                 InnovationHistory.Instance = new InnovationHistory(this.model);
 
                 // Init trainer
-                NEATTrainer.Initialize(this);
+                NEATTrainer.InitializeTrainer(this);
             }          
         }
         public void InitNetwork()

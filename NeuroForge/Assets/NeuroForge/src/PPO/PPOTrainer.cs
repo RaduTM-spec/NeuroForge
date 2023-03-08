@@ -8,6 +8,7 @@ using System.IO;
 using Unity.VisualScripting;
 using UnityEditor;
 
+
 namespace NeuroForge
 {
     public sealed class PPOTrainer : MonoBehaviour
@@ -109,12 +110,11 @@ namespace NeuroForge
             Instance.agentsReady = 0;
         }
 
-
         void UpdateDiscreteModel(List<PPOSample> mb_playback, List<double> mb_advantages, List<double> mb_returns)
         {
             for (int t = 0; t < mb_playback.Count; t++)
             {
-                double[] distributions = Instance.actorNetwork.DiscreteForwardPropagation(mb_playback[t].state).Item1;
+                double[] distributions = Instance.actorNetwork.Forward_Discrete(mb_playback[t].state).Item1;
 
                 double[] old_log_probs = mb_playback[t].log_probs;
                 double[] new_log_probs = PPOActor.GetDiscreteLogProbs(distributions);
@@ -125,6 +125,8 @@ namespace NeuroForge
                 {
                     ratios[r] = Math.Exp(new_log_probs[r] - old_log_probs[r]);
                 }
+
+                Functions.Print(ratios);
 
                 // Calculate surrogate loss
                 double[] L_CLIP = new double[ratios.Length];
@@ -147,15 +149,14 @@ namespace NeuroForge
                 // critic label (not loss)
                 double[] L_V = new double[] { mb_returns[t] };
 
-                // Update policy with SGD
-                Instance.actorNetwork.BackPropagation(mb_playback[t].state, L_CLIP);
-                Instance.criticNetwork.BackPropagation(mb_playback[t].state, L_V);
+                Instance.actorNetwork.Backward(mb_playback[t].state, L_CLIP);
+                Instance.criticNetwork.Backward(mb_playback[t].state, L_V);
 
-                Instance.actorNetwork.GradientsClipNorm(hp.maxGradNorm);
-                Instance.criticNetwork.GradientsClipNorm(hp.maxGradNorm);
+                // Instance.actorNetwork.GradClipNorm(hp.maxGradNorm);
+                // Instance.criticNetwork.GradClipNorm(hp.maxGradNorm);
 
-                Instance.actorNetwork.OptimiseParameters(Instance.hp.actorLearnRate, Instance.hp.momentum, Instance.hp.regularization);
-                Instance.criticNetwork.OptimiseParameters(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
+                Instance.actorNetwork.OptimStep(Instance.hp.actorLearnRate, Instance.hp.momentum, Instance.hp.regularization);
+                Instance.criticNetwork.OptimStep(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
 
             }
         }
@@ -163,18 +164,21 @@ namespace NeuroForge
         {
             for (int t = 0; t < mini_batch.Count; t++)
             {
-                (double[], float[]) forwardPropagation = Instance.actorNetwork.ContinuousForwardPropagation(mini_batch[t].state);
+                (double[], float[]) forwardPropagation = Instance.actorNetwork.Forward_Continuous(mini_batch[t].state);
 
                 double[] old_log_probs = mini_batch[t].log_probs;
-                double[] new_log_probs = Instance.actorNetwork.GetContinuousLogProbs(forwardPropagation.Item1, forwardPropagation.Item2);
+                double[] new_log_probs = PPOActor.GetContinuousLogProbs(forwardPropagation.Item1, forwardPropagation.Item2);
 
-                // Calculate ratios
+                //double[].length = 2 x float[].length
+
+
+                // Calculate ratios (they are not neccesarily to be 1 in the first update because actions are random on continuous actions)
                 double[] ratios = new double[new_log_probs.Length];
                 for (int r = 0; r < ratios.Length; r++)
                 {
                     ratios[r] = Math.Exp(new_log_probs[r] - old_log_probs[r]);
                 }
-                
+
                 // Calculate surroagate loss
                 double[] L_CLIP = new double[ratios.Length];       
                 for (int r = 0; r < ratios.Length; r++)
@@ -190,8 +194,9 @@ namespace NeuroForge
                 double[] entropies = new double[ratios.Length];
                 for (int e = 0; e < entropies.Length; e += 2)
                 {
-                    double sigma = forwardPropagation.Item2[e + 1];
-                    double entropy = Math.Sqrt(2 * Math.PI * Math.E * sigma * sigma);
+                    double sigma = forwardPropagation.Item1[e + 1];
+                    double entropy = Math.Log(Math.Sqrt(2.0 * Math.PI * Math.E) * sigma);
+                    // double entropy = Math.Sqrt(2 * Math.PI * Math.E * sigma * sigma); //old
 
                     entropies[e] = entropy;
                     entropies[e + 1] = entropy;
@@ -204,18 +209,18 @@ namespace NeuroForge
                     L_CLIP[i] -= L_H;
                 }
 
-                // critic label (not loss)
+                // critic label
                 double[] L_V = new double[] { mb_returns[t] };
 
-                // Update policy SGD 
-                Instance.actorNetwork.BackPropagation(mini_batch[t].state, L_CLIP);
-                Instance.criticNetwork.BackPropagation(mini_batch[t].state, L_V);
 
-                Instance.actorNetwork.GradientsClipNorm(hp.maxGradNorm);
-                Instance.criticNetwork.GradientsClipNorm(hp.maxGradNorm);
+                Instance.actorNetwork.Backward(mini_batch[t].state, L_CLIP);
+                Instance.criticNetwork.Backward(mini_batch[t].state, L_V);
 
-                Instance.actorNetwork.OptimiseParameters(Instance.hp.actorLearnRate, Instance.hp.momentum, Instance.hp.regularization);
-                Instance.criticNetwork.OptimiseParameters(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
+                // Instance.actorNetwork.GradClipNorm(hp.maxGradNorm);
+                // Instance.criticNetwork.GradClipNorm(hp.maxGradNorm);
+
+                Instance.actorNetwork.OptimStep(Instance.hp.actorLearnRate, Instance.hp.momentum, Instance.hp.regularization);
+                Instance.criticNetwork.OptimStep(Instance.hp.criticLearnRate, Instance.hp.momentum, Instance.hp.regularization);
             }
         }
 
@@ -255,6 +260,7 @@ namespace NeuroForge
         }
         void GAE(List<PPOSample> playback, out List<double> advantages, out List<double> returns)
         {
+            // ADVANTAGE = RETURN - VALUE
             double gamma = Instance.hp.discountFactor;
             double lambda = Instance.hp.gaeFactor;
 
@@ -262,24 +268,25 @@ namespace NeuroForge
             advantages = new List<double>();
 
             double Vt = 0;
-            double At = 0;
+            double At = 0; //gae
             double nextValue = 0;
 
             for (int i = playback.Count - 1; i >= 0; i--)
             {
-                int mask = playback[i].done ? 0 : 1;
+                PPOSample step_t = playback[i];
+                int mask = step_t.done ? 0 : 1;
 
-                double delta = playback[i].reward +
+                double delta = step_t.reward +
                                gamma * nextValue * mask - 
-                               playback[i].value;
+                               step_t.value;
 
                 At = delta + gamma * lambda * mask * At;
-                Vt = At + playback[i].value;
+                Vt = At + step_t.value;
                                 
                 advantages.Insert(0, At);
                 returns.Insert(0, Vt);
 
-                nextValue = playback[i].value;
+                nextValue = step_t.value;
             }
         }
         void ShuffleTrainingData(TrainingData data)
@@ -288,7 +295,7 @@ namespace NeuroForge
             for (int i = 0; i < data.playback.Count; i++)
             {
                 int j = rand.Next(0, data.playback.Count - 1);
-                
+
                 // interchange playback memories
                 PPOSample temp = data.playback[i];
                 data.playback[i] = data.playback[j];

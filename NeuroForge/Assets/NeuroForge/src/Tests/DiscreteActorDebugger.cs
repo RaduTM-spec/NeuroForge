@@ -10,7 +10,7 @@ public class DiscreteActorDebugger : MonoBehaviour
     private void Update()
     {
         double[] inputs = new double[] {transform.position.x, transform.position.y, transform.position.z, transform.position.x, transform.position.y, transform.position.z };
-        double[] probs = discreteNet.DiscreteForwardPropagation(inputs).Item1;
+        double[] probs = discreteNet.Forward_Discrete(inputs).Item1;
         Functions.Print(probs);
     }
 }

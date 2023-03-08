@@ -21,10 +21,10 @@ namespace NeuroForge
         [Range(0f, 1e-1f), Tooltip("beta")] public float regularization = 0.00005f;                                                                                                            
                                                                                                                                                                                                
         [Header("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")]
-        [Range(0.8f, 0.995f), Tooltip("gamma")] public float discountFactor = 0.9f;                                                                                                             
+        [Range(0.8f, 0.995f), Tooltip("gamma")] public float discountFactor = 0.99f;                                                                                                             
         [Range(0.9f, 0.95f), Tooltip("lambda")] public float gaeFactor = 0.95f;                                                                                                                 
         [Range(0.1f, 0.3f), Tooltip("epsilon")] public float clipFactor = 0.2f;                                                                                                                 
-        [Range(1e-4f, 1e-2f), Tooltip("beta")] public float entropyRegularization = 0.01f;                                                                                                     
+        [Range(0f, 1e-2f), Tooltip("beta")] public float entropyRegularization = 0.005f;                                                                                                     
                                                                                                                                                                                                 
         [Header("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")]
         [SerializeField] private BufferSize bufferSize = BufferSize.size256;    

@@ -16,11 +16,12 @@ namespace NeuroForge {
     [Serializable]
     public class NeuralNetwork: ScriptableObject
     {
-        [SerializeField] public int[] format;
+        [SerializeField] public int[] layerFormat;
         [SerializeField] public NeuronLayer[] neuronLayers;
         [SerializeField] public WeightLayer[] weightLayers;
         [SerializeField] public BiasLayer[] biasLayers;
-        
+
+        [SerializeField] public InitializationType initializationType; // shows how the network was initialized
         [SerializeField] public ActivationType activationType;
         [SerializeField] public ActivationType outputActivationType;
         [SerializeField] public LossType lossType;
@@ -35,19 +36,20 @@ namespace NeuroForge {
                              ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, 
                              InitializationType initType, bool createAsset, string name)
         {
-            this.format = GetFormat(inputs, outputs, hiddenUnits, hiddenLayersNumber);
+            this.layerFormat = GetFormat(inputs, outputs, hiddenUnits, hiddenLayersNumber);
+            this.initializationType = initType;
             this.activationType = activationFunction;
             this.outputActivationType = outputActivationFunction;
             this.lossType = lossFunction;
 
-            neuronLayers = new NeuronLayer[format.Length];
-            biasLayers = new BiasLayer[format.Length];
-            weightLayers = new WeightLayer[format.Length - 1];
+            neuronLayers = new NeuronLayer[layerFormat.Length];
+            biasLayers = new BiasLayer[layerFormat.Length];
+            weightLayers = new WeightLayer[layerFormat.Length - 1];
 
             for (int i = 0; i < neuronLayers.Length; i++)
             {
-                neuronLayers[i] = new NeuronLayer(format[i]);
-                biasLayers[i] = new BiasLayer(format[i], initType);
+                neuronLayers[i] = new NeuronLayer(layerFormat[i]);
+                biasLayers[i] = new BiasLayer(layerFormat[i], initType);
 
             }
             for (int i = 0; i < neuronLayers.Length - 1; i++)
@@ -63,8 +65,8 @@ namespace NeuroForge {
             }
         }
 
-        #region TRAIN
-        public double[] ForwardPropagation(double[] inputs)
+        
+        public double[] Forward(double[] inputs)
         {
             neuronLayers[0].SetOutValues(inputs);
             for (int l = 1; l < neuronLayers.Length; l++)
@@ -90,12 +92,12 @@ namespace NeuroForge {
             }
             return neuronLayers[neuronLayers.Length - 1].GetOutValues();
         }
-        public double BackPropagation(double[] inputs, double[] labels)
+        public double Backward(double[] inputs, double[] labels)
         {
             if (weightGradients == null || weightGradients.Length < 1)
-                InitGradients();
+                ZeroGrad();
 
-            ForwardPropagation(inputs);
+            Forward(inputs);
             double error = CalculateOutputLayerCost(labels);
 
             for (int wLayer = weightLayers.Length - 1; wLayer >= 0; wLayer--)
@@ -106,7 +108,7 @@ namespace NeuroForge {
             updatesCount++;
             return error;
         }
-        public void GradientsClipNorm(float threshold)
+        public void GradClipNorm(float threshold)
         {
             double global_sum = 0;
 
@@ -154,7 +156,7 @@ namespace NeuroForge {
                 }
             }
         }
-        public void OptimiseParameters(float learningRate, float momentum, float regularization)
+        public void OptimStep(float learningRate, float momentum, float regularization)
         {
             learningRate /= updatesCount;
             updatesCount = 0;
@@ -190,24 +192,24 @@ namespace NeuroForge {
                 }
             }
         }
-        private void InitGradients()
+        private void ZeroGrad()
         {
-             biasGradients = new BiasLayer[format.Length];
-             biasMomentums = new BiasLayer[format.Length];
-             weightGradients = new WeightLayer[format.Length - 1];
-             weightMomentums = new WeightLayer[format.Length - 1];
+                biasGradients = new BiasLayer[layerFormat.Length];
+                biasMomentums = new BiasLayer[layerFormat.Length];
+                weightGradients = new WeightLayer[layerFormat.Length - 1];
+                weightMomentums = new WeightLayer[layerFormat.Length - 1];
 
-             for (int i = 0; i < neuronLayers.Length; i++)
-             {
-                 biasGradients[i] = new BiasLayer(format[i], InitializationType.Zero);
-                 biasMomentums[i] = new BiasLayer(format[i], InitializationType.Zero);
+                for (int i = 0; i < neuronLayers.Length; i++)
+                {
+                    biasGradients[i] = new BiasLayer(layerFormat[i], InitializationType.Zero);
+                    biasMomentums[i] = new BiasLayer(layerFormat[i], InitializationType.Zero);
 
-             }
-             for (int i = 0; i < neuronLayers.Length - 1; i++)
-             {
-                 weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
-                 weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
-             }
+                }
+                for (int i = 0; i < neuronLayers.Length - 1; i++)
+                {
+                    weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
+                    weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
+                }          
         }
 
         private void UpdateGradients(WeightLayer weightGradient, BiasLayer biasGradient, NeuronLayer previousNeuronLayer, NeuronLayer nextNeuronLayer)
@@ -266,7 +268,7 @@ namespace NeuroForge {
         private double CalculateOutputLayerCost(double[] labels)
         {
             NeuronLayer outLayer = neuronLayers[neuronLayers.Length - 1];
-            double cost = 0;
+            double err = 0;
             if (outputActivationType != ActivationType.SoftMax)
             {
                 for (int i = 0; i < outLayer.neurons.Length; i++)
@@ -274,17 +276,16 @@ namespace NeuroForge {
                     switch (lossType)
                     {
                         case LossType.MeanSquare:
-                            outLayer.neurons[i].CostValue = Cost.MeanSquareDerivative(outLayer.neurons[i].OutValue, labels[i]) * Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
-                            cost += .5 * Cost.MeanSquare(outLayer.neurons[i].OutValue, labels[i]);
+                            outLayer.neurons[i].CostValue = Loss.MeanSquareDerivative(outLayer.neurons[i].OutValue, labels[i]) * Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
+                            err += Error.MeanSquare(outLayer.neurons[i].OutValue, labels[i]);
                             break;
                         case LossType.CrossEntropy:
-                            outLayer.neurons[i].CostValue = Cost.CrossEntropyDerivative(outLayer.neurons[i].OutValue, labels[i]) * Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
-                            double locCost = Cost.CrossEntropy(outLayer.neurons[i].OutValue, labels[i]);
-                            cost += double.IsNaN(locCost) ? 0 : locCost;
+                            outLayer.neurons[i].CostValue = Loss.CrossEntropyDerivative(outLayer.neurons[i].OutValue, labels[i]) * Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
+                            err += Error.CrossEntropy(outLayer.neurons[i].OutValue, labels[i]);                          
                             break;
                         case LossType.MeanAbsolute:
-                            outLayer.neurons[i].CostValue = Cost.AbsoluteDerivative(outLayer.neurons[i].OutValue, labels[i]) * Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
-                            cost += Cost.Absolute(outLayer.neurons[i].OutValue, labels[i]);
+                            outLayer.neurons[i].CostValue = Loss.AbsoluteDerivative(outLayer.neurons[i].OutValue, labels[i]) * Derivative.DeriveValue(outLayer.neurons[i].InValue, outputActivationType);
+                            err += Error.MeanAbsolute(outLayer.neurons[i].OutValue, labels[i]);
                             break;
                     }
                 }
@@ -302,17 +303,16 @@ namespace NeuroForge {
                     switch (lossType)
                     {
                         case LossType.MeanSquare:
-                            outLayer.neurons[i].CostValue = Cost.MeanSquareDerivative(outLayer.neurons[i].OutValue, labels[i]) * derivedInValuesBySoftMax[i];
-                            cost += .5 * Cost.MeanSquare(outLayer.neurons[i].OutValue, labels[i]);
+                            outLayer.neurons[i].CostValue = Loss.MeanSquareDerivative(outLayer.neurons[i].OutValue, labels[i]) * derivedInValuesBySoftMax[i];
+                            err += Error.MeanSquare(outLayer.neurons[i].OutValue, labels[i]);
                             break;
                         case LossType.CrossEntropy:
-                            outLayer.neurons[i].CostValue = Cost.CrossEntropyDerivative(outLayer.neurons[i].OutValue, labels[i]) * derivedInValuesBySoftMax[i];
-                            double locCost = Cost.CrossEntropy(outLayer.neurons[i].OutValue, labels[i]);   
-                            cost += double.IsNaN(locCost) ? 0 : locCost;
+                            outLayer.neurons[i].CostValue = Loss.CrossEntropyDerivative(outLayer.neurons[i].OutValue, labels[i]) * derivedInValuesBySoftMax[i];
+                            err += Error.CrossEntropy(outLayer.neurons[i].OutValue, labels[i]);
                             break;
                         case LossType.MeanAbsolute:
-                            outLayer.neurons[i].CostValue = Cost.AbsoluteDerivative(outLayer.neurons[i].OutValue, labels[i]) * derivedInValuesBySoftMax[i];
-                            cost += Cost.Absolute(outLayer.neurons[i].OutValue, labels[i]);
+                            outLayer.neurons[i].CostValue = Loss.AbsoluteDerivative(outLayer.neurons[i].OutValue, labels[i]) * derivedInValuesBySoftMax[i];
+                            err += Error.MeanAbsolute(outLayer.neurons[i].OutValue, labels[i]);
                             break;
                     }
                 }
@@ -321,15 +321,12 @@ namespace NeuroForge {
 
             }
 
-            return cost / labels.Length;
+            return err / labels.Length;
         }
        
 
-        #endregion
-        
-
-        #region OTHER
-        private int[] GetFormat(int inputs, int outs, int hidden_units, int hidden_lay_num)
+        // OTHER
+        static int[] GetFormat(int inputs, int outs, int hidden_units, int hidden_lay_num)
         {
             int[] form = new int[2 + hidden_lay_num];
 
@@ -342,28 +339,8 @@ namespace NeuroForge {
 
             return form;
         }
-        public int GetInputsNumber() => format[0];
-        public int GetOutputsNumber() => format[format.Length - 1];
-        public double GetMaxGradientValue()
-        {
-            double max = 0;
-            for (int i = 0; i < weightGradients.Length; i++)
-            {
-                for (int j = 0; j < weightGradients[i].weights.Length; j++)
-                {
-                    for (int k = 0; k < weightGradients[i].weights[j].Length; k++)
-                    {
-                        if (weightGradients[i].weights[j][k] > max)
-                        {
-                            max = weightGradients[i].weights[j][k];
-                        }
-                    }
-                }
-            }
-            return max;
-        }
-
-        #endregion
+        public int GetNoInputs() => layerFormat[0];
+        public int GetNoOutputs() => layerFormat[layerFormat.Length - 1];
     }
 
 

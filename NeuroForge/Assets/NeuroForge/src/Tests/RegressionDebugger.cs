@@ -147,12 +147,13 @@ public class RegressionDebugger : MonoBehaviour
     {
          double data_acc = 0;
 
+
         for (int i = 0; i < inputsData.Count / 2; i++)
         {
 
-            data_acc += net.BackPropagation(inputsData[i], labelsData[i]);
+            data_acc += net.Backward(inputsData[i], labelsData[i]);
             if(i%batch_size == 0)
-                net.OptimiseParameters(learn_rate, momentum, regularization);
+                net.OptimStep(learn_rate, momentum, regularization);
         }
 
         epoch++;
@@ -169,13 +170,13 @@ public class RegressionDebugger : MonoBehaviour
         {
             
             double[] inps = inputsData[i];
-            double[] outs = net.ForwardPropagation(inps);
+            double[] outs = net.Forward(inps);
 
             double[] labels = labelsData[i];
 
             testDots.Add((inps[0], outs[0]));
 
-            double error_on_sample = Functions.Cost.MeanSquare(outs[0], labels[0]);
+            double error_on_sample = Functions.Error.MeanSquare(outs[0], labels[0]);
             
             error_on_sample = (1.0 - error_on_sample) * 100;
             test_acc += error_on_sample;

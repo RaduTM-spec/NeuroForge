@@ -85,12 +85,12 @@ public class MNISTTrain_NN : MonoBehaviour
             foreach (var sample in digit.Value)
             {
                 double[] input = sample.Select(x => (double)x).ToArray();
-                err += network.BackPropagation(input, labels);
+                err += network.Backward(input, labels);
 
                 count++;      
                 
             }
-            network.OptimiseParameters(learnRate, momentum, regularization);
+            network.OptimStep(learnRate, momentum, regularization);
         }
         trainAcc = ((1.0 - err / count) * 100).ToString("0.000") + "%";
     }
@@ -105,11 +105,11 @@ public class MNISTTrain_NN : MonoBehaviour
             foreach (var sample in digit.Value)
             {
                 double[] input = sample.Select(x => (double)x).ToArray();
-                double[] prediction = network.ForwardPropagation(input);
+                double[] prediction = network.Forward(input);
 
                 for (int i = 0; i < 10; i++)
                 {
-                    err += 0.5 * Functions.Cost.MeanSquare(prediction[i], labels[i]);
+                    err += Functions.Error.MeanSquare(prediction[i], labels[i]);
                 }
 
                 count++;

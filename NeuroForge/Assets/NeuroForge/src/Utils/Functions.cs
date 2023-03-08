@@ -22,43 +22,34 @@ namespace NeuroForge
             double y1 = Math.Sqrt(-2.0 * Math.Log(x1)) * Math.Cos(2.0 * Math.PI * x2);
             return y1 * stddev + mean;          
         }
-        public static double RandomValue() => UnityEngine.Random.value;
-        public static T RandomIn<T>(IEnumerable<T> values)
+        public static double RandomValue() => new System.Random().NextDouble();
+        public static double RandomRange(double min, double max) => new System.Random().NextDouble() * (max - min) + min;
+        public static int RandomRange(int min, int max) => new System.Random().Next(min, max);
+        public static T RandomIn<T>(IEnumerable<T> values, List<float> unormProbs = null)
         {
-            int randIndex = UnityEngine.Random.Range(0, values.Count());
-            try
+            if (unormProbs == null)
             {
-                
-                return values.ElementAt(randIndex);
-
+                int randIndex = UnityEngine.Random.Range(0, values.Count());
+                return values.ElementAtOrDefault(randIndex);
             }
-            catch
-            {
-                Debug.LogError("IEnumrable is empty");
-                return values.First();
-            }
-            
-        }
-        public static T RandomIn<T>(IEnumerable<T> values, List<float> probs)
-        {
             // recommended to let it as it is
-            // Push or drag them such way the minimum value in probs is 0
-            for (int i = 0; i < probs.Count; i++)
+            for (int i = 0; i < unormProbs.Count; i++)
             {
-                if (probs[i] <= 0)
-                    probs[i] = 1e-8f;
+                if (unormProbs[i] <= 0)
+                    unormProbs[i] = 1e-8f;
             }
 
-            float random = FunctionsF.RandomValue() * probs.Sum();
+            float random = FunctionsF.RandomValue() * unormProbs.Sum();
             int index = 0; // dont modify this and that -1 at the end, is case for 0 0 0 0 on probs
 
             while (random > 0)
             {
-                random -= probs[index];
+                random -= unormProbs[index];
                 index++;
             }
 
             return values.ElementAt(index - 1);
+
         }
         public static void Normalize(List<double> list)
         {
@@ -77,19 +68,18 @@ namespace NeuroForge
             // Normalize list
             list = list.Select(x => (x - mean) / (std + 1e-8)).ToList();
         }
-        public static void Shuffle<T>(List<T> list, int iterations = 1)
+        public static void Shuffle<T>(List<T> list)
         {
             var random = new System.Random();
-            for(int iter = 0; iter < iterations; iter++)
+            
+            for (int i = 0; i < list.Count; i++)
             {
-                for (int i = 0; i < list.Count; i++)
-                {
-                    int j = random.Next(0, list.Count - 1);
-                    T temp = list[i];
-                    list[i] = list[j];
-                    list[j] = temp;
-                }
+                int j = random.Next(0, list.Count - 1);
+                T temp = list[i];
+                list[i] = list[j];
+                list[j] = temp;
             }
+            
            
         }
         public static void Print(IEnumerable array, string tag = null)
@@ -159,11 +149,23 @@ namespace NeuroForge
             T temp = obj1;
             obj1 = obj2;
             obj2 = temp;
-        }    
+        }
+        public static int ArgMax(double[] values)
+        {
+            int index = -1;
+            double max = double.MinValue;
+            for (int i = 0; i < values.Length; i++)
+                if (values[i] > max)
+                {
+                    max = values[i];
+                    index = i;
+                }
+            return index;
+        }
 
         public readonly struct Activation
         {
-            internal static double ActivateValue(double value, ActivationType activationFunction)
+            public static double ActivateValue(double value, ActivationType activationFunction)
             {
                 switch(activationFunction)
                 {
@@ -220,22 +222,10 @@ namespace NeuroForge
                         values[i] = 0;
                 }
             }
-            public static int ArgMax(double[] values)
-            {
-                int index = -1;
-                double max = double.MinValue;
-                for (int i = 0; i < values.Length; i++)
-                    if (values[i] > max)
-                    {
-                        max = values[i];
-                        index = i;
-                    }
-                return index;
-            }
         }
         public readonly struct Derivative
         {
-            static internal double DeriveValue(double value, ActivationType activationFunction)
+            public static double DeriveValue(double value, ActivationType activationFunction)
             {
                 switch (activationFunction)
                 {
@@ -257,29 +247,29 @@ namespace NeuroForge
                         return 1;
                 }
             }
-            
-            static public double TanH(double  value)
+
+            public static double TanH(double  value)
             {
                 double e2 = Math.Exp(2 * value);
                 double tanh = (e2 - 1) / (e2 + 1);
                 return 1 - tanh * tanh;
                 
             }
-            static public double Sigmoid(double value)
+            public static double Sigmoid(double value)
             {
                 double act = Activation.Sigmoid(value);
                 return act * (1 - act);
             }
-            static public double ReLU(double value) => value > 0 ? 1 : 0;
-            static public double LeakyReLU(double value, double alpha = 0.2) => value > 0 ? 1 : alpha;
-            static public double SiLU(double value)
+            public static double ReLU(double value) => value > 0 ? 1 : 0;
+            public static double LeakyReLU(double value, double alpha = 0.2) => value > 0 ? 1 : alpha;
+            public static double SiLU(double value)
             {
                 double sigm = Activation.Sigmoid(value);
                 return value * sigm * (1 - sigm) + sigm;
             }
-            static public double ELU(double value) => value < 0 ? Math.Exp(value) : 1;
-            static public double SoftPlus(double value) => Activation.Sigmoid(value);
-            static public void SoftMax(double[] values)
+            public static double ELU(double value) => value < 0 ? Math.Exp(value) : 1;
+            public static double SoftPlus(double value) => Activation.Sigmoid(value);
+            public static void SoftMax(double[] values)
             {
                 double exp_sum = 0;
                 for (int i = 0; i < values.Length; i++)
@@ -296,26 +286,27 @@ namespace NeuroForge
                 }
             }
         }
-        public readonly struct Cost
+        public readonly struct Error
         {
-            public static double Absolute(double prediction, double label)
+            public static double MeanAbsolute(double prediction, double label)
             {
                 return Math.Abs(prediction - label);
             }
             public static double MeanSquare(double prediction, double label)
             {
-                return (prediction - label) * (prediction - label);
+                return 0.5 * (prediction - label) * (prediction - label);
             }
             public static double CrossEntropy(double prediction, double label)
             {
-                return -label * Math.Log(prediction);
+                double err = -label * Math.Log(prediction);
+                return double.IsNaN(err) ? 0 : err;
             }
-
+        }
+        public readonly struct Loss
+        {
             public static double AbsoluteDerivative(double prediction, double label)
             {
-                if ((prediction - label) > 0)
-                    return 1;
-                return -1;
+                return prediction - label > 0 ? 1 : -1;
             }
             public static double MeanSquareDerivative(double prediction, double label)
             {
@@ -323,10 +314,73 @@ namespace NeuroForge
             }
             public static double CrossEntropyDerivative(double prediction, double label)
             {
-                prediction += 1e-10;
-                return (-prediction + label) / (prediction * (prediction - 1));
+                return (-prediction + label) / (prediction * (prediction - 1) + 1e-10);
             }
-        }     
+        }
+        public readonly struct Image
+        {
+            public static Texture2D Blur(Texture2D texture, float standardDeviation = 2.0f)
+            {
+                int radius = Mathf.CeilToInt(standardDeviation * 3f);
+                int size = radius * 2 + 1;
+                float[,] kernel = new float[size, size];
+                float kernelSum = 0f;
+
+                for (int y = -radius; y <= radius; y++)
+                {
+                    for (int x = -radius; x <= radius; x++)
+                    {
+                        float distance = Mathf.Sqrt(x * x + y * y);
+                        float weight = Mathf.Exp(-(distance * distance) / (2f * standardDeviation * standardDeviation));
+                        kernel[y + radius, x + radius] = weight;
+                        kernelSum += weight;
+                    }
+                }
+
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        kernel[y, x] /= kernelSum;
+                    }
+                }
+
+                Texture2D smoothedTexture = new Texture2D(texture.width, texture.height);
+
+                for (int y = 0; y < texture.height; y++)
+                {
+                    for (int x = 0; x < texture.width; x++)
+                    {
+                        Color sum = Color.black;
+                        float weightSum = 0f;
+
+                        for (int ky = -radius; ky <= radius; ky++)
+                        {
+                            for (int kx = -radius; kx <= radius; kx++)
+                            {
+                                int textureX = Mathf.Clamp(x + kx, 0, texture.width - 1);
+                                int textureY = Mathf.Clamp(y + ky, 0, texture.height - 1);
+                                Color color = texture.GetPixel(textureX, textureY);
+                                float weight = kernel[ky + radius, kx + radius];
+                                sum += color * weight;
+                                weightSum += weight;
+                            }
+                        }
+
+                        Color averageColor = sum / weightSum;
+                        smoothedTexture.SetPixel(x, y, averageColor);
+                    }
+                }
+
+                smoothedTexture.Apply();
+                return smoothedTexture;
+
+            }
+            public static Texture2D Convolute(Texture2D texture, int iterations, float standardDeviation)
+            {
+                return texture;
+            }
+        }
 
     }
 }

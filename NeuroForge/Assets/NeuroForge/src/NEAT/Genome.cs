@@ -334,7 +334,7 @@ namespace NeuroForge
             }
 
             // Create node
-            NodeGene new_node = new NodeGene(GetNextNodeId(), NEATNodeType.hidden, this_node_layer, NEATTrainer.GetHiddenNodeActivationType());
+            NodeGene new_node = new NodeGene(GetNextNodeId(), NEATNodeType.hidden, this_node_layer, NEATTrainer.GetNodeActivation());
             nodes.Add(new_node.id, new_node);
             //new_node.activationType = ActivationTypeF.HyperbolicTangent;
 

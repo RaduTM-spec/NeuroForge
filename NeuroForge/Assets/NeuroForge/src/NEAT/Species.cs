@@ -15,6 +15,7 @@ namespace NeuroForge
         private float sharedFitnessSum = float.MinValue;
         public int stagnation = 0;
         public int age = -1;
+        public int no_offsprings_assigned;
 
         private List<NEATAgent> individuals = new List<NEATAgent>();
         private NEATAgent representative;
@@ -42,8 +43,23 @@ namespace NeuroForge
             representative.SetSpecies(this);
             individuals.Add(representative);
         }
+        public void FullReset()
+        {
+            foreach (var item in individuals)
+            {
+                item.SetSpecies(null);
+            }
+            individuals.Clear();
 
-        // Joining
+            representative = null;
+        }
+
+
+        // Joining/Exiting
+        public bool TryRemove(NEATAgent agent)
+        {
+            return individuals.Remove(agent);
+        }
         public bool TryAdd(NEATAgent agent)
         {
             if(AreCompatible(agent.model, representative.model))
@@ -360,7 +376,7 @@ namespace NeuroForge
 
         // Other
         public void CalculateShFitSum() => sharedFitnessSum = individuals.Sum(x => x.GetAdjustedFitness());
-        public float GetShFitSum() => sharedFitnessSum;
+        public float GetSpeciesSharedFitness() => sharedFitnessSum;
         public void UpdateStagnation()
         {
             NEATAgent bestAgent = GetChampion();

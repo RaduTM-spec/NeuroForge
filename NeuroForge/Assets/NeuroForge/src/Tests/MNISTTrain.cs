@@ -88,19 +88,19 @@ public class MNISTTrain : MonoBehaviour
             {
                 // MSE
                 double[] input = sample.Select(x => (double)x).ToArray();
-                double[] prediction = network.DiscreteForwardPropagation(input).Item1;
+                double[] prediction = network.Forward_Discrete(input).Item1;
                
                 double[] losses = new double[10];
                
                 for (int i = 0; i < 10; i++)
                 {
-                    losses[i] = Functions.Cost.MeanSquareDerivative(prediction[i], labels[i]);
-                    err += .5 * Functions.Cost.MeanSquare(prediction[i], labels[i]);
+                    losses[i] = Functions.Loss.MeanSquareDerivative(prediction[i], labels[i]);
+                    err += Functions.Error.MeanSquare(prediction[i], labels[i]);
                 }
                
                 count++;
-                network.BackPropagation(input, losses);
-                network.OptimiseParameters(learnRate, momentum, regularization);
+                network.Backward(input, losses);
+                network.OptimStep(learnRate, momentum, regularization);
             }         
         }
         trainAcc = ((1.0 - err / count) * 100).ToString("0.000");
@@ -116,11 +116,11 @@ public class MNISTTrain : MonoBehaviour
             foreach (var sample in digit.Value)
             {
                 double[] input = sample.Select(x => (double)x).ToArray();
-                double[] prediction = network.DiscreteForwardPropagation(input).Item1;
+                double[] prediction = network.Forward_Discrete(input).Item1;
 
                 for (int i = 0; i < 10; i++)
                 {
-                    err += 0.5 * Functions.Cost.MeanSquare(prediction[i], labels[i]);
+                    err += Functions.Error.MeanSquare(prediction[i], labels[i]);
                 }
 
                 count++;

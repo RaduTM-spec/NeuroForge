@@ -18,7 +18,7 @@ namespace NeuroForge
     {
         private static NEATTrainer Instance;
 
-        [SerializeField] private HashSet<NEATAgent> population;
+        [SerializeField] private List<NEATAgent> population;
         private List<Species> species;
 
         private Genome mainModel;
@@ -55,7 +55,7 @@ namespace NeuroForge
             if (!sessionEnd && Instance != null && (Instance.episodeTimePassed >= Instance.hp.timeHorizon || Instance.agentsDead == Instance.population.Count))
             {
                 // Update NEAT
-                Instance.Evolution();
+                Instance.NEAT_Algorithm2();
 
                 // Reset Environment
                 Instance.trainingEnvironment.Reset();
@@ -75,7 +75,7 @@ namespace NeuroForge
                 }
 
                 // Check for stop
-                if(generation == hp.generations)
+                if (generation == hp.generations)
                 {
                     sessionEnd = true;
                     species = null;
@@ -85,7 +85,7 @@ namespace NeuroForge
                     }
                     Debug.Log("<color=#2873eb><b>Training session ended!\n\n\n\n\n\n\n\n\n\n\n</b></color>");
                     EditorApplication.isPlaying = false;
-                   
+
                 }
             }
         }
@@ -164,12 +164,12 @@ namespace NeuroForge
                         break;
                     case NEATNodeType.hidden:
                         Gizmos.color = hp.hiddenNodesColor;
-                        break;                 
+                        break;
                     case NEATNodeType.bias:
                         Gizmos.color = hp.biasNodeColor;
                         break;
                 }
-                if(drawSphereNodes) 
+                if (drawSphereNodes)
                     Gizmos.DrawSphere(new Vector3(node.Value.x, node.Value.y, node.Value.z), NODE_SCALE);
                 else
                     Gizmos.DrawCube(new Vector3(node.Value.x, node.Value.y, node.Value.z), Vector3.one * NODE_SCALE);
@@ -206,15 +206,15 @@ namespace NeuroForge
             if (Instance)
                 Instance.agentsDead++;
         }
-        public static void Initialize(NEATAgent agent)
+        public static void InitializeTrainer(NEATAgent agent)
         {
             if (Instance != null)
                 return;
-            
+
             GameObject go = new GameObject("NEATTrainer");
             go.AddComponent<NEATTrainer>();
 
-            Instance.population = new HashSet<NEATAgent>() { agent };
+            Instance.population = new List<NEATAgent>() { agent };
             Instance.species = new List<Species>();
 
             Instance.mainModel = agent.model;
@@ -222,15 +222,13 @@ namespace NeuroForge
             Instance.hp.generations = agent.hp.generations;
             Instance.hp.timeHorizon = agent.hp.timeHorizon;
 
-            if (Instance.hp.oneActivationType)
+            if (Instance.hp.OnlySigmoid)
                 Instance.hp.mutateNode = 0;
 
-            Instance.InitPopulation(agent.gameObject, agent.hp.populationSize - 1);
+            Instance.InitializeAgents(agent.gameObject, agent.hp.populationSize - 1);
             Instance.trainingEnvironment = new TransformReseter(agent.transform.parent); // is ok placed here, to get reference of all other agents
-            Instance.Evolution();
-          
         }
-        private void InitPopulation(GameObject modelAgent, int size)
+        private void InitializeAgents(GameObject modelAgent, int size)
         {
             // init the agent gameobjects
             for (int i = 0; i < size; i++)
@@ -245,12 +243,126 @@ namespace NeuroForge
             {
                 agent.model = mainModel.Clone() as Genome;
                 agent.model.Mutate();
-            }     
+            }
         }
 
 
-        // NEAT
-        private void Evolution()
+        // NEAT 1 (original implementation -- actually works extremly bad)
+        private void NEAT_Algorithm1()
+        {
+            //1
+            Speciate();
+            //2 
+            SpeciesCalculations();
+            //3
+            SpeciesOffspringCalculations();
+            //4
+            KillPopulation();
+            //5
+            KillSpeciesWith0Team();
+            //6
+            Breed();
+
+            // Increment the age foreach species
+            foreach (var item in species)
+            {
+                item.age++;
+            }
+
+        }
+        private void SpeciesOffspringCalculations()
+        {
+            float total_sh_fitness = species.Sum(s => s.GetSpeciesSharedFitness());
+            int offsprings_assigned = 0;
+            foreach (var spec in species)
+            {
+                int i_offer_this_number = (int)(spec.GetSpeciesSharedFitness() / total_sh_fitness * population.Count);
+                spec.no_offsprings_assigned = i_offer_this_number;
+                offsprings_assigned += i_offer_this_number;
+            }
+            // Because the sum of assigned offsprings != population, we give more to random species until we fill up
+            for (int i = 0; i < population.Count - offsprings_assigned; i++)
+            {
+                Species spec = Functions.RandomIn(species);
+                spec.no_offsprings_assigned++;
+            }
+            
+        }
+        private void KillPopulation()
+        {
+
+            // Kill the worst agents (only their genome ofc) from the population (we do not care about their species)
+            // Actually this idea is extremly bad, so i changed it
+            population.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
+            int how_many_to_kill = (int) (1f - Instance.hp.survivalRate) * population.Count;
+            for (int i = 0; i < how_many_to_kill; i++)
+            {
+                NEATAgent x = population[i];
+                x.GetSpecies().TryRemove(x);
+                x.SetSpecies(null);
+                x.SetFitness(0);
+                x.SetAdjustedFitness(0);         
+                x.model = null;
+            }
+        }
+        private void KillSpeciesWith0Team()
+        {
+            List<Species> toRemove = new List<Species>();
+            foreach (var spec in species)
+            {
+                if (spec.GetIndividuals().Count == 0)
+                {
+                    toRemove.Add(spec);
+                }
+            }
+            foreach (var extSpecies in toRemove)
+            {
+                extSpecies.GoExtinct();
+                species.Remove(extSpecies);
+            }
+        }
+        private void Breed()
+        {
+            // Keep all offsprings here foreach species
+            Dictionary<Species, List<Genome>> offsprings = new Dictionary<Species, List<Genome>>();
+            foreach (var spec in species)
+            {
+                int num = spec.no_offsprings_assigned;
+                List<Genome> offs = new List<Genome>();
+                for (int i = 0; i < num; i++)
+                {
+                    offs.Add(spec.Breed());
+                }
+                offsprings.Add(spec, offs);
+            }
+
+            // Clean up old generation
+            foreach (var spec in species)
+            {
+                spec.FullReset();
+            }
+            foreach (var ind in population)
+            {
+                ind.model = null;
+            }
+
+            // Fill up the species
+            foreach (var item in offsprings)
+            {
+                Species spec = item.Key;
+                List<Genome> offs = item.Value;
+                foreach (var brain in offs)
+                {
+                    NEATAgent brainlessAg = GetBrainlessAgent();
+                    brainlessAg.model = brain;
+                    spec.ForceAdd(brainlessAg);
+                }
+
+            }
+        }
+
+        // NEAT 2
+        private void NEAT_Algorithm2()
         {
             /*
              *  Every species is
@@ -274,7 +386,7 @@ namespace NeuroForge
         }
         void Speciate()
         {
-            // Reset species - Champion becomes the representative
+            // Reset species - rand indiv becomes the representative
             foreach (var spec in species)
             {
                 spec.Reset();
@@ -336,7 +448,7 @@ namespace NeuroForge
             List<Species> toRemove = new List<Species>();
             foreach (var spec in species)
             {
-                if (spec.GetIndividuals().Count < 2)
+                if (spec.GetIndividuals().Count < 2 && spec.age > 3)
                 {
                     toRemove.Add(spec);
                 }
@@ -365,7 +477,6 @@ namespace NeuroForge
                 item.age++;
             }
         }
-        
 
         // Other
         private void PrintEpisodeStatistic()
@@ -373,7 +484,9 @@ namespace NeuroForge
             StringBuilder text = new StringBuilder();
             text.Append("<color=#2873eb><b>Generation ");
             text.Append(++generation);
-            text.Append("</b></color>\n");
+            text.Append("</b> (No. species: ");
+            text.Append(species.Count);
+            text.Append(")</color>\n");
             text.Append("<color=#099c94>_______________________________________________________________________\n</color>");
             text.Append("<color=#099c94>| SpeciesID | Size | Shared Fitness | Best Fitness | Age | Stagnation |\n</color>"); 
             text.Append("<color=#099c94>-----------------------------------------------------------------------\n</color>");
@@ -390,7 +503,7 @@ namespace NeuroForge
 
                 string id = ("#" + spec.id).PadLeft(10, ' ');             
                 string size = spec.GetIndividuals().Count.ToString().PadLeft(5, ' ');
-                string shFitness = spec.GetShFitSum().ToString("0.000").PadLeft(15,' ');
+                string shFitness = spec.GetSpeciesSharedFitness().ToString("0.000").PadLeft(15,' ');
                 float bestFit = spec.GetChampion().GetFitness();
                 string bestFitness = bestFit.ToString("0.000").PadLeft(13, ' ');
                 string age = spec.age.ToString().PadLeft(4, ' ');
@@ -446,7 +559,7 @@ namespace NeuroForge
                 allowed_to_reproduce_species.Add(species[1]);
             }
 
-            List<float> probs = allowed_to_reproduce_species.Select(x => x.GetShFitSum()).ToList();
+            List<float> probs = allowed_to_reproduce_species.Select(x => x.GetSpeciesSharedFitness()).ToList();
 
             return Functions.RandomIn(allowed_to_reproduce_species, probs);
         }
@@ -461,15 +574,24 @@ namespace NeuroForge
             }
             return best.model;
         }
+        private NEATAgent GetBrainlessAgent()
+        {
+            foreach (var item in population)
+            {
+                if (item.model == null)
+                    return item;
+            }
+            return null;
+        }
 
         public static void Dispose() { Destroy(Instance.gameObject); Instance = null; }
         public static void InitializeHyperParameters() => Instance.hp = new NEATHyperParameters();
         public static NEATHyperParameters GetHyperParam() => Instance.hp;
-        public static ActivationTypeF GetHiddenNodeActivationType()
+        public static ActivationTypeF GetNodeActivation()
         {
             // Better results with random activations!
             // Modified sigmoid is actually shit idk why
-            if (Instance.hp.oneActivationType)
+            if (Instance.hp.OnlySigmoid)
             {
                 if (Instance.mainModel.actionSpace == ActionType.Continuous)
                     return ActivationTypeF.HyperbolicTangent;

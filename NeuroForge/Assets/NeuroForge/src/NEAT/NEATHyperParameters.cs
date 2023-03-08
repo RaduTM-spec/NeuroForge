@@ -34,7 +34,7 @@ namespace NeuroForge
         [Header("Genome structure")]
         [Min(30)] public int maxConnections = 150;
         [Min(5)] public int maxNodes = 30;
-        public bool oneActivationType = false;
+        public bool OnlySigmoid = false;
 
         [Header("Display")]
         public Color biasNodeColor = Color.blue;

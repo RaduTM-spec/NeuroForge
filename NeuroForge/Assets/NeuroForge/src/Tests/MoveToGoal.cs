@@ -6,45 +6,66 @@ public class MoveToGoal : PPOAgent
     [Header("Attributes")]
     public float speed = 5f;
     public Transform target;
-    Rigidbody rb;
+
+    public Vector2 x_range;
+    public Vector2 z_range;
+
+    public ActionType type = ActionType.Continuous;
 
     protected override void Awake()
     {
         base.Awake();
-        rb = GetComponent<Rigidbody>();
     }
     public override void CollectObservations(SensorBuffer sensorBuffer)
     {
-        //6 inputs
-        sensorBuffer.AddObservation(transform.localPosition);
-        sensorBuffer.AddObservation(target.localPosition);
+        //4 inputs
+        float x_pos = transform.localPosition.x / 6f;
+        float z_pos = transform.localPosition.z / 5f;
+
+        float t_x_pos = target.localPosition.x;
+        float t_z_pos = target.localPosition.z;
+
+        sensorBuffer.AddObservation(x_pos);
+        sensorBuffer.AddObservation(z_pos);
+        sensorBuffer.AddObservation(t_x_pos);
+        sensorBuffer.AddObservation(t_z_pos);
     }
     public override void OnActionReceived(in ActionBuffer actionBuffer)
     {
-        //transform.position += new Vector3(actionBuffer.continuousActions[0], 0, actionBuffer.continuousActions[1]) * Time.deltaTime * speed;
-       switch(actionBuffer.DiscreteActions[0])
+        if(type == ActionType.Continuous)
         {
-            case 0:
-                transform.position += Vector3.left * Time.fixedDeltaTime * speed;
-                break;
-            case 1:
-                transform.position += Vector3.forward * Time.fixedDeltaTime * speed;
-                break;
-            case 2:
-                transform.position += Vector3.right * Time.fixedDeltaTime * speed;
-                break;
-            case 3:
-                transform.position += Vector3.back * Time.fixedDeltaTime * speed;
-                break;
+            transform.position +=
+             new Vector3(actionBuffer.ContinuousActions[0], 0, actionBuffer.ContinuousActions[1])
+             * Time.fixedDeltaTime
+             * speed;
         }
-       switch(actionBuffer.DiscreteActions[1])
-        {
-            case 0:
-                break;
-            case 1:               
-                break;
+       else if(type == ActionType.Discrete)
+       {
+            switch (actionBuffer.DiscreteActions[0])
+            {
+                case 0:
+                    transform.position += Vector3.left * Time.fixedDeltaTime * speed;
+                    break;
+                case 1:
+                    transform.position += Vector3.forward * Time.fixedDeltaTime * speed;
+                    break;
+                case 2:
+                    transform.position += Vector3.right * Time.fixedDeltaTime * speed;
+                    break;
+                case 3:
+                    transform.position += Vector3.back * Time.fixedDeltaTime * speed;
+                    break;
+            }
+            switch (actionBuffer.DiscreteActions[1])
+            {
+                case 0:
+                    break;
+                case 1:
+                    break;
 
+            }
         }
+       
         
     }
     public override void Heuristic(ActionBuffer actionSet)

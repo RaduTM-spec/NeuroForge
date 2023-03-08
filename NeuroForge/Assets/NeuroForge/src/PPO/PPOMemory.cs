@@ -42,7 +42,7 @@ namespace NeuroForge
         string GenerateName()
         {
             short id = 1;
-            while (AssetDatabase.LoadAssetAtPath<NeuralNetwork>("Assets/Memory#" + id + ".asset") != null)
+            while (AssetDatabase.LoadAssetAtPath<PPOMemory>("Assets/Memory#" + id + ".asset") != null)
                 id++;
             return "Memory#" + id;
         }

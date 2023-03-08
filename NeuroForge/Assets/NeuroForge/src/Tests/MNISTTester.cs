@@ -76,8 +76,8 @@ public class MNISTTester : MonoBehaviour
         meshFilter.mesh = new Mesh();*/
 
         // Generate predict
-        double[] output = model.ForwardPropagation(input);
-        netPrediction = Functions.Activation.ArgMax(output);
+        double[] output = model.Forward(input);
+        netPrediction = Functions.ArgMax(output);
 
         if (netPrediction == digitLabel)
             Debug.Log("Correct");

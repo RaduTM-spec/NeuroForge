@@ -54,7 +54,7 @@ namespace NeuroForge
            
             // Init buffers
             sensorBuffer = new SensorBuffer(observationSize);
-            actionBuffer = new ActionBuffer(actor.GetActionsNumber());
+            actionBuffer = new ActionBuffer(actor.GetNoParallelActions());
             
             // Init sensors
             agentSensor = new AgentSensor(this.transform);
@@ -73,12 +73,12 @@ namespace NeuroForge
             // change the inspector vars if actor network exists
             if (actor)
             {
-                observationSize = actor.GetObservationsNumber();
+                observationSize = actor.GetNoObservations();
                 
                 if (actor.actionSpace == ActionType.Continuous)
                 {
                     actionSpace = ActionType.Continuous;
-                    ContinuousSize = actor.GetActionsNumber();
+                    ContinuousSize = actor.GetNoParallelActions();
                 }
                 else
                 {
@@ -164,11 +164,11 @@ namespace NeuroForge
 
             if(actionSpace == ActionType.Continuous)
             {
-                actionBuffer.ContinuousActions = actor.ContinuousForwardPropagation(sensorBuffer.Observations).Item2;           
+                actionBuffer.ContinuousActions = actor.Forward_Continuous(sensorBuffer.Observations).Item2;           
             }
             else
             {
-                actionBuffer.DiscreteActions = actor.DiscreteForwardPropagation(sensorBuffer.Observations).Item2;
+                actionBuffer.DiscreteActions = actor.Forward_Discrete(sensorBuffer.Observations).Item2;
             }
             OnActionReceived(actionBuffer);
 
@@ -186,25 +186,25 @@ namespace NeuroForge
 
             if(actionSpace == ActionType.Continuous)
             {
-                (double[], float[]) outs_acts = actor.ContinuousForwardPropagation(sensorBuffer.Observations);
+                (double[], float[]) outs_acts = actor.Forward_Continuous(sensorBuffer.Observations);
                 actionBuffer.ContinuousActions = outs_acts.Item2;
 
                 double[] state = sensorBuffer.Observations;
                 double[] action = outs_acts.Item1;
-                double[] log_probs = actor.GetContinuousLogProbs(outs_acts.Item1, outs_acts.Item2);
-                double value = critic.ForwardPropagation(sensorBuffer.Observations)[0];
+                double[] log_probs = PPOActor.GetContinuousLogProbs(outs_acts.Item1, outs_acts.Item2);
+                double value = critic.Forward(sensorBuffer.Observations)[0];
                 
                 memory.Store(state, action, reward, log_probs, value, isEpisodeEnd);
             }
             else
             {
-                (double[],int[]) dist_acts = actor.DiscreteForwardPropagation(sensorBuffer.Observations);
+                (double[],int[]) dist_acts = actor.Forward_Discrete(sensorBuffer.Observations);
                 actionBuffer.DiscreteActions = dist_acts.Item2;
 
                 double[] state = sensorBuffer.Observations;
                 double[] action = dist_acts.Item1;
                 double[] log_probs = PPOActor.GetDiscreteLogProbs(dist_acts.Item1);
-                double value = critic.ForwardPropagation(sensorBuffer.Observations)[0];
+                double value = critic.Forward(sensorBuffer.Observations)[0];
                 
                 memory.Store(state, action, reward, log_probs, value, isEpisodeEnd);
             }

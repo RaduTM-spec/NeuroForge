@@ -1,13 +1,9 @@
-using NeuroForge;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
 using UnityEditor;
-using UnityEditor.PackageManager;
 using UnityEngine;
-using UnityEngine.Windows;
 using static NeuroForge.Functions;
 
 namespace NeuroForge
@@ -15,12 +11,13 @@ namespace NeuroForge
     [Serializable]
     public class PPOActor : ScriptableObject
     {
-        [SerializeField] public int[] format;
+        [SerializeField] public int[] layerFormat;
         [SerializeField] public int[] outputBranches;
         [SerializeField] public NeuronLayer[] neuronLayers;
         [SerializeField] public WeightLayer[] weightLayers;
         [SerializeField] public BiasLayer[] biasLayers;
 
+        [SerializeField] public InitializationType initialization;
         [SerializeField] public ActivationType activationType;
         [SerializeField] public ActionType actionSpace;
 
@@ -32,18 +29,36 @@ namespace NeuroForge
 
         int backwardsCount = 0;
 
-        // Gradient Descent
-        public void BackPropagation(double[] inputs, double[] losses)
+        // SGD
+        private void ZeroGrad()
         {
-            // losses represent the derivative of the loss function values
+                biasGradients = new BiasLayer[layerFormat.Length];
+                biasMomentums = new BiasLayer[layerFormat.Length];
+                weightGradients = new WeightLayer[layerFormat.Length - 1];
+                weightMomentums = new WeightLayer[layerFormat.Length - 1];
+
+                for (int i = 0; i < neuronLayers.Length; i++)
+                {
+                    biasGradients[i] = new BiasLayer(layerFormat[i], InitializationType.Zero);
+                    biasMomentums[i] = new BiasLayer(layerFormat[i], InitializationType.Zero);
+
+                }
+                for (int i = 0; i < neuronLayers.Length - 1; i++)
+                {
+                    weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
+                    weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
+                }
+        }
+        public void Backward(double[] inputs, double[] losses)
+        {
             if (weightGradients == null || weightGradients.Length < 1)
-                ZeroGradients();
+                ZeroGrad();
 
             NeuronLayer outLayer = neuronLayers[neuronLayers.Length - 1];
 
             if (actionSpace == ActionType.Continuous)
             {
-                ContinuousForwardPropagation(inputs);
+                Forward_Continuous(inputs);
                 for (int i = 0; i < outLayer.neurons.Length; i++)
                 {
                     if (i % 2 == 0)
@@ -54,7 +69,7 @@ namespace NeuroForge
             } else
             if (actionSpace == ActionType.Discrete)
             {
-                double[] rawOuts = DiscreteForwardPropagation(inputs).Item1;
+                double[] rawOuts = Forward_Discrete(inputs).Item1;
 
                 int rawIndex = 0;
                 for (int i = 0; i < outputBranches.Length; i++)
@@ -83,7 +98,7 @@ namespace NeuroForge
 
             backwardsCount++;
         }
-        public void GradientsClipNorm(float threshold)
+        public void GradClipNorm(float threshold)
         {
             double global_sum = 0;
 
@@ -131,7 +146,7 @@ namespace NeuroForge
                 }
             }
         }
-        public void OptimiseParameters(float learningRate, float momentum, float regularization)
+        public void OptimStep(float learningRate, float momentum, float regularization)
         {
             learningRate /= backwardsCount;
             backwardsCount = 0;
@@ -169,25 +184,6 @@ namespace NeuroForge
         }
        
 
-        private void ZeroGradients()
-        {
-            biasGradients = new BiasLayer[format.Length];
-            biasMomentums = new BiasLayer[format.Length];
-            weightGradients = new WeightLayer[format.Length - 1];
-            weightMomentums = new WeightLayer[format.Length - 1];
-
-            for (int i = 0; i < neuronLayers.Length; i++)
-            {
-                biasGradients[i] = new BiasLayer(format[i], InitializationType.Zero);
-                biasMomentums[i] = new BiasLayer(format[i], InitializationType.Zero);
-
-            }
-            for (int i = 0; i < neuronLayers.Length - 1; i++)
-            {
-                weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
-                weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
-            }
-        }
         private void ActivateLayer(NeuronLayer layer, ActivationType activation)
         {
             if (activation == ActivationType.SoftMax)
@@ -220,8 +216,7 @@ namespace NeuroForge
 
                 layer.neurons[i].CostValue = costVal;
             }
-        }
-        
+        }  
         private void UpdateGradients(WeightLayer weightGradient, BiasLayer biasGradient, NeuronLayer previousNeuronLayer, NeuronLayer nextNeuronLayer)
         {
             //Related to Backpropagation
@@ -246,32 +241,36 @@ namespace NeuroForge
         }
 
 
-        // Continuous
+        // Continuous (mu sigma mu sigma mu sigma)
+        const double sigma_scale = 0; // - 1.5, 3.5..  so on
+        const double sigma_min = 0.01;
+        const double sigma_max = 10.0;
         public PPOActor(int inputsNum, int continuousSpaceSize, int hiddenUnits, int layersNum, ActivationType activation, InitializationType initType)
         {
             // Set format
-            format = new int[2 + layersNum];
-            format[0] = inputsNum;
-            for (int i = 1; i < format.Length - 1; i++)
+            layerFormat = new int[2 + layersNum];
+            layerFormat[0] = inputsNum;
+            for (int i = 1; i < layerFormat.Length - 1; i++)
             {
-                format[i] = hiddenUnits;
+                layerFormat[i] = hiddenUnits;
             }
-            format[format.Length - 1] = continuousSpaceSize * 2;
+            layerFormat[layerFormat.Length - 1] = continuousSpaceSize * 2;
 
             // Set types
             this.outputBranches = new int[1];
             this.outputBranches[0] = continuousSpaceSize * 2;
             this.actionSpace = ActionType.Continuous;
+            this.initialization = initType;
             this.activationType = activation;
 
             // Init weight and biases
-            neuronLayers = new NeuronLayer[format.Length];
-            biasLayers = new BiasLayer[format.Length];
-            weightLayers = new WeightLayer[format.Length - 1];
+            neuronLayers = new NeuronLayer[layerFormat.Length];
+            biasLayers = new BiasLayer[layerFormat.Length];
+            weightLayers = new WeightLayer[layerFormat.Length - 1];
             for (int i = 0; i < neuronLayers.Length; i++)
             {
-                neuronLayers[i] = new NeuronLayer(format[i]);
-                biasLayers[i] = new BiasLayer(format[i], initType);
+                neuronLayers[i] = new NeuronLayer(layerFormat[i]);
+                biasLayers[i] = new BiasLayer(layerFormat[i], initType);
 
             }
             for (int i = 0; i < neuronLayers.Length - 1; i++)
@@ -281,7 +280,7 @@ namespace NeuroForge
 
             CreateAsset();
         }
-        public (double[], float[]) ContinuousForwardPropagation(double[] inputs)
+        public (double[], float[]) Forward_Continuous(double[] inputs)
         {
             if (actionSpace != ActionType.Continuous)
                 throw new Exception("Action space for this model was set to Discrete");
@@ -308,7 +307,7 @@ namespace NeuroForge
             ContinuousActivation();
 
             double[] outputs = neuronLayers[neuronLayers.Length - 1].GetOutValues();
-            float[] continuousActions = GetContinuousActions(outputs);
+            float[] continuousActions = TransformIntoContinuousActions(outputs);
             return (outputs, continuousActions);
         }
         private void ContinuousActivation()
@@ -323,35 +322,41 @@ namespace NeuroForge
                     Functions.Activation.SoftPlus(outputLay.neurons[i].InValue);  // sigma
             }
         }
-        private float[] GetContinuousActions(double[] rawValues)
+        private float[] TransformIntoContinuousActions(double[] rawValues)
         {
-            float[] continuousActions = new float[rawValues.Length];
+            float[] continuousActions = new float[rawValues.Length/2];
             for (int i = 0; i < rawValues.Length; i += 2)
             {
                 double mean = rawValues[i];
                 double stddev = rawValues[i + 1];
-                if (stddev == 0) stddev = 1e-8;
-                double actionSample = Math.Clamp(Functions.RandomGaussian(mean, stddev), -1.0, 1.0);
 
+                // sigma scale
+                stddev += sigma_scale;
+                stddev = Math.Clamp(stddev, sigma_min, sigma_max);
+
+                double actionSample = Math.Clamp(Functions.RandomGaussian(mean, stddev), -1.0, 1.0);
                 continuousActions[i / 2] = (float)actionSample;
             }
             return continuousActions;
         }
-        public double[] GetContinuousLogProbs(double[] rawContinuousOutputs, float[] continuousActions)
+        static public double[] GetContinuousLogProbs(double[] rawContinuousOutputs, float[] continuousActions)
         {
             double[] log_probs = new double[rawContinuousOutputs.Length];
 
-            for (int i = 0; i < continuousActions.Length/2; i++)
+            for (int i = 0; i < rawContinuousOutputs.Length; i += 2)
             {
-                double x = continuousActions[i];
-                double mu = rawContinuousOutputs[i * 2];
-                double sigma = rawContinuousOutputs[i * 2 + 1] + 1e-8;
+                double x = continuousActions[i / 2];
+                double mu = rawContinuousOutputs[i];
+                double sigma = rawContinuousOutputs[i + 1]; // +1e-8
 
-                double log_prob = -Math.Pow(x - mu, 2) / (2 * sigma * sigma) - Math.Log(Math.Sqrt(2 * Math.PI * sigma * sigma));
+                double n = x - mu;
+                double f = -(n * n) / (2 * sigma * sigma);
+                double log_prob = f - Math.Log(sigma) - Math.Log(Math.Sqrt(2 * Math.PI));
 
-                log_probs[i * 2] = log_prob;
-                log_probs[i * 2 + 1] = log_prob;
+                log_probs[i] = log_prob;        //mu head
+                log_probs[i + 1] = log_prob;    //sigma head
             }
+
             return log_probs;
         }
 
@@ -361,27 +366,28 @@ namespace NeuroForge
         {
 
             // Set format
-            format = new int[2 + layersNum];
-            format[0] = inputsNum;
-            for (int i = 1; i < format.Length - 1; i++)
+            layerFormat = new int[2 + layersNum];
+            layerFormat[0] = inputsNum;
+            for (int i = 1; i < layerFormat.Length - 1; i++)
             {
-                format[i] = hiddenUnits;
+                layerFormat[i] = hiddenUnits;
             }
-            format[format.Length - 1] = discreteOutputShape.Sum();
+            layerFormat[layerFormat.Length - 1] = discreteOutputShape.Sum();
 
             // Set types
             this.outputBranches = discreteOutputShape;
             this.actionSpace = ActionType.Discrete;
+            this.initialization = initType;
             this.activationType = activation;
 
             // Init weight and biases
-            neuronLayers = new NeuronLayer[format.Length];
-            biasLayers = new BiasLayer[format.Length];
-            weightLayers = new WeightLayer[format.Length - 1];
+            neuronLayers = new NeuronLayer[layerFormat.Length];
+            biasLayers = new BiasLayer[layerFormat.Length];
+            weightLayers = new WeightLayer[layerFormat.Length - 1];
             for (int i = 0; i < neuronLayers.Length; i++)
             {
-                neuronLayers[i] = new NeuronLayer(format[i]);
-                biasLayers[i] = new BiasLayer(format[i], initType);
+                neuronLayers[i] = new NeuronLayer(layerFormat[i]);
+                biasLayers[i] = new BiasLayer(layerFormat[i], initType);
 
             }
             for (int i = 0; i < neuronLayers.Length - 1; i++)
@@ -390,7 +396,7 @@ namespace NeuroForge
             }
             CreateAsset();            
         }
-        public (double[], int[]) DiscreteForwardPropagation(double[] inputs)
+        public (double[], int[]) Forward_Discrete(double[] inputs)
         {
             if (actionSpace != ActionType.Discrete)
                 throw new Exception("Action space for this model was set to Continuous");
@@ -417,7 +423,7 @@ namespace NeuroForge
 
             DiscreteActivation();
             double[] outputs = neuronLayers[neuronLayers.Length - 1].GetOutValues();
-            int[] discreteActions = GetDiscreteActions(outputs);
+            int[] discreteActions = TransformIntoDiscreteActions(outputs);
             return (outputs, discreteActions);
 
         }
@@ -446,7 +452,7 @@ namespace NeuroForge
                 index += branch;
             }
         }
-        private int[] GetDiscreteActions(double[] rawValues)
+        private int[] TransformIntoDiscreteActions(double[] rawValues)
         {
             int[] discreteActions = new int[outputBranches.Length];
 
@@ -459,13 +465,13 @@ namespace NeuroForge
                     BRANCH_VALUES[i] = rawValues[indexInRawOutputs++];
                 }
 
-                int discreteAction = Functions.Activation.ArgMax(BRANCH_VALUES);
+                int discreteAction = Functions.ArgMax(BRANCH_VALUES);
                 discreteActions[br] = discreteAction;
             }
 
             return discreteActions;
         }
-        public static double[] GetDiscreteLogProbs(double[] rawDiscreteOutputs)
+        static public double[] GetDiscreteLogProbs(double[] rawDiscreteOutputs)
         {
             double[] log_probs = new double[rawDiscreteOutputs.Length];
 
@@ -489,26 +495,8 @@ namespace NeuroForge
             AssetDatabase.CreateAsset(this, "Assets/" + assetName);
             AssetDatabase.SaveAssets();
         }
-        public int GetObservationsNumber() => format[0];
-        public int GetActionsNumber() => actionSpace == ActionType.Continuous ? outputBranches[0] : outputBranches.Length; // 1 branch is 1 action for discrete
-        public double GetMaxGradientValue()
-        {
-            double max = 0;
-            for (int i = 0; i < weightGradients.Length; i++)
-            {
-                for (int j = 0; j < weightGradients[i].weights.Length; j++)
-                {
-                    for (int k = 0; k < weightGradients[i].weights[j].Length; k++)
-                    {
-                        if (weightGradients[i].weights[j][k] > max)
-                        {
-                            max = weightGradients[i].weights[j][k];
-                        }
-                    }
-                }
-            }
-            return max;
-        }//to be deleted
+        public int GetNoObservations() => layerFormat[0];
+        public int GetNoParallelActions() => actionSpace == ActionType.Continuous ? outputBranches[0] : outputBranches.Length; // 1 branch is 1 action for discrete
     }
 }
 
