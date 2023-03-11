@@ -63,8 +63,8 @@ namespace NeuroForge
                         return Sine(value);
                     case ActivationTypeF.Cosine:
                         return Cosine(value);
-                    case ActivationTypeF.BinaryStep:
-                        return BinaryStep(value);
+                    //case ActivationTypeF.BinaryStep:
+                    //    return BinaryStep(value);
                     case ActivationTypeF.Reluctant:
                         return Reluctant(value);
                     case ActivationTypeF.Gaussian:
@@ -126,7 +126,7 @@ namespace NeuroForge
         Square,
         Sine,
         Cosine,      
-        BinaryStep,   
+        //BinaryStep,   
         Reluctant,
         Gaussian,
     }

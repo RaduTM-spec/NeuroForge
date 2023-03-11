@@ -15,15 +15,16 @@ namespace NeuroForge
 
         [Header("Individuals")]
         [Min(1)] public int populationSize = 150;
-        [Min(5), Tooltip("generations")] public int stagnationAllowance = 20;
+        [Min(0), Tooltip("on 0 is disabled")] public int stagnationAllowance = 20;
         [Range(.2f, .8f)] public float survivalRate = .5f;
 
         [Header("Speciation")]
         [Min(0), Tooltip("distance")] public float delta = 3f;
         [Min(0), Tooltip("excess coef")] public float c1 = 1f;
         [Min(0), Tooltip("disjoint coef")] public float c2 = 1f;
-        [Min(0), Tooltip("weight diff coef")] public float c3 = 0.4f;
+        [Min(0), Tooltip("weight difference coef")] public float c3 = 0.4f;
         [Range(0, 1)] public float cloneBreeding = 0.25f;
+        [Min(0), Tooltip("killing protection based on age")]public int ageProtection = 3;
 
         [Header("Mutation probabilities")]
         [Range(0, 1)] public float addConnection = 0.05f;
@@ -34,7 +35,7 @@ namespace NeuroForge
         [Header("Genome structure")]
         [Min(30)] public int maxConnections = 150;
         [Min(5)] public int maxNodes = 30;
-        public bool OnlySigmoid = false;
+        public bool onlySigmoid = false;
 
         [Header("Display")]
         public Color biasNodeColor = Color.blue;

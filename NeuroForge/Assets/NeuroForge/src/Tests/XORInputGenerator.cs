@@ -7,9 +7,28 @@ public class XORInputGenerator : MonoBehaviour
 {
     static public int[] inputs = new int[2];
 
-    private void Update()
+    int step = 0;
+    private void FixedUpdate()
     {
-        inputs[0] = Functions.RandomValue() < .5f ? 1 : 0;
-        inputs[1] = Functions.RandomValue() < .5f ? 1 : 0;
+       switch(step % 4)
+        {
+            case 0:
+                inputs[0] = 0;
+                inputs[1] = 0;
+                break;
+            case 1:
+                inputs[0] = 1;
+                inputs[1] = 0;
+                break;
+            case 2:
+                inputs[0] = 0;
+                inputs[1] = 1;
+                break;
+            case 3:
+                inputs[0] = 1;
+                inputs[1] = 1;
+                break;
+        }
+        step++;
     }
 }

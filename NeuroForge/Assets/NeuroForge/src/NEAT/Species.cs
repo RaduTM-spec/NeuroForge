@@ -60,7 +60,7 @@ namespace NeuroForge
         {
             return individuals.Remove(agent);
         }
-        public bool TryAdd(NEATAgent agent)
+        public bool TryJoin(NEATAgent agent)
         {
             if(AreCompatible(agent.model, representative.model))
             {
@@ -70,7 +70,7 @@ namespace NeuroForge
             }
             return false;
         }
-        public void ForceAdd(NEATAgent agent)
+        public void Join(NEATAgent agent)
         {
             individuals.Add(agent);
             agent.SetSpecies(this);
@@ -80,7 +80,6 @@ namespace NeuroForge
         public void Kill(float percentage01)
         {
             individuals.Sort((x, y) => x.GetFitness().CompareTo(y.GetFitness()));
-
             float range = individuals.Count * percentage01;
             for (int i = 0; i < range && individuals.Count > 1; i++) 
             {
@@ -96,10 +95,7 @@ namespace NeuroForge
             if (representative.GetSpecies() == null)
             {
                 representative = Functions.RandomIn(individuals);
-            }
-
-
-            
+            }           
         }
         public void GoExtinct()
         {
@@ -108,13 +104,14 @@ namespace NeuroForge
                 ag.model = null;
                 ag.SetSpecies(null);
             }
+            representative = null;
         }
         public void AdjustFitness()
         {
             // f'[i] = f[i] / Sum(sh(i,j))
             // f' = shared fitness
             // Sum is the sum of total fitnesses in this species
-            // sh is 1 if (i,j) are compatible (they are not exceed delta)
+            // sh is 1 if (i,j) are compatible (they do not exceed delta)
             // sh is 0 if (i,j) are not compatible
 
             foreach (var indiv in individuals)
@@ -127,7 +124,7 @@ namespace NeuroForge
         public Genome Breed()
         {
             Genome offspring = null;
-            List<float> probs = individuals.Select(x => x.GetAdjustedFitness()).ToList();//Here works with normal fit too
+            List<float> probs = individuals.Select(x => x.GetFitness()).ToList();//Here works with normal fit too
 
             // 25% asexual breeding
             if (FunctionsF.RandomValue() < NEATTrainer.GetHyperParam().cloneBreeding)
@@ -179,7 +176,7 @@ namespace NeuroForge
                 NodeGene clone;
                 if (parent1_node != null && parent2_node != null)
                 {   
-                    if(FunctionsF.RandomValue() < 0.5f)
+                    if(Functions.RandomValue() < 0.5)
                         clone = parent1_node.Clone() as NodeGene;
                     else
                         clone = parent2_node.Clone() as NodeGene;
@@ -197,7 +194,7 @@ namespace NeuroForge
             }
 
             // Insert connections
-            int max_conn_innovation = Mathf.Max(parent1.GetLastInnovation(), parent2.GetLastInnovation());         
+            int max_conn_innovation = Math.Max(parent1.GetLastInnovation(), parent2.GetLastInnovation());         
             for (int i = 1; i <= max_conn_innovation; i++)
             {
                 ConnectionGene parent1_gene = null;
@@ -210,13 +207,13 @@ namespace NeuroForge
 
                 if (parent1_gene != null && parent2_gene != null)
                 {
-                    ConnectionGene clone = FunctionsF.RandomValue() < 0.5f ?
+                    ConnectionGene clone = Functions.RandomValue() < 0.5 ?
                             parent1_gene.Clone() as ConnectionGene :
                             parent2_gene.Clone() as ConnectionGene;
 
                     // if the gene is disabled in both parents, 75% chances of inherited gene to be disabled. Otherwise if enabled by default
                     if (!parent1_gene.enabled && !parent2_gene.enabled)
-                        clone.enabled = FunctionsF.RandomValue() < 0.75f ? false : true;
+                        clone.enabled = Functions.RandomValue() < 0.75 ? false : true;
                     else
                         clone.enabled = true;
 
@@ -388,7 +385,13 @@ namespace NeuroForge
 
             bestFitness = Math.Max(bestFitness, bestAgent.GetFitness());
         }
-        public bool IsAllowedToReproduce(int stagnationAllowance) => stagnationAllowance > stagnation;
+        public bool IsAllowedToReproduce(int stagnationAllowance)
+        {
+            if (stagnationAllowance == 0)
+                return true;
+
+            return stagnationAllowance > stagnation;
+        }
         public NEATAgent GetChampion()
         {
             NEATAgent best_ag = null;

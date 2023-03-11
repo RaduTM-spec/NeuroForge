@@ -299,13 +299,14 @@ MonoBehaviour:
   c2: 1
   c3: 0.4
   cloneBreeding: 0.25
+  ageProtection: 3
   addConnection: 0.05
   addNode: 0.01
   mutateConnections: 0.8
   mutateNode: 0.04
   maxConnections: 100
   maxNodes: 20
-  OnlySigmoid: 0
+  onlySigmoid: 0
   biasNodeColor: {r: 0, g: 0, b: 1, a: 1}
   inputNodesColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   hiddenNodesColor: {r: 0, g: 1, b: 0, a: 1}
@@ -1028,8 +1029,7 @@ MonoBehaviour:
   hp: {fileID: 0}
   input1: -1
   input2: -1
-  result: -1
-  generationSteps: 40
+  XOR: -1
 --- !u!114 &278657397
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1042,23 +1042,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ca894bcd623b054c8da9c0030e9fd8e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  generations: 100
+  generations: 1000
   timeHorizon: 60
-  populationSize: 1000
-  stagnationAllowance: 20
+  populationSize: 50
+  stagnationAllowance: 0
   survivalRate: 0.5
   delta: 3
   c1: 1
   c2: 1
   c3: 0.4
   cloneBreeding: 0.25
+  ageProtection: 0
   addConnection: 0.05
   addNode: 0.01
   mutateConnections: 0.8
   mutateNode: 0.04
   maxConnections: 100
   maxNodes: 20
-  OnlySigmoid: 0
+  onlySigmoid: 0
   biasNodeColor: {r: 0, g: 0, b: 1, a: 1}
   inputNodesColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   hiddenNodesColor: {r: 0, g: 1, b: 0, a: 1}
@@ -1705,13 +1706,14 @@ MonoBehaviour:
   c2: 1
   c3: 0.4
   cloneBreeding: 0.25
+  ageProtection: 3
   addConnection: 0.05
   addNode: 0.01
   mutateConnections: 0.8
   mutateNode: 0.04
   maxConnections: 100
   maxNodes: 20
-  OnlySigmoid: 0
+  onlySigmoid: 0
   biasNodeColor: {r: 0, g: 0, b: 1, a: 1}
   inputNodesColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   hiddenNodesColor: {r: 0, g: 1, b: 0, a: 1}
@@ -3274,7 +3276,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eec1dce92a60eb74cad96efdc2816725, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  genome: {fileID: 11400000, guid: f9ded82915a881d408255e8c9f4a6de9, type: 2}
+  genome: {fileID: 11400000, guid: cc72cdf78369f8b408a3332d7a76a914, type: 2}
   iterations: 1000
   error: 0
 --- !u!1 &1867706499
@@ -3892,13 +3894,14 @@ MonoBehaviour:
   c2: 1
   c3: 0.4
   cloneBreeding: 0.25
+  ageProtection: 3
   addConnection: 0.05
   addNode: 0.01
   mutateConnections: 0.8
   mutateNode: 0.04
   maxConnections: 100
   maxNodes: 20
-  OnlySigmoid: 0
+  onlySigmoid: 0
   biasNodeColor: {r: 0, g: 0, b: 1, a: 1}
   inputNodesColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   hiddenNodesColor: {r: 0, g: 1, b: 0, a: 1}
