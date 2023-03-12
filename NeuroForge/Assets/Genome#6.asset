@@ -1,0 +1,231 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4752d252c5d9a474a99733f277d713d3, type: 3}
+  m_Name: Genome#6
+  m_EditorClassIdentifier: 
+  actionSpace: 0
+  outputShape: 02000000
+  input_cache:
+  - id: 2
+    layer: 0
+    InValue: 0
+    OutValue: 0.15089092
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 3
+    layer: 0
+    InValue: 0
+    OutValue: 3.068683
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 4
+    layer: 0
+    InValue: 0
+    OutValue: 2.2191067
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  output_cache:
+  - id: 5
+    layer: 1
+    InValue: -2.467616
+    OutValue: -2.467616
+    activationType: 0
+    type: 2
+    incomingConnections: 01000000030000000500000015000000
+  - id: 6
+    layer: 1
+    InValue: 6.3262963
+    OutValue: 6.3262963
+    activationType: 0
+    type: 2
+    incomingConnections: 070000000a0000000c000000190000001e000000
+  layers:
+  - 0
+  - 0.5
+  - 0.75
+  - 1
+  serialized_nodes:
+  - id: 1
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 3
+    incomingConnections: 
+  - id: 2
+    layer: 0
+    InValue: 0
+    OutValue: 0.15089092
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 3
+    layer: 0
+    InValue: 0
+    OutValue: 3.068683
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 4
+    layer: 0
+    InValue: 0
+    OutValue: 2.2191067
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 5
+    layer: 1
+    InValue: -2.467616
+    OutValue: -2.467616
+    activationType: 0
+    type: 2
+    incomingConnections: 01000000030000000500000015000000
+  - id: 6
+    layer: 1
+    InValue: 6.3262963
+    OutValue: 6.3262963
+    activationType: 0
+    type: 2
+    incomingConnections: 070000000a0000000c000000190000001e000000
+  - id: 7
+    layer: 0.5
+    InValue: 0.14234659
+    OutValue: 0.14139289
+    activationType: 2
+    type: 1
+    incomingConnections: 0e000000
+  - id: 8
+    layer: 0.5
+    InValue: 7.705868
+    OutValue: 0.9999996
+    activationType: 2
+    type: 1
+    incomingConnections: 0f000000130000001a00000014000000
+  - id: 9
+    layer: 0.75
+    InValue: -0.4211519
+    OutValue: -0.3979004
+    activationType: 2
+    type: 1
+    incomingConnections: 160000001800000024000000290000002c000000
+  - id: 10
+    layer: 0.5
+    InValue: 6.391026
+    OutValue: 0.9999944
+    activationType: 2
+    type: 1
+    incomingConnections: 20000000
+  serialized_connections_keys: 010000000300000005000000070000000a0000000c0000000e0000000f00000013000000150000001600000018000000190000001a0000001e0000002000000024000000290000002c00000014000000
+  serialized_connections_values:
+  - innovation: 1
+    weight: 1.4369892
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 5
+  - innovation: 3
+    weight: 1.4553375
+    enabled: 1
+    inNeuron: 7
+    outNeuron: 5
+  - innovation: 5
+    weight: -0.9251101
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 5
+  - innovation: 7
+    weight: 1.7715183
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 6
+  - innovation: 10
+    weight: 0.14648914
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 6
+  - innovation: 12
+    weight: -0.96585053
+    enabled: 1
+    inNeuron: 7
+    outNeuron: 6
+  - innovation: 14
+    weight: 0.046386868
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 7
+  - innovation: 15
+    weight: 2.1116495
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 8
+  - innovation: 19
+    weight: -0.27981493
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 8
+  - innovation: 21
+    weight: -0.051349327
+    enabled: 1
+    inNeuron: 8
+    outNeuron: 5
+  - innovation: 22
+    weight: 0.85899854
+    enabled: 0
+    inNeuron: 3
+    outNeuron: 9
+  - innovation: 24
+    weight: 1.0444751
+    enabled: 1
+    inNeuron: 7
+    outNeuron: 9
+  - innovation: 25
+    weight: 0.032144487
+    enabled: 1
+    inNeuron: 9
+    outNeuron: 6
+  - innovation: 26
+    weight: 0.39880988
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 8
+  - innovation: 30
+    weight: 1.0173246
+    enabled: 1
+    inNeuron: 10
+    outNeuron: 6
+  - innovation: 32
+    weight: 2.082661
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 10
+  - innovation: 36
+    weight: -1.0622271
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 9
+  - innovation: 41
+    weight: 1.2187436
+    enabled: 1
+    inNeuron: 1
+    outNeuron: 9
+  - innovation: 44
+    weight: 0.5696216
+    enabled: 1
+    inNeuron: 10
+    outNeuron: 9
+  - innovation: 20
+    weight: 0.38310483
+    enabled: 1
+    inNeuron: 1
+    outNeuron: 8

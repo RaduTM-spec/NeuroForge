@@ -1,16 +1,19 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
-
+using static UnityEditor.Experimental.GraphView.GraphView;
 namespace NeuroForge
 {
     [Serializable]
-    public class NeuronLayer:ICloneable
+    public class NeuronLayer : ICloneable, IResetable
     {
         [SerializeField] public Neuron[] neurons;
-        public NeuronLayer(int noNeurons)
+        [SerializeField] public ActivationType activationType;
+        public NeuronLayer(int noNeurons, ActivationType activationType)
         {
+            this.activationType = activationType;
             neurons = new Neuron[noNeurons];
             for (int i = 0; i < neurons.Length; i++)
             {
@@ -19,12 +22,31 @@ namespace NeuroForge
         }
         public object Clone()
         {
-            NeuronLayer clone = new NeuronLayer(this.neurons.Length);
+            NeuronLayer clone = new NeuronLayer(this.neurons.Length, this.activationType);
             for (int i = 0; i < this.neurons.Length; i++)
             {
                 clone.neurons[i] = (Neuron)this.neurons[i].Clone();
             }
             return clone;
+        }
+        public void Activate()
+        {
+            if (activationType == ActivationType.SoftMax)
+            {
+                double[] InValuesToActivate = neurons.Select(x => x.InValue).ToArray();
+                Functions.Activation.SoftMax(InValuesToActivate);
+                for (int i = 0; i < InValuesToActivate.Length; i++)
+                {
+                    neurons[i].OutValue = InValuesToActivate[i];
+                }
+            }
+            else
+            {
+                foreach (Neuron neuron in neurons)
+                {
+                    neuron.OutValue = Functions.Activation.ActivateValue(neuron.InValue, activationType);
+                }
+            }
         }
 
         public void SetInValues(double[] values)
@@ -34,7 +56,7 @@ namespace NeuroForge
                 neurons[i].InValue = values[i];
             }
         }
-        public void SetValues(double[] values)
+        public void SetCostValues(double[] values)
         {
             for (int i = 0; i < neurons.Length; i++)
             {
@@ -58,7 +80,7 @@ namespace NeuroForge
             }
             return inVals;
         }
-        public double[] GetValues()
+        public double[] GetCostValues()
         {
             double[] vals = new double[neurons.Length];
             for (int i = 0; i < neurons.Length; i++)
@@ -75,6 +97,16 @@ namespace NeuroForge
                 vals[i] = neurons[i].OutValue;
             }
             return vals;
+        }
+
+        public void Reset()
+        {
+            foreach (var neur in neurons)
+            {
+                neur.InValue = 0;
+                neur.OutValue = 0;
+                neur.CostValue = 0;
+            }
         }
     }
 }

@@ -7,22 +7,24 @@ public class NEATTestResultGenome : MonoBehaviour
 {
     public Genome genome;
     public int iterations = 1000;
-    public float error;
-
+    public string accuracy;
     // Update is called once per frame
 
 
     private void Start()
     {
+        float error = 0;
         for (int i = 0; i < iterations; i++)
         {
             double[] input = GetInputs();
-            double label = (int)input[0] ^ (int)input[1];
+            double XOR = (int)input[0] ^ (int)input[1];
             
             ///>>> TO COMPLETE
-            int output = genome.GetDiscreteActions(input)[0];
-            error += Mathf.Abs((float)label - output);
+            float output = genome.GetContinuousActions(input)[0];
+            error += Mathf.Abs((float)XOR - output);
         }
+        error /= iterations;
+        accuracy = ((1f - error) * 100f).ToString("0.000") + "%";
     }
     private double[] GetInputs()
     {

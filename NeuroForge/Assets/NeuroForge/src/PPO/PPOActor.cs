@@ -184,25 +184,6 @@ namespace NeuroForge
         }
        
 
-        private void ActivateLayer(NeuronLayer layer, ActivationType activation)
-        {
-            if (activation == ActivationType.SoftMax)
-            {
-                double[] InValuesToActivate = layer.neurons.Select(x => x.InValue).ToArray();
-                Activation.SoftMax(InValuesToActivate);
-                for (int i = 0; i < InValuesToActivate.Length; i++)
-                {
-                    layer.neurons[i].OutValue = InValuesToActivate[i];
-                }
-            }
-            else
-            {
-                foreach (Neuron neuron in layer.neurons)
-                {
-                    neuron.OutValue = Activation.ActivateValue(neuron.InValue, activation);
-                }
-            }
-        }
         private void CalculateLayerCost(NeuronLayer layer, WeightLayer weights, NeuronLayer nextLayer)
         {
             for (int i = 0; i < layer.neurons.Length; i++)
@@ -269,7 +250,11 @@ namespace NeuroForge
             weightLayers = new WeightLayer[layerFormat.Length - 1];
             for (int i = 0; i < neuronLayers.Length; i++)
             {
-                neuronLayers[i] = new NeuronLayer(layerFormat[i]);
+                if (i != neuronLayers.Length - 1)
+                    neuronLayers[i] = new NeuronLayer(layerFormat[i], activationType);
+                else
+                    neuronLayers[i] = new NeuronLayer(layerFormat[i], ActivationType.Linear);
+
                 biasLayers[i] = new BiasLayer(layerFormat[i], initType);
 
             }
@@ -299,10 +284,7 @@ namespace NeuroForge
                 }
 
                 //Activate neuron layer
-                if (l < neuronLayers.Length - 1)
-                {
-                    ActivateLayer(neuronLayers[l], activationType);
-                }
+                neuronLayers[l].Activate();
             }
             ContinuousActivation();
 
@@ -386,7 +368,11 @@ namespace NeuroForge
             weightLayers = new WeightLayer[layerFormat.Length - 1];
             for (int i = 0; i < neuronLayers.Length; i++)
             {
-                neuronLayers[i] = new NeuronLayer(layerFormat[i]);
+                if (i != neuronLayers.Length - 1)
+                    neuronLayers[i] = new NeuronLayer(layerFormat[i], activationType);
+                else
+                    neuronLayers[i] = new NeuronLayer(layerFormat[i], ActivationType.Linear);
+
                 biasLayers[i] = new BiasLayer(layerFormat[i], initType);
 
             }
@@ -415,10 +401,7 @@ namespace NeuroForge
                 }
 
                 //Activate neuron layer
-                if (l < neuronLayers.Length - 1)
-                {
-                    ActivateLayer(neuronLayers[l], activationType);
-                }
+                neuronLayers[l].Activate();
             }
 
             DiscreteActivation();

@@ -172,6 +172,22 @@ namespace NeuroForge
             AddObservation(obsevation10.rotation);
         }
         /// <summary>
+        /// Appends an array of int values to the SensorBuffer.
+        /// </summary>
+        /// <param name="observations">Values of the observations</param>
+        public void AddObservation(int[] observations)
+        {
+            if (this.Observations.Length - counter < observations.Length)
+            {
+                Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". int[] observations is too large.");
+                return;
+            }
+            foreach (var item in observations)
+            {
+                AddObservation(item);
+            }
+        }
+        /// <summary>
         /// Appends an array of double values to the SensorBuffer.
         /// </summary>
         /// <param name="observations">Values of the observations</param>
@@ -196,6 +212,22 @@ namespace NeuroForge
             if (this.Observations.Length - counter < observations.Length)
             {
                 Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". float[] observations size is " + observations.Length + ".");
+                return;
+            }
+            foreach (var item in observations)
+            {
+                AddObservation(item);
+            }
+        }
+        /// <summary>
+        /// Appends a list of int values to the SensorBuffer.
+        /// </summary>
+        /// <param name="observations">Values of the observations</param>
+        public void AddObservation(List<int> observations)
+        {
+            if (this.Observations.Length - counter < observations.Count)
+            {
+                Debug.LogError("SensorBuffer available space is " + (this.Observations.Length - counter) + ". List<int> observations is too large.");
                 return;
             }
             foreach (var item in observations)

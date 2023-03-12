@@ -376,10 +376,6 @@ namespace NeuroForge
                 return smoothedTexture;
 
             }
-            public static Texture2D Convolute(Texture2D texture, int iterations, float standardDeviation)
-            {
-                return texture;
-            }
         }
 
     }

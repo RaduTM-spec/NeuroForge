@@ -3,8 +3,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Burst.Intrinsics;
+using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEngine;
+using static UnityEditor.PlayerSettings;
 
 namespace NeuroForge
 {
@@ -13,6 +16,8 @@ namespace NeuroForge
         public int id;
         private float bestFitness = float.MinValue; // best fitness managed by an individual ever in this species (not shared)
         private float sharedFitnessSum = float.MinValue;
+
+        // A species stagnates if it's best fitness managed by an individual is surpassed
         public int stagnation = 0;
         public int age = -1;
         public int no_offsprings_assigned;
@@ -54,7 +59,6 @@ namespace NeuroForge
             representative = null;
         }
 
-
         // Joining/Exiting
         public bool TryRemove(NEATAgent agent)
         {
@@ -70,7 +74,7 @@ namespace NeuroForge
             }
             return false;
         }
-        public void Join(NEATAgent agent)
+        public void ForceJoin(NEATAgent agent)
         {
             individuals.Add(agent);
             agent.SetSpecies(this);
@@ -124,7 +128,7 @@ namespace NeuroForge
         public Genome Breed()
         {
             Genome offspring = null;
-            List<float> probs = individuals.Select(x => x.GetFitness()).ToList();//Here works with normal fit too
+            List<float> probs = individuals.Select(x => x.GetFitness()).ToList();
 
             // 25% asexual breeding
             if (FunctionsF.RandomValue() < NEATTrainer.GetHyperParam().cloneBreeding)
@@ -146,7 +150,7 @@ namespace NeuroForge
             offspring.Mutate();
             return offspring;
         }    
-        private static Genome CrossOver(Genome parent1, Genome parent2, float p1_fitness, float p2_fitness)
+        public static Genome CrossOver(Genome parent1, Genome parent2, float p1_fitness, float p2_fitness)
         {
             // Parent1 is set as the fittest parent
             if (p1_fitness < p2_fitness)
@@ -154,8 +158,7 @@ namespace NeuroForge
 
             // Notes: matching genes are taken randomly 50/50
             //        disjoint or excess genes are taken from the fittest parent
-            //        the offspring is mutated afterwards
-
+            //  Note: if fitnesses are equal, also dis and exc are taken randomly (paper), but we assume one to be fittest
             Genome offspring = new Genome(parent1.GetInputsNumber(), parent1.outputShape, parent1.actionSpace, false, false);
             offspring.nodes.Clear();
             offspring.connections.Clear();
@@ -370,8 +373,12 @@ namespace NeuroForge
             return dif / matchesCount;
         }
 
-
         // Other
+        public NEATAgent GetNotSoRandomIndividual()
+        {
+            List<float> probs = individuals.Select(x => x.GetFitness()).ToList();
+            return Functions.RandomIn(individuals, probs);
+        }
         public void CalculateShFitSum() => sharedFitnessSum = individuals.Sum(x => x.GetAdjustedFitness());
         public float GetSpeciesSharedFitness() => sharedFitnessSum;
         public void UpdateStagnation()

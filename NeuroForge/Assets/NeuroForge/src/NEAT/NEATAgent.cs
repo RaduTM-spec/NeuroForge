@@ -21,6 +21,7 @@ namespace NeuroForge
         [Min(1), SerializeField] private int ContinuousSize;
         [Min(1), SerializeField] private int[] DiscreteBranches;
 
+        [Space, Tooltip("auto-collect observations from sensors attached to this gameObject and it's children")]public bool useSensors = true;
         [HideInInspector] public NEATHyperParameters hp;
 
         private AgentSensor agentSensor;
@@ -44,8 +45,8 @@ namespace NeuroForge
             actionBuffer = new ActionBuffer(model.GetOutputsNumber());
 
             // Init sensors
-            agentSensor = new AgentSensor(this.transform);
-
+            if(useSensors)
+                agentSensor = new AgentSensor(this.transform);
 
             if (behavior == BehaviourType.Inference)
             {
@@ -125,7 +126,7 @@ namespace NeuroForge
             actionBuffer.Clear();
 
             CollectObservations(sensorBuffer);
-            agentSensor.CollectObservations(sensorBuffer);
+            agentSensor?.CollectObservations(sensorBuffer);
 
             if (actionSpace == ActionType.Continuous)
             {

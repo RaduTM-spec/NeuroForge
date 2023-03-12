@@ -31,9 +31,9 @@ public class NEATXORTest : NEATAgent
     {
         XOR = input1 ^ input2;
 
-        int prediction = actionBuffer.DiscreteActions[0];
-        if (prediction == XOR)
-            AddReward(1);
+        float prediction = actionBuffer.ContinuousActions[0];
+        float error = Mathf.Abs(XOR - prediction);
+            AddReward(1 - error);
 
         if(--oneGenerationTests == 0)
         {

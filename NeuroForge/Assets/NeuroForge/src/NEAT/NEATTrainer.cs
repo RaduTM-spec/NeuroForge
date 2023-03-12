@@ -54,6 +54,7 @@ namespace NeuroForge
         {
             if (!sessionEnd && Instance != null && (Instance.episodeTimePassed >= Instance.hp.timeHorizon || Instance.agentsDead == Instance.population.Count))
             {
+                generation++;
                 // Update NEAT
                 Instance.NEAT();
 
@@ -221,9 +222,10 @@ namespace NeuroForge
             Instance.hp.generations = agent.hp.generations;
             Instance.hp.timeHorizon = agent.hp.timeHorizon;
 
-            if (Instance.hp.onlySigmoid)
+            if (Instance.hp.oneActivation)
                 Instance.hp.mutateNode = 0;
 
+            Instance.hp.progressGraph.AddKey(0, 0);
             Instance.InitializeAgents(agent.gameObject, agent.hp.populationSize - 1);
             Instance.trainingEnvironment = new TransformReseter(agent.transform.parent); // is ok placed here, to get reference of all other agents
         }
@@ -255,12 +257,13 @@ namespace NeuroForge
             Reproduce();
 
             NEATAgent generation_champ = GetChampionOfThemAll();
-            if(generation_champ.GetFitness() > fitnessRecord)
+            if(generation_champ.GetFitness() >= fitnessRecord)
             {
                 mainModel.SetFrom(generation_champ.model);
                 EditorUtility.SetDirty(mainModel);
                 AssetDatabase.SaveAssetIfDirty(mainModel);
             }
+            hp.progressGraph.AddKey(generation, generation_champ.GetFitness());
            
         }
         void Speciate()
@@ -355,7 +358,7 @@ namespace NeuroForge
 
                 champ_child.model = champ.model.Clone() as Genome;
                 champ_child.model.Mutate();
-                spec.Join(champ_child);
+                spec.ForceJoin(champ_child);
                     
             }
 
@@ -363,9 +366,32 @@ namespace NeuroForge
             {
                 if(agent.GetSpecies() == null)
                 {
-                    Species spec = GetNotSoRandomSpecies();
-                    agent.model = spec.Breed(); // is mutated there already
-                    spec.Join(agent);
+                    if (Functions.RandomValue() < hp.interspeciesMating)
+                    {
+                        // Mating between different species
+                        Species spec1 = GetNotSoRandomSpecies();
+                        Species spec2 = GetNotSoRandomSpecies();
+
+                        NEATAgent parent1 = spec1.GetNotSoRandomIndividual();
+                        NEATAgent parent2 = spec2.GetNotSoRandomIndividual();
+
+                        agent.model = Species.CrossOver(parent1.model, parent2.model, parent1.GetFitness(), parent2.GetFitness());
+
+                        //this offspring joins to the species of the fittest parent because it will be more likely to resemble him
+                        if (parent1.GetFitness() > parent2.GetFitness())
+                            spec1.ForceJoin(agent);
+                        else
+                            spec2.ForceJoin(agent);
+                       
+
+                    }
+                    else
+                    {
+                        // Mating between same species
+                        Species spec = GetNotSoRandomSpecies();
+                        agent.model = spec.Breed(); // is mutated there already
+                        spec.ForceJoin(agent);
+                    }           
                 }
             }
 
@@ -381,7 +407,7 @@ namespace NeuroForge
         {
             StringBuilder text = new StringBuilder();
             text.Append("<color=#2873eb><b>Generation ");
-            text.Append(++generation);
+            text.Append(generation);
             text.Append("</b> (No. species: ");
             text.Append(species.Count);
             text.Append(")</color>\n");
@@ -489,7 +515,7 @@ namespace NeuroForge
         {
             // Better results with random activations!
             // Modified sigmoid is actually shit idk why
-            if (Instance.hp.onlySigmoid)
+            if (Instance.hp.oneActivation)
             {
                 if (Instance.mainModel.actionSpace == ActionType.Continuous)
                     return ActivationTypeF.HyperbolicTangent;
@@ -501,7 +527,6 @@ namespace NeuroForge
             
         }
     }
-
     public enum NodesDrawShape
     {
         Sphere,

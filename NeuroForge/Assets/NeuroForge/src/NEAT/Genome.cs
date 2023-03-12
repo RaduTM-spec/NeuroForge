@@ -216,7 +216,7 @@ namespace NeuroForge
 
             return discreteActions;
         }
-        public float[] Forward(double[] inputs)
+        private float[] Forward(double[] inputs)
         {
             // Insert inputs
             for (int i = 0; i < inputs.Length; i++)
@@ -390,7 +390,6 @@ namespace NeuroForge
             if (node1.layer == node2.layer) return false;
 
             // nodes already connected cannot be connected again
-
             int inNeur = node1.layer < node2.layer? node1.id : node2.id;
             int outNeur = node1.layer < node2.layer ? node2.id : node1.id;
             foreach (var con in connections.Values)

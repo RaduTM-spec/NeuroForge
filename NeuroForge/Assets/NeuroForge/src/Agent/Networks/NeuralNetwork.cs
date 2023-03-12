@@ -31,10 +31,10 @@ namespace NeuroForge {
         private BiasLayer[] biasGradients;    
         private BiasLayer[] biasMomentums;
 
-        int updatesCount = 0;
+        int backpropsCount = 0;
         public NeuralNetwork(int inputs, int outputs,int hiddenUnits, int hiddenLayersNumber, 
                              ActivationType activationFunction, ActivationType outputActivationFunction, LossType lossFunction, 
-                             InitializationType initType, bool createAsset, string name)
+                             InitializationType initType, bool createAsset, string name) 
         {
             this.layerFormat = GetFormat(inputs, outputs, hiddenUnits, hiddenLayersNumber);
             this.initializationType = initType;
@@ -48,7 +48,10 @@ namespace NeuroForge {
 
             for (int i = 0; i < neuronLayers.Length; i++)
             {
-                neuronLayers[i] = new NeuronLayer(layerFormat[i]);
+                if (i != neuronLayers.Length - 1)
+                    neuronLayers[i] = new NeuronLayer(layerFormat[i], activationType);
+                else
+                    neuronLayers[i] = new NeuronLayer(layerFormat[i], outputActivationType);
                 biasLayers[i] = new BiasLayer(layerFormat[i], initType);
 
             }
@@ -81,14 +84,7 @@ namespace NeuroForge {
                     neuronLayers[l].neurons[n].InValue = sumValue;
                 }
 
-                if(l < neuronLayers.Length - 1)
-                {
-                    ActivateLayer(neuronLayers[l], activationType);
-                }
-                else
-                {
-                   ActivateLayer(neuronLayers[l], outputActivationType);
-                }
+                neuronLayers[l].Activate();
             }
             return neuronLayers[neuronLayers.Length - 1].GetOutValues();
         }
@@ -105,7 +101,7 @@ namespace NeuroForge {
                 UpdateGradients(weightGradients[wLayer], biasGradients[wLayer + 1], neuronLayers[wLayer], neuronLayers[wLayer + 1]);
                 CalculateLayerCost(neuronLayers[wLayer], weightLayers[wLayer], neuronLayers[wLayer + 1]);
             }
-            updatesCount++;
+            backpropsCount++;
             return error;
         }
         public void GradClipNorm(float threshold)
@@ -158,8 +154,8 @@ namespace NeuroForge {
         }
         public void OptimStep(float learningRate, float momentum, float regularization)
         {
-            learningRate /= updatesCount;
-            updatesCount = 0;
+            learningRate /= backpropsCount;
+            backpropsCount = 0;
 
             double weightDecay = 1 - regularization * learningRate;
             for (int l = 0; l < weightLayers.Length; l++)
@@ -205,7 +201,7 @@ namespace NeuroForge {
                     biasMomentums[i] = new BiasLayer(layerFormat[i], InitializationType.Zero);
 
                 }
-                for (int i = 0; i < neuronLayers.Length - 1; i++)
+                for (int i = 0; i < weightLayers.Length; i++)
                 {
                     weightGradients[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
                     weightMomentums[i] = new WeightLayer(neuronLayers[i], neuronLayers[i + 1], InitializationType.Zero);
@@ -229,25 +225,6 @@ namespace NeuroForge {
                 for (int i = 0; i < nextNeuronLayer.neurons.Length; i++)
                 {
                     biasGradient.biases[i] += 1 * nextNeuronLayer.neurons[i].CostValue;
-                }
-            }
-        }
-        private void ActivateLayer(NeuronLayer layer, ActivationType activation)
-        {
-            if (activation == ActivationType.SoftMax)
-            {
-                double[] InValuesToActivate = layer.neurons.Select(x => x.InValue).ToArray();
-                Activation.SoftMax(InValuesToActivate);
-                for (int i = 0; i < InValuesToActivate.Length; i++)
-                {
-                    layer.neurons[i].OutValue = InValuesToActivate[i];
-                }
-            }
-            else
-            {
-                foreach (Neuron neuron in layer.neurons)
-                {
-                    neuron.OutValue = Activation.ActivateValue(neuron.InValue, activation);
                 }
             }
         }

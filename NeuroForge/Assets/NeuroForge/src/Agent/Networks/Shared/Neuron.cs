@@ -26,8 +26,8 @@ namespace NeuroForge
                 InValue = this.InValue,
                 CostValue = this.CostValue,
                 OutValue = this.OutValue
-
             };
         }
+
     }
 }

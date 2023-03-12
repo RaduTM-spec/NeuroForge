@@ -1,0 +1,129 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4752d252c5d9a474a99733f277d713d3, type: 3}
+  m_Name: Genome#4
+  m_EditorClassIdentifier: 
+  actionSpace: 0
+  outputShape: 02000000
+  input_cache:
+  - id: 2
+    layer: 0
+    InValue: 0
+    OutValue: 0.0019595367
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 3
+    layer: 0
+    InValue: 0
+    OutValue: 1.7190878
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 4
+    layer: 0
+    InValue: 0
+    OutValue: 2.368038
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  output_cache:
+  - id: 5
+    layer: 1
+    InValue: 0.003658078
+    OutValue: 0.003658078
+    activationType: 0
+    type: 2
+    incomingConnections: 0500000009000000
+  - id: 6
+    layer: 1
+    InValue: 2.7862473
+    OutValue: 2.7862473
+    activationType: 0
+    type: 2
+    incomingConnections: 0a000000
+  layers:
+  - 0
+  - 0.5
+  - 1
+  serialized_nodes:
+  - id: 1
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 3
+    incomingConnections: 
+  - id: 2
+    layer: 0
+    InValue: 0
+    OutValue: 0.0019595367
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 3
+    layer: 0
+    InValue: 0
+    OutValue: 1.7190878
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 4
+    layer: 0
+    InValue: 0
+    OutValue: 2.368038
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 5
+    layer: 1
+    InValue: 0.003658078
+    OutValue: 0.003658078
+    activationType: 0
+    type: 2
+    incomingConnections: 0500000009000000
+  - id: 6
+    layer: 1
+    InValue: 2.7862473
+    OutValue: 2.7862473
+    activationType: 0
+    type: 2
+    incomingConnections: 0a000000
+  - id: 7
+    layer: 0.5
+    InValue: 0.0019905474
+    OutValue: 0.0019905448
+    activationType: 2
+    type: 1
+    incomingConnections: 0e000000
+  serialized_connections_keys: 05000000090000000a0000000e000000
+  serialized_connections_values:
+  - innovation: 5
+    weight: 1.1847178
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 5
+  - innovation: 9
+    weight: 0.6714644
+    enabled: 1
+    inNeuron: 7
+    outNeuron: 5
+  - innovation: 10
+    weight: 1.1766058
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 6
+  - innovation: 14
+    weight: 1.0158255
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 7

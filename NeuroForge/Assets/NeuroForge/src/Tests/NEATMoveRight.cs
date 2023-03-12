@@ -9,20 +9,15 @@ public class NEATMoveRight : NEATAgent
     [Header("Attributes")]
     public float speed = 5f;
     public Transform target;
-    Rigidbody rb;
-
-    protected override void Awake()
-    {
-        base.Awake();
-        rb = GetComponent<Rigidbody>();
-    }
-    protected void Update()
-    {
-        AddReward(Time.deltaTime);
-    }
+    public RaySensor raysensor;
     public override void CollectObservations(SensorBuffer sensorBuffer)
     {
-        
+        var obs = raysensor.Observations;
+        for (int i = 0; i < obs.Count; i++)
+        {
+            obs[i] /= 5;
+        }
+        sensorBuffer.AddObservation(obs);
     }
     public override void OnActionReceived(in ActionBuffer actionBuffer)
     {

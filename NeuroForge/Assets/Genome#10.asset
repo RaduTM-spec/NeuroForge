@@ -1,0 +1,201 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4752d252c5d9a474a99733f277d713d3, type: 3}
+  m_Name: Genome#10
+  m_EditorClassIdentifier: 
+  actionSpace: 1
+  outputShape: 02000000
+  input_cache:
+  - id: 2
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 3
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 4
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 5
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  output_cache:
+  - id: 6
+    layer: 1
+    InValue: -1.38484
+    OutValue: -1.38484
+    activationType: 0
+    type: 2
+    incomingConnections: 02000000060000000b000000
+  - id: 7
+    layer: 1
+    InValue: -1.7027173
+    OutValue: -1.7027173
+    activationType: 0
+    type: 2
+    incomingConnections: 0400000007000000080000000c0000000e000000
+  layers:
+  - 0
+  - 0.25
+  - 0.5
+  - 1
+  serialized_nodes:
+  - id: 1
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 3
+    incomingConnections: 
+  - id: 2
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 3
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 4
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 5
+    layer: 0
+    InValue: 0
+    OutValue: 1
+    activationType: 0
+    type: 0
+    incomingConnections: 
+  - id: 6
+    layer: 1
+    InValue: -1.38484
+    OutValue: -1.38484
+    activationType: 0
+    type: 2
+    incomingConnections: 02000000060000000b000000
+  - id: 7
+    layer: 1
+    InValue: -1.7027173
+    OutValue: -1.7027173
+    activationType: 0
+    type: 2
+    incomingConnections: 0400000007000000080000000c0000000e000000
+  - id: 8
+    layer: 0.5
+    InValue: 0.62419784
+    OutValue: 0.8229898
+    activationType: 10
+    type: 1
+    incomingConnections: 0d0000000f000000100000001100000015000000
+  - id: 9
+    layer: 0.25
+    InValue: 0.9973617
+    OutValue: 0.8400426
+    activationType: 7
+    type: 1
+    incomingConnections: 1a000000
+  serialized_connections_keys: 02000000040000000600000007000000080000000b0000000c0000000d0000000e0000000f0000001000000011000000150000001a000000
+  serialized_connections_values:
+  - innovation: 2
+    weight: -1.1493841
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 6
+  - innovation: 4
+    weight: -0.50103724
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 7
+  - innovation: 6
+    weight: -0.94070345
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 6
+  - innovation: 7
+    weight: 0.7651562
+    enabled: 1
+    inNeuron: 1
+    outNeuron: 7
+  - innovation: 8
+    weight: -0.80056465
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 7
+  - innovation: 11
+    weight: 0.8569336
+    enabled: 1
+    inNeuron: 8
+    outNeuron: 6
+  - innovation: 12
+    weight: -0.6237749
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 7
+  - innovation: 13
+    weight: 0.6861618
+    enabled: 1
+    inNeuron: 3
+    outNeuron: 8
+  - innovation: 14
+    weight: -0.6591779
+    enabled: 1
+    inNeuron: 8
+    outNeuron: 7
+  - innovation: 15
+    weight: -0.36703897
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 8
+  - innovation: 16
+    weight: -0.47926295
+    enabled: 1
+    inNeuron: 4
+    outNeuron: 8
+  - innovation: 17
+    weight: 1.4330262
+    enabled: 1
+    inNeuron: 5
+    outNeuron: 8
+  - innovation: 21
+    weight: -0.7722087
+    enabled: 1
+    inNeuron: 9
+    outNeuron: 8
+  - innovation: 26
+    weight: 0.9973617
+    enabled: 1
+    inNeuron: 2
+    outNeuron: 9

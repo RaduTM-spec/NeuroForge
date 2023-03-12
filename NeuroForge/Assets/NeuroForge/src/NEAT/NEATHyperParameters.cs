@@ -9,22 +9,23 @@ namespace NeuroForge
     [DisallowMultipleComponent, AddComponentMenu("NeuroForge/HyperParameters")]
     public class NEATHyperParameters : MonoBehaviour 
     {
-        [Header("Session")]
+        [Header("Training session")]
         [Min(5)] public int generations = 1000;
         [Min(5), Tooltip("seconds")] public int timeHorizon = 60;
 
-        [Header("Individuals")]
+        [Header("Population individuals")]
         [Min(1)] public int populationSize = 150;
         [Min(0), Tooltip("on 0 is disabled")] public int stagnationAllowance = 20;
         [Range(.2f, .8f)] public float survivalRate = .5f;
 
-        [Header("Speciation")]
+        [Header("Speciation coefficients")]
         [Min(0), Tooltip("distance")] public float delta = 3f;
         [Min(0), Tooltip("excess coef")] public float c1 = 1f;
         [Min(0), Tooltip("disjoint coef")] public float c2 = 1f;
         [Min(0), Tooltip("weight difference coef")] public float c3 = 0.4f;
         [Range(0, 1)] public float cloneBreeding = 0.25f;
-        [Min(0), Tooltip("killing protection based on age")]public int ageProtection = 3;
+        [Range(0, 0.1f)] public float interspeciesMating = 0.001f;
+        [Min(0), Tooltip("OnKill() => if(age < this_number) continue;")]public int ageProtection = 3;
 
         [Header("Mutation probabilities")]
         [Range(0, 1)] public float addConnection = 0.05f;
@@ -35,15 +36,17 @@ namespace NeuroForge
         [Header("Genome structure")]
         [Min(30)] public int maxConnections = 150;
         [Min(5)] public int maxNodes = 30;
-        public bool onlySigmoid = false;
+        [Tooltip("on discrete actions: Sigmoid \non continuous actions: TanH")] public bool oneActivation = false;
+
 
         [Header("Display")]
-        public Color biasNodeColor = Color.blue;
-        public Color inputNodesColor = Color.yellow;
-        public Color hiddenNodesColor = Color.green;
-        public Color outputNodesColor = Color.red;
-        public Color disabledConnectionsColor = Color.white;
-        public NodesDrawShape nodeShape = NodesDrawShape.Sphere;
+        public AnimationCurve progressGraph;
+        [HideInInspector] public Color biasNodeColor = Color.blue;
+        [HideInInspector] public Color inputNodesColor = Color.yellow;
+        [HideInInspector] public Color hiddenNodesColor = Color.green;
+        [HideInInspector] public Color outputNodesColor = Color.red;
+        [HideInInspector] public Color disabledConnectionsColor = Color.white;
+        [HideInInspector] public NodesDrawShape nodeShape = NodesDrawShape.Sphere;
     }
 
     [CustomEditor(typeof(NEATHyperParameters), true), CanEditMultipleObjects]

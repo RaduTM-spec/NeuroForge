@@ -21,8 +21,8 @@ public class GenomeTest : MonoBehaviour
         if(Functions.RandomValue() < 0.02f)
         {
             genome.Mutate();
-            var outs = genome.Forward(new double[] { Functions.RandomValue(), Functions.RandomValue()});
-            Functions.Print(outs);
+            //var outs = genome.Forward(new double[] { Functions.RandomValue(), Functions.RandomValue()});
+            //Functions.Print(outs);
             EditorUtility.SetDirty(genome);
             AssetDatabase.SaveAssetIfDirty(genome);
         }
