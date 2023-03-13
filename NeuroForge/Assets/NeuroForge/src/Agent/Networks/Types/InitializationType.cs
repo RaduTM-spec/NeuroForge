@@ -1,7 +1,10 @@
-public enum InitializationType
+namespace NeuroForge
 {
-    Zero,
-    NormalDistribution,
-    Xavier,
-    He,
+    public enum InitializationType
+    {
+        Zero,
+        NormalDistribution,
+        Xavier,
+        He,
+    }
 }

@@ -1,9 +1,9 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
-public enum PoolType
+namespace NeuroForge
 {
-    Max,
-    Average,
+    public enum PoolType
+    {
+        Max,
+        Average,
+    }
 }
+

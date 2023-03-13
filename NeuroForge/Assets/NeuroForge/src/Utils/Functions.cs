@@ -376,6 +376,41 @@ namespace NeuroForge
                 return smoothedTexture;
 
             }
+            
+            public readonly struct Kernel
+            {
+                public static int[,] kernel3x3_edge = new int[3, 3]
+                {
+                { -1, 0, 1 },
+                { -2, 0, 2 },
+                { -1, 0, 1 }
+                };
+                public static int[,] kernel3x3_blur = new int[3, 3]
+                {
+                { 1, 2, 1 },
+                { 2, 4, 2 },
+                { 1, 2, 1 }
+                };
+                public static int[,] kernel3x3_emboss = new int[3, 3]
+                {
+                { -2, -1, 0 },
+                { -1,  1, 1 },
+                {  0,  1, 2 }
+                };
+                public static int[,] kernel3x3_sharp = new int[3, 3]
+                {
+                { -1, -1, -1 },
+                { -1,  8, -1 },
+                { -1, -1, -1 }
+                };
+                public static int[,] kernel3x3_mo_blur = new int[3, 3]
+                {
+                { 1, 0, 0 },
+                { 0, 1, 0 },
+                { 0, 0, 1 }
+                };
+            }
+           
         }
 
     }
